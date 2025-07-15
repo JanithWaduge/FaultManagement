@@ -1,203 +1,192 @@
 import React, { useState } from "react";
 import { Card, Button, Form, InputGroup } from "react-bootstrap";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
+import { useNavigate } from "react-router-dom";
 
-const mockUsers = {
-  michael: {
-    name: "Michael Smith",
-    avatarUrl: "https://i.pravatar.cc/100?img=3",
-    password: "admin123",
-    role: "admin",  // <-- add role here
-  },
-
-  emily: {
-    name: "Emily Davis",
-    avatarUrl: "https://i.pravatar.cc/100?img=15",
-    password: "password456",
-    role: "user",  // <-- add role here
-  },
-};
+const API_BASE_URL = "http://localhost:5000/api/auth";
 
 export default function LoginPage({ onLogin, onRegisterClick }) {
-  console.log("LoginPage rendered");
-  const [step, setStep] = useState(1);
-  const [usernameInput, setUsernameInput] = useState("");
-  const [user, setUser] = useState(null);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleUsernameSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const usernameKey = usernameInput.trim().toLowerCase();
+    setError(null);
 
-    if (!usernameKey) {
-      alert("Please enter your username");
+    if (!username.trim() || !password.trim()) {
+      setError("Please enter both the username and password");
       return;
     }
 
-    if (mockUsers[usernameKey]) {
-      setUser(mockUsers[usernameKey]);
-      setStep(2);
-    } else {
-      alert("User not found");
-    }
-  };
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password.trim(),
+        }),
+      });
 
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    if (password.trim() === "") {
-      alert("Please enter your password");
-      return;
-    }
+      const result = await response.json();
 
-    if (password === user.password) {
-      onLogin({
-        name: user.name,
-        email: `${usernameInput}@example.com`,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-     });
-    } else {
-      alert("Incorrect password");
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (result.message.includes('inactive')) {
+            throw new Error('Your account is inactive. Please contact support.');
+          }
+          throw new Error('Invalid username or password');
+        }
+        throw new Error(result.message || 'Login failed');
+      }
+
+      if (!result.user?.role) {
+        throw new Error('Invalid user data received');
+      }
+
+      // Store token and user data
+      localStorage.setItem('token', result.token);
+      localStorage.setItem('user', JSON.stringify(result.user));
+
+      // Call parent callback
+      if (onLogin) {
+        onLogin({
+          token: result.token,
+          user: result.user
+        });
+      }
+
+      // Navigate to home
+      navigate('/');
+
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message);
+      
+      if (err.message.includes('inactive')) {
+        setPassword("");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: "#0b1e39",
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "1rem",
-      }}
-    >
-      <Card
-        style={{
-          maxWidth: "400px",
-          width: "100%",
-          backgroundColor: "#12345b",
-          borderRadius: "16px",
-          padding: "2rem",
-          color: "white",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-          textAlign: "center",
-        }}
-      >
-        {step === 1 && (
-          <>
-            <h3 className="mb-4">Welcome!<br></br> What's your username?</h3>
-            <Form onSubmit={handleUsernameSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Control
-                  type="text"
-                  placeholder="Enter username"
-                  value={usernameInput}
-                  onChange={(e) => setUsernameInput(e.target.value.trimStart())}
-                  autoFocus
-                  style={{
-                    backgroundColor: "#102c4a",
-                    borderColor: "#345b96",
-                    color: "white",
-                    textAlign: "center",
-                  }}
-                />
-              </Form.Group>
-              <Button
-                type="submit"
-                variant="primary"
-                style={{ borderRadius: "8px", width: "100%" }}
-              >
-                Next
-              </Button>
-            </Form>
-
-            {onRegisterClick && (
-              <Button
-                variant="link"
-                className="mt-3 text-light"
-                onClick={() => {
-                  console.log("Register clicked");
-                  onRegisterClick();
-                }}
-                style={{ textDecoration: "underline", fontSize: "0.9rem", cursor: "pointer" }}
-              >
-                Register New User
-              </Button>
-            )}
-          </>
+    <div style={{
+      backgroundColor: "#0b1e39",
+      minHeight: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: "1rem",
+    }}>
+      <Card style={{
+        maxWidth: "500px",
+        width: "100%",
+        backgroundColor: "#12345b",
+        borderRadius: "16px",
+        padding: "2rem",
+        color: "white",
+        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+      }}>
+        <h3 className="mb-4 text-center">Login to your account</h3>
+        
+        {error && (
+          <div className="mb-3 alert alert-danger">
+            {error}
+          </div>
         )}
 
-        {step === 2 && user && (
-          <>
-            <div className="mb-4">
-              <img
-                src={user.avatarUrl}
-                alt={user.name}
-                className="rounded-circle"
-                width="100"
-                height="100"
-                style={{ objectFit: "cover" }}
-              />
-              <h4 className="mt-3">{user.name}</h4>
-            </div>
-            <Form onSubmit={handlePasswordSubmit}>
-              <Form.Group className="mb-3" style={{ textAlign: "left" }}>
-                <Form.Label>Password</Form.Label>
-                <InputGroup>
-                  <Form.Control
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoFocus
-                    style={{
-                      backgroundColor: "#102c4a",
-                      borderColor: "#345b96",
-                      color: "white",
-                    }}
-                  />
-                  <InputGroup.Text
-                    style={{
-                      backgroundColor: "#102c4a",
-                      borderColor: "#345b96",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => setShowPassword((v) => !v)}
-                    title={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? (
-                      <EyeSlash color="lightgray" />
-                    ) : (
-                      <Eye color="lightgray" />
-                    )}
-                  </InputGroup.Text>
-                </InputGroup>
-              </Form.Group>
-              <Button
-                type="submit"
-                variant="primary"
-                style={{ borderRadius: "8px", width: "100%" }}
-              >
-                Login
-              </Button>
-            </Form>
-
-            <Button
-              variant="link"
-              className="mt-3 text-light"
-              onClick={() => {
-                setStep(1);
-                setPassword("");
-                setUsernameInput("");
-                setUser(null);
+        <Form onSubmit={handleSubmit}>
+          <Form.Group className="mb-3">
+            <Form.Label>Username</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Enter username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              disabled={loading}
+              style={{
+                backgroundColor: "#102c4a",
+                borderColor: "#345b96",
+                color: "white",
               }}
-            >
-              Change User
-            </Button>
-          </>
-        )}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Password</Form.Label>
+            <InputGroup>
+              <Form.Control
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                style={{
+                  backgroundColor: "#102c4a",
+                  borderColor: "#345b96",
+                  color: "white",
+                }}
+              />
+              <InputGroup.Text
+                style={{
+                  backgroundColor: "#102c4a",
+                  borderColor: "#345b96",
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeSlash color="lightgray" /> : <Eye color="lightgray" />}
+              </InputGroup.Text>
+            </InputGroup>
+          </Form.Group>
+
+          <Button
+            type="submit"
+            variant="primary"
+            style={{ 
+              borderRadius: "8px", 
+              width: "100%",
+              backgroundColor: "#345b96",
+              border: "none"
+            }}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
+          </Button>
+        </Form>
+
+        <div className="mt-3 text-center">
+          <span className="text-muted">Don't have an account? </span>
+          <Button
+            variant="link"
+            className="p-0 text-light"
+            onClick={onRegisterClick}
+            style={{ 
+              textDecoration: "underline",
+              fontSize: "0.9rem",
+            }}
+          >
+            Register here
+          </Button>
+        </div>
       </Card>
     </div>
   );

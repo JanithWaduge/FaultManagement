@@ -1,4 +1,3 @@
-// Imports
 import React, { useEffect, useState, useRef } from "react";
 import {
   Table,
@@ -9,33 +8,70 @@ import {
   Card,
   Tabs,
   Tab,
+  Form,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
-import { useNavigate } from "react-router-dom";
 
-// Component
 export default function Dashboard({
   userInfo,
-  faults,
   notifications,
   setNotifications,
   onLogout,
-  onNewFault,
-  onUpdateFault,
-  onDeleteFault,
 }) {
-  const navigate = useNavigate();
   const [showFooterInfo, setShowFooterInfo] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef();
   const [showNewFaultModal, setShowNewFaultModal] = useState(false);
   const [editFault, setEditFault] = useState(null);
+  const [faults, setFaults] = useState([]);
+  const [error, setError] = useState("");
   const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
-  
-  
-  // Handle notification dropdown close
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  // Fetch faults on component mount and refresh
+  useEffect(() => {
+    const fetchFaults = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        return;
+      }
+      try {
+        const response = await fetch('http://localhost:5000/api/faults', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const mappedFaults = data.map(fault => ({
+            id: fault.id,
+            SystemID: fault.SystemID,
+            SectionID: fault.SectionID,
+            ReportedBy: fault.ReportedBy,
+            Location: fault.Location,
+            DescFault: fault.DescFault,
+            Status: fault.Status,
+            AssignTo: fault.AssignTo,
+            DateTime: fault.DateTime
+          }));
+          setFaults(mappedFaults);
+          setError("");
+        } else {
+          const errorData = await response.json();
+          setError(`Failed to fetch faults: ${errorData.message || response.statusText}`);
+        }
+      } catch (error) {
+        setError(`Error fetching faults: ${error.message}`);
+      }
+    };
+    fetchFaults();
+  }, []);
+
+  // Handle click outside for notifications
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -45,11 +81,7 @@ export default function Dashboard({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  
-  const logout = () => {
-  onLogout();
-  navigate("/login");
-};
+
   // Mark notifications as read
   useEffect(() => {
     if (showNotifications && notifications.some((n) => !n.isRead)) {
@@ -57,42 +89,129 @@ export default function Dashboard({
     }
   }, [showNotifications, notifications, setNotifications]);
 
-  const toggleStatus = (id) => {
-    const fault = faults.find((f) => f.id === id);
-    if (!fault) return;
-    const updatedFault = {
-      ...fault,
-      status: fault.status === "open" ? "closed" : "open",
-    };
-    onUpdateFault(updatedFault);
-  };
-
-  const handleDeleteFault = (id) => {
+  const handleDeleteFault = async (id) => {
     if (window.confirm("Are you sure you want to delete this fault?")) {
-      onDeleteFault(id);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:5000/api/faults/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          setFaults(faults.filter(f => f.id !== id));
+          setError("");
+        } else {
+          const errorData = await response.json();
+          setError(`Failed to delete fault: ${errorData.message || response.statusText}`);
+        }
+      } catch (error) {
+        setError(`Error deleting fault: ${error.message}`);
+      }
     }
   };
-  
-  const [searchTerm, setSearchTerm] = useState("");
-const [filterUrgency, setFilterUrgency] = useState("all");
-const [filterStatus, setFilterStatus] = useState("all");
 
-const filteredFaults = faults.filter((fault) => {
-  const matchesSearch =
-    fault.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    fault.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    fault.reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleUpdateFault = async (data) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError("No authentication token found. Please log in.");
+      throw new Error("Authentication required");
+    }
+    try {
+      const response = await fetch(`http://localhost:5000/api/faults/${data.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          SystemID: parseInt(data.SystemID),
+          Location: data.Location,
+          DescFault: data.DescFault,
+          ReportedBy: data.ReportedBy,
+          AssignTo: data.AssignTo,
+          Status: data.Status,
+          SectionID: parseInt(data.SectionID)
+        })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setFaults(faults.map(f => f.id === result.fault.id ? result.fault : f));
+        setEditFault(null);
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('Update failed:', errorData);
+        throw new Error(errorData.message || 'Failed to update fault');
+      }
+    } catch (error) {
+      console.error('Error updating fault:', error.message);
+      throw error;
+    }
+  };
 
-  const matchesUrgency = filterUrgency === "all" || fault.urgency === filterUrgency;
-  const matchesStatus = filterStatus === "all" || fault.status === filterStatus;
+  const handleNewFaultSubmit = async (data) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError("No authentication token found. Please log in.");
+      throw new Error("Authentication required");
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/faults', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          SystemID: parseInt(data.SystemID),
+          Location: data.Location,
+          LocFaultID: null,
+          DescFault: data.DescFault,
+          ReportedBy: data.ReportedBy,
+          ExtNo: null,
+          AssignTo: data.AssignTo,
+          Status: data.Status,
+          SectionID: parseInt(data.SectionID),
+          FaultForwardID: null
+        })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setFaults([...faults, result.fault]);
+        return true;
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create fault');
+      }
+    } catch (error) {
+      throw new Error(`Error creating fault: ${error.message}`);
+    }
+  };
 
-  return matchesSearch && matchesUrgency && matchesStatus;
-});
+  const filteredFaults = faults.filter((fault) => {
+    if (!fault || typeof fault !== 'object') return false;
+    const description = fault.DescFault || '';
+    const location = fault.Location || '';
+    const reportedBy = fault.ReportedBy || '';
 
+    const matchesSearch =
+      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === "all" || (fault.Status && fault.Status.toLowerCase() === filterStatus);
+
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <>
-      {/* Navbar */}
       <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
           <div style={{ width: 120 }}></div>
@@ -135,15 +254,19 @@ const filteredFaults = faults.filter((fault) => {
                 </div>
               )}
             </div>
-            <Button className="glass-button" size="sm" onClick={logout}>Logout</Button>
-
+            <Button className="glass-button" size="sm" onClick={onLogout}>Logout</Button>
             <UserProfileDisplay user={userInfo} />
           </div>
         </Container>
       </nav>
 
-      {/* Main Content */}
       <Container fluid className="pt-5 mt-4">
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+            <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
+          </div>
+        )}
         <Row className="mb-3 align-items-center">
           <Col>
             <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
@@ -153,40 +276,28 @@ const filteredFaults = faults.filter((fault) => {
                     + New Fault
                   </Button>
                 </div>
-  <Row className="mb-3 px-3">
-  <Col md={4} className="mb-2">
-    <input
-      type="text"
-      className="form-control"
-      placeholder="Search faults..."
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-    />
-  </Col>
-  <Col md={3} className="mb-2">
-    <select
-      className="form-select"
-      value={filterUrgency}
-      onChange={(e) => setFilterUrgency(e.target.value)}
-    >
-      <option value="all">All Urgencies</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-    </select>
-  </Col>
-  <Col md={3} className="mb-2">
-    <select
-      className="form-select"
-      value={filterStatus}
-      onChange={(e) => setFilterStatus(e.target.value)}
-    >
-      <option value="all">All Statuses</option>
-      <option value="open">Open</option>
-      <option value="closed">Closed</option>
-    </select>
-  </Col>
-</Row>
+                <Row className="mb-3 px-3">
+                  <Col md={4} className="mb-2">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Search faults..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </Col>
+                  <Col md={3} className="mb-2">
+                    <select
+                      className="form-select"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="open">Open</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </Col>
+                </Row>
 
                 <Card className="shadow-sm">
                   <Card.Body className="p-0">
@@ -199,7 +310,6 @@ const filteredFaults = faults.filter((fault) => {
                           <th>Reported By</th>
                           <th>Location</th>
                           <th>Description</th>
-                          <th>Urgency</th>
                           <th>Status</th>
                           <th>Assigned To</th>
                           <th>Reported At</th>
@@ -210,21 +320,30 @@ const filteredFaults = faults.filter((fault) => {
                         {filteredFaults.map((fault) => (
                           <tr key={fault.id} className="table-row-hover">
                             <td>{fault.id}</td>
-                            <td>{fault.systemID}</td>
-                            <td>{fault.sectionID}</td>
-                            <td>{fault.reportedBy}</td>
-                            <td>{fault.location}</td>
-                            <td className="description-col">{fault.description}</td>
-                            <td><span className={`badge bg-${getUrgencyColor(fault.urgency)}`}>{fault.urgency}</span></td>
-                            <td>{fault.status}</td>
-                            <td>{fault.assignedTo}</td>
-                            <td>{fault.reportedAt}</td>
+                            <td>{fault.SystemID}</td>
+                            <td>{fault.SectionID}</td>
+                            <td>{fault.ReportedBy}</td>
+                            <td>{fault.Location}</td>
+                            <td className="description-col">{fault.DescFault}</td>
+                            <td>{fault.Status}</td>
+                            <td>{fault.AssignTo}</td>
+                            <td>{new Date(fault.DateTime).toLocaleString()}</td>
                             <td>
-                              <Button variant="outline-success" size="sm" className="me-1 mb-1" onClick={() => toggleStatus(fault.id)}>
-                                {fault.status === "open" ? "Mark Closed" : "Reopen"}
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                className="me-1 mb-1"
+                                onClick={() => setEditFault(fault)}
+                              >
+                                Edit
                               </Button>
-                              <Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => setEditFault(fault)}>Edit</Button>
-                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteFault(fault.id)}>Delete</Button>
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                onClick={() => handleDeleteFault(fault.id)}
+                              >
+                                Delete
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -238,7 +357,6 @@ const filteredFaults = faults.filter((fault) => {
         </Row>
       </Container>
 
-      {/* Footer */}
       <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
           <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
@@ -252,33 +370,23 @@ const filteredFaults = faults.filter((fault) => {
           </Button>
           {showFooterInfo && (
             <div className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-              &copy; 2025 Network Fault Management System. All rights reserved.
+              © 2025 Network Fault Management System. All rights reserved.
             </div>
           )}
         </div>
       </footer>
 
-      {/* Modal */}
       <NewFaultModal
         show={showNewFaultModal || !!editFault}
         handleClose={() => {
           setShowNewFaultModal(false);
           setEditFault(null);
         }}
-        handleAdd={(data) => {
-          if (editFault) {
-            onUpdateFault({ ...editFault, ...data });
-            setEditFault(null);
-          } else {
-            onNewFault(data);
-          }
-          setShowNewFaultModal(false);
-        }}
+        handleAdd={editFault ? handleUpdateFault : handleNewFaultSubmit}
         assignablePersons={assignablePersons}
         initialData={editFault}
       />
 
-      {/* Styles */}
       <style>{`
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
@@ -320,9 +428,8 @@ const filteredFaults = faults.filter((fault) => {
           padding: 1rem 1.25rem;
           vertical-align: middle;
         }
-        
         .tab-title-lg {
-          font-size: 1.6rem;        /* Adjust size as needed */
+          font-size: 1.6rem;
           font-weight: 700;
           color: #001f3f;
           letter-spacing: 0.5px;
@@ -343,18 +450,7 @@ const filteredFaults = faults.filter((fault) => {
           font-size: 1rem;
           border-radius: 8px;
         }
-    
       `}</style>
     </>
   );
-}
-
-// Helper
-function getUrgencyColor(level) {
-  switch (level) {
-    case "high": return "danger";
-    case "medium": return "warning";
-    case "low": return "secondary";
-    default: return "light";
-  }
 }

@@ -13,15 +13,20 @@
   "description": "",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "celebrate": "^15.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.1.0",
+    "dotenv": "^17.2.0",
     "express": "^4.21.2",
     "express-rate-limit": "^6.11.2",
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
     "mssql": "^11.0.1",
-    "path-to-regexp": "6.2.1"
+    "path-to-regexp": "6.2.1",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

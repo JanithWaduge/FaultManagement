@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -14,43 +14,35 @@ import Register from "./Register";
 const App = () => {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
-
-  // Mock fault data
-  const [faults, setFaults] = useState([
-    {
-      id: 1,
-      systemID: "SYS001",
-      sectionID: "SEC001",
-      reportedBy: "Michael Smith",
-      location: "Server Room",
-      description: "Router malfunction",
-      urgency: "high",
-      status: "open",
-      assignedTo: "John Doe",
-      reportedAt: "2025-07-11 09:30 AM",
-    },
-    {
-      id: 2,
-      systemID: "SYS002",
-      sectionID: "SEC002",
-      reportedBy: "Emily Davis",
-      location: "Office Floor",
-      description: "Switch port failure",
-      urgency: "medium",
-      status: "closed",
-      assignedTo: "Jane Smith",
-      reportedAt: "2025-07-10 02:15 PM",
-    },
-  ]);
-
+  const [faults, setFaults] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
-  // Fault handlers (add/update/delete)
-  const handleNewFault = (faultData) => {
-     const maxId = faults.length > 0 ? Math.max(...faults.map(f => f.id)) : 0;
+  // Restore session from localStorage on initial load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      try {
+        const parsedUser = JSON.parse(user);
+        if (parsedUser?.role) {
+          setUserInfo(parsedUser);
+          setLoggedIn(true);
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
 
+  // Fault handlers
+  const handleNewFault = (faultData) => {
     const newFault = {
-      id: maxId + 1, // Incremental ID based on existing faults
+      id: Date.now(),
       reportedAt: new Date().toLocaleString(),
       ...faultData,
     };
@@ -75,33 +67,40 @@ const App = () => {
     setFaults((prev) => prev.filter((f) => f.id !== id));
   };
 
-  // Login handler: expects user object with at least {role, name}
-  const handleLogin = (user) => {
-    if (!user || !user.role) {
-      alert("Login failed: missing role in user data.");
+  // Auth handlers
+  const handleLogin = (authData) => {
+    if (!authData?.user?.role) {
+      console.error("Login failed: missing role in user data");
       return;
     }
-    setUserInfo(user);
+    
+    setUserInfo(authData.user);
     setLoggedIn(true);
+    
+    if (authData.token) {
+      localStorage.setItem('token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+    }
   };
 
   const handleLogout = () => {
     setUserInfo(null);
     setLoggedIn(false);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
-  // Protected Route wrapper component
+  // Protected Route wrapper
   const RequireAuth = ({ children }) => {
-    if (!loggedIn) {
+    if (!loggedIn || !userInfo?.role) {
       return <Navigate to="/login" replace />;
     }
     return children;
   };
 
-  // Wrapper to use navigate in LoginPage
+  // Wrapper components for navigation
   const LoginWrapper = () => {
     const navigate = useNavigate();
-
     return (
       <LoginPage
         onLogin={handleLogin}
@@ -110,14 +109,12 @@ const App = () => {
     );
   };
 
-  // Wrapper for Register page to pass onRegisterSuccess and onCancel properly
   const RegisterWrapper = () => {
     const navigate = useNavigate();
-
     return (
       <Register
         onRegisterSuccess={(user) => {
-          handleLogin(user); // user must contain role!
+          handleLogin({ user });
           navigate("/");
         }}
         onCancel={() => navigate("/login")}
@@ -130,11 +127,11 @@ const App = () => {
       <Routes>
         <Route
           path="/login"
-          element={loggedIn ? <Navigate to="/" replace /> : <LoginWrapper />}
+          element={loggedIn && userInfo?.role ? <Navigate to="/" replace /> : <LoginWrapper />}
         />
         <Route
           path="/register"
-          element={loggedIn ? <Navigate to="/" replace /> : <RegisterWrapper />}
+          element={loggedIn && userInfo?.role ? <Navigate to="/" replace /> : <RegisterWrapper />}
         />
         <Route
           path="/"
@@ -151,20 +148,15 @@ const App = () => {
                   onUpdateFault={handleUpdateFault}
                   onDeleteFault={handleDeleteFault}
                 />
-              ) : userInfo?.role === "user" ? (
+              ) : (
                 <DashboardViewOnly
                   faults={faults}
                   notifications={notifications}
                   setNotifications={setNotifications}
                   userInfo={userInfo}
                   onLogout={handleLogout}
-                  onNewFault={handleNewFault} 
+                  onNewFault={handleNewFault}
                 />
-              ) : (
-                <div style={{ padding: "2rem", textAlign: "center" }}>
-                  <h2>Unauthorized Access</h2>
-                  <button onClick={handleLogout}>Logout</button>
-                </div>
               )}
             </RequireAuth>
           }

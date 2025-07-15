@@ -20,11 +20,11 @@ export default function DashboardViewOnly({
   notifications,
   setNotifications,
   onLogout,
-  onNewFault, // <--- Receive onNewFault prop
+  onNewFault, // Receive onNewFault prop
 }) {
   const [showFooterInfo, setShowFooterInfo] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showNewFaultModal, setShowNewFaultModal] = useState(false); // modal control
+  const [showNewFaultModal, setShowNewFaultModal] = useState(false); // Modal control
   const notifRef = useRef();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,27 +33,44 @@ export default function DashboardViewOnly({
 
   // New Fault form state
   const [newFaultData, setNewFaultData] = useState({
-    systemID: "",
-    sectionID: "",
-    reportedBy: userInfo?.name || "", // default to current user
-    location: "",
-    description: "",
-    urgency: "medium",
-    status: "open",
-    assignedTo: "",
+    SystemID: "",
+    SectionID: "",
+    ReportedBy: userInfo?.name || "", // Default to current user
+    Location: "",
+    DescFault: "",
+    Urgency: "medium",
+    Status: "open",
+    AssignTo: "",
   });
 
-  const filteredFaults = faults.filter((fault) => {
-    const matchesSearch =
-      fault.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fault.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fault.reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+  // Debug: Log faults to console
+  useEffect(() => {
+    console.log("Faults received:", faults);
+    if (faults && faults.length > 0) {
+      console.log("Sample fault:", faults[0]);
+    } else {
+      console.log("No faults data available or faults is undefined");
+    }
+  }, [faults]);
 
-    const matchesUrgency = filterUrgency === "all" || fault.urgency === filterUrgency;
-    const matchesStatus = filterStatus === "all" || fault.status === filterStatus;
+  // Filter faults based on search, urgency, and status
+  const filteredFaults = faults?.filter((fault) => {
+    if (!fault || typeof fault !== "object") return false;
+    const description = fault.DescFault || "";
+    const location = fault.Location || "";
+    const reportedBy = fault.ReportedBy || "";
+
+    const matchesSearch =
+      !searchTerm ||
+      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesUrgency = filterUrgency === "all" || fault.Urgency === filterUrgency;
+    const matchesStatus = filterStatus === "all" || fault.Status === filterStatus;
 
     return matchesSearch && matchesUrgency && matchesStatus;
-  });
+  }) || [];
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -81,13 +98,13 @@ export default function DashboardViewOnly({
   const handleAddNewFault = () => {
     // Basic validation
     if (
-      !newFaultData.systemID.trim() ||
-      !newFaultData.sectionID.trim() ||
-      !newFaultData.reportedBy.trim() ||
-      !newFaultData.location.trim() ||
-      !newFaultData.description.trim() ||
-      !newFaultData.urgency.trim() ||
-      !newFaultData.status.trim()
+      !newFaultData.SystemID.trim() ||
+      !newFaultData.SectionID.trim() ||
+      !newFaultData.ReportedBy.trim() ||
+      !newFaultData.Location.trim() ||
+      !newFaultData.DescFault.trim() ||
+      !newFaultData.Urgency.trim() ||
+      !newFaultData.Status.trim()
     ) {
       alert("Please fill in all required fields");
       return;
@@ -97,14 +114,14 @@ export default function DashboardViewOnly({
     setShowNewFaultModal(false);
     // Reset form
     setNewFaultData({
-      systemID: "",
-      sectionID: "",
-      reportedBy: userInfo?.name || "",
-      location: "",
-      description: "",
-      urgency: "medium",
-      status: "open",
-      assignedTo: "",
+      SystemID: "",
+      SectionID: "",
+      ReportedBy: userInfo?.name || "",
+      Location: "",
+      DescFault: "",
+      Urgency: "medium",
+      Status: "open",
+      AssignTo: "",
     });
   };
 
@@ -255,28 +272,42 @@ export default function DashboardViewOnly({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredFaults.map((fault) => (
-                          <tr key={fault.id} className="table-row-hover">
-                            <td>{fault.id}</td>
-                            <td>{fault.systemID}</td>
-                            <td>{fault.sectionID}</td>
-                            <td>{fault.reportedBy}</td>
-                            <td>{fault.location}</td>
-                            <td className="description-col">{fault.description}</td>
-                            <td>
-                              <span className={`badge bg-${getUrgencyColor(fault.urgency)}`}>
-                                {fault.urgency}
-                              </span>
+                        {filteredFaults.length > 0 ? (
+                          filteredFaults.map((fault) => (
+                            <tr key={fault.id} className="table-row-hover">
+                              <td>{fault.id}</td>
+                              <td>{fault.SystemID}</td>
+                              <td>{fault.SectionID}</td>
+                              <td>{fault.ReportedBy}</td>
+                              <td>{fault.Location}</td>
+                              <td className="description-col">{fault.DescFault}</td>
+                              <td>
+                                <span className={`badge bg-${getUrgencyColor(fault.Urgency)}`}>
+                                  {fault.Urgency}
+                                </span>
+                              </td>
+                              <td>{fault.Status}</td>
+                              <td>{fault.AssignTo || "Unassigned"}</td>
+                              <td>{new Date(fault.DateTime).toLocaleString()}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="10" className="text-center py-3">
+                              No faults found. Check console for debug info.
                             </td>
-                            <td>{fault.status}</td>
-                            <td>{fault.assignedTo}</td>
-                            <td>{fault.reportedAt}</td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </Table>
                   </Card.Body>
                 </Card>
+                {/* Debug: Display raw faults if filtering fails */}
+                {faults && faults.length > 0 && filteredFaults.length === 0 && (
+                  <div className="alert alert-warning mt-3">
+                    Filtering excluded all faults. Raw data: {JSON.stringify(faults)}
+                  </div>
+                )}
               </Tab>
             </Tabs>
           </Col>
@@ -288,10 +319,12 @@ export default function DashboardViewOnly({
         style={{ backgroundColor: "#001f3f" }}
       >
         <div className="mb-2 mb-sm-0">
-                  <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
-                </div>
+          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>
+            Support
+          </Button>
+        </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Faults: {faults.length} | Unread Notifications:{" "}
+          Total Faults: {faults?.length || 0} | Unread Notifications:{" "}
           {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
@@ -304,7 +337,7 @@ export default function DashboardViewOnly({
           </Button>
           {showFooterInfo && (
             <div className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-              &copy; 2025 Network Fault Management System. All rights reserved.
+              © 2025 Network Fault Management System. All rights reserved.
             </div>
           )}
         </div>
@@ -322,63 +355,69 @@ export default function DashboardViewOnly({
         <Modal.Body>
           <Form>
             <Form.Group className="mb-2" controlId="formSystemID">
-              <Form.Label>System ID</Form.Label>
+              <Form.Label>System ID <span className="text-danger">*</span></Form.Label>
               <Form.Control
-                type="text"
-                name="systemID"
-                value={newFaultData.systemID}
+                type="number"
+                name="SystemID"
+                value={newFaultData.SystemID}
                 onChange={handleNewFaultChange}
                 placeholder="Enter system ID"
+                required
               />
             </Form.Group>
             <Form.Group className="mb-2" controlId="formSectionID">
-              <Form.Label>Section ID</Form.Label>
+              <Form.Label>Section ID <span className="text-danger">*</span></Form.Label>
               <Form.Control
-                type="text"
-                name="sectionID"
-                value={newFaultData.sectionID}
+                type="number"
+                name="SectionID"
+                value={newFaultData.SectionID}
                 onChange={handleNewFaultChange}
                 placeholder="Enter section ID"
+                required
               />
             </Form.Group>
             <Form.Group className="mb-2" controlId="formReportedBy">
-              <Form.Label>Reported By</Form.Label>
+              <Form.Label>Reported By <span className="text-danger">*</span></Form.Label>
               <Form.Control
                 type="text"
-                name="reportedBy"
-                value={newFaultData.reportedBy}
+                name="ReportedBy"
+                value={newFaultData.ReportedBy}
                 onChange={handleNewFaultChange}
                 placeholder="Enter reporter name"
+                required
                 disabled
               />
             </Form.Group>
             <Form.Group className="mb-2" controlId="formLocation">
-              <Form.Label>Location</Form.Label>
+              <Form.Label>Location <span className="text-danger">*</span></Form.Label>
               <Form.Control
                 type="text"
-                name="location"
-                value={newFaultData.location}
+                name="Location"
+                value={newFaultData.Location}
                 onChange={handleNewFaultChange}
                 placeholder="Enter location"
+                required
               />
             </Form.Group>
             <Form.Group className="mb-2" controlId="formDescription">
-              <Form.Label>Description</Form.Label>
+              <Form.Label>Description <span className="text-danger">*</span></Form.Label>
               <Form.Control
                 as="textarea"
                 rows={2}
-                name="description"
-                value={newFaultData.description}
+                name="DescFault"
+                value={newFaultData.DescFault}
                 onChange={handleNewFaultChange}
                 placeholder="Enter description"
+                required
               />
             </Form.Group>
             <Form.Group className="mb-2" controlId="formUrgency">
-              <Form.Label>Urgency</Form.Label>
+              <Form.Label>Urgency <span className="text-danger">*</span></Form.Label>
               <Form.Select
-                name="urgency"
-                value={newFaultData.urgency}
+                name="Urgency"
+                value={newFaultData.Urgency}
                 onChange={handleNewFaultChange}
+                required
               >
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -386,15 +425,27 @@ export default function DashboardViewOnly({
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-2" controlId="formStatus">
-              <Form.Label>Status</Form.Label>
+              <Form.Label>Status <span className="text-danger">*</span></Form.Label>
               <Form.Select
-                name="status"
-                value={newFaultData.status}
+                name="Status"
+                value={newFaultData.Status}
                 onChange={handleNewFaultChange}
+                required
               >
                 <option value="open">Open</option>
                 <option value="closed">Closed</option>
               </Form.Select>
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formAssignedTo">
+              <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
+              <Form.Control
+                type="text"
+                name="AssignTo"
+                value={newFaultData.AssignTo}
+                onChange={handleNewFaultChange}
+                placeholder="Enter assignee name"
+                required
+              />
             </Form.Group>
           </Form>
         </Modal.Body>
@@ -467,10 +518,12 @@ export default function DashboardViewOnly({
           cursor: pointer;
           transition: background-color 0.25s ease;
         }
-
         .form-control, .form-select {
-         font-size: 1rem;
-         border-radius: 8px;
+          font-size: 1rem;
+          border-radius: 8px;
+        }
+        .badge {
+          text-transform: capitalize;
         }
       `}</style>
     </>

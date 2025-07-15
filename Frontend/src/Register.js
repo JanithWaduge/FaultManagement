@@ -1,69 +1,129 @@
-import React, { useState } from "react";
-import { Card, Button, Form } from "react-bootstrap";
+import React, { useState } from 'react';
+import { Card, Button, Form, InputGroup } from 'react-bootstrap';
+import { Eye, EyeSlash } from 'react-bootstrap-icons';
+import { useNavigate } from 'react-router-dom';
 
-const inputStyle = {
-  backgroundColor: "#102c4a",
-  borderColor: "#345b96",
-  color: "white",
-};
-
-const cancelBtnStyle = {
-  backgroundColor: "#345b96",
-  borderColor: "#2c4a7f",
-  color: "white",
-  fontWeight: "600",
-  minWidth: "100px",
-};
-
-const registerBtnStyle = {
-  backgroundColor: "#ff6f00",
-  borderColor: "#e65c00",
-  color: "white",
-  fontWeight: "600",
-  minWidth: "100px",
-};
+const API_BASE_URL = "http://localhost:5000/api/auth";
 
 export default function Register({ onRegisterSuccess, onCancel }) {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'user'
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.username.trim()) {
+      setError('Username is required');
+      return false;
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    if (!formData.password) {
+      setError('Password is required');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
 
-    if (
-      !username.trim() ||
-      !email.trim() ||
-      !password.trim() ||
-      !confirmPassword.trim() ||
-      !role.trim()
-    ) {
-      alert("Please fill in all fields");
-      return;
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          role: formData.role
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error(result.message || 'Username or email already exists');
+        }
+        throw new Error(result.message || 'Registration failed');
+      }
+
+      // Automatically log in the user after successful registration
+      const loginResponse = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          password: formData.password,
+        }),
+      });
+
+      const loginResult = await loginResponse.json();
+
+      if (!loginResponse.ok) {
+        throw new Error(loginResult.message || 'Auto-login failed');
+      }
+
+      if (!loginResult.user?.role) {
+        throw new Error('Invalid user data received');
+      }
+
+      // Store token and user data
+      localStorage.setItem('token', loginResult.token);
+      localStorage.setItem('user', JSON.stringify(loginResult.user));
+
+      // Call success callback
+      if (onRegisterSuccess) {
+        onRegisterSuccess(loginResult.user);
+      }
+
+      // Navigate to home
+      navigate('/');
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert("Please enter a valid email address");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
-
-    alert(`User "${username}" registered successfully with role "${role}"!`);
-
-    // Pass user info back to App
-    onRegisterSuccess({
-      name: username,
-      email,
-      role,
-      avatarUrl: "https://i.pravatar.cc/100", // Placeholder avatar
-    });
   };
 
   return (
@@ -79,108 +139,154 @@ export default function Register({ onRegisterSuccess, onCancel }) {
     >
       <Card
         style={{
-          maxWidth: 400,
+          maxWidth: "500px",
           width: "100%",
           backgroundColor: "#12345b",
-          borderRadius: 16,
+          borderRadius: "16px",
           padding: "2rem",
           color: "white",
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-          textAlign: "center",
         }}
       >
-        <h3 className="mb-4">Register New User</h3>
-        <Form onSubmit={handleSubmit} aria-label="Register form">
-          <Form.Group className="mb-3" controlId="registerUsername">
+        <h3 className="mb-4 text-center">Create New Account</h3>
+        
+        {error && (
+          <div className="mb-3 alert alert-danger">
+            {error}
+          </div>
+        )}
+
+        <Form onSubmit={handleSubmit}>
+          <Form.Group className="mb-3">
             <Form.Label>Username</Form.Label>
             <Form.Control
               type="text"
+              name="username"
               placeholder="Enter username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={inputStyle}
-              aria-required="true"
-              autoFocus
+              value={formData.username}
+              onChange={handleChange}
+              disabled={loading}
+              style={{
+                backgroundColor: "#102c4a",
+                borderColor: "#345b96",
+                color: "white",
+              }}
             />
           </Form.Group>
 
-          <Form.Group className="mb-3" controlId="registerEmail">
+          <Form.Group className="mb-3">
             <Form.Label>Email</Form.Label>
             <Form.Control
               type="email"
+              name="email"
               placeholder="Enter email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={inputStyle}
-              aria-required="true"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={loading}
+              style={{
+                backgroundColor: "#102c4a",
+                borderColor: "#345b96",
+                color: "white",
+              }}
             />
           </Form.Group>
 
-          <Form.Group className="mb-3" controlId="registerPassword">
+          <Form.Group className="mb-3">
             <Form.Label>Password</Form.Label>
-            <Form.Control
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={inputStyle}
-              aria-required="true"
-            />
+            <InputGroup>
+              <Form.Control
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Enter password (min 6 characters)"
+                value={formData.password}
+                onChange={handleChange}
+                disabled={loading}
+                style={{
+                  backgroundColor: "#102c4a",
+                  borderColor: "#345b96",
+                  color: "white",
+                }}
+              />
+              <InputGroup.Text
+                style={{
+                  backgroundColor: "#102c4a",
+                  borderColor: "#345b96",
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeSlash color="lightgray" /> : <Eye color="lightgray" />}
+              </InputGroup.Text>
+            </InputGroup>
           </Form.Group>
 
-          <Form.Group className="mb-3" controlId="registerConfirmPassword">
+          <Form.Group className="mb-3">
             <Form.Label>Confirm Password</Form.Label>
             <Form.Control
-              type="password"
+              type={showPassword ? "text" : "password"}
+              name="confirmPassword"
               placeholder="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              style={inputStyle}
-              aria-required="true"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              disabled={loading}
+              style={{
+                backgroundColor: "#102c4a",
+                borderColor: "#345b96",
+                color: "white",
+              }}
             />
           </Form.Group>
 
-          <Form.Group className="mb-4" controlId="registerRole">
+          <Form.Group className="mb-3">
             <Form.Label>Role</Form.Label>
             <Form.Select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              style={inputStyle}
-              aria-required="true"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              disabled={loading}
+              style={{
+                backgroundColor: "#102c4a",
+                borderColor: "#345b96",
+                color: "white",
+              }}
             >
-              <option value="">Select role</option>
-              <option value="admin">Admin</option>
               <option value="user">User</option>
-              <option value="guest">Guest</option>
+              <option value="admin">Admin</option>
+              <option value="technician">Technician</option>
             </Form.Select>
           </Form.Group>
 
-          <div className="d-flex justify-content-between">
+          <div className="d-grid gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={loading}
+              style={{
+                backgroundColor: "#345b96",
+                border: "none",
+                borderRadius: "8px",
+              }}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Registering...
+                </>
+              ) : (
+                  "Register"
+              )}
+            </Button>
+
             <Button
               variant="secondary"
               onClick={onCancel}
-              style={cancelBtnStyle}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#2c4a7f")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = cancelBtnStyle.backgroundColor)
-              }
+              disabled={loading}
+              style={{
+                borderRadius: "8px",
+              }}
             >
               Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="success"
-              style={registerBtnStyle}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#27ae60")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = registerBtnStyle.backgroundColor)
-              }
-            >
-              Register
             </Button>
           </div>
         </Form>

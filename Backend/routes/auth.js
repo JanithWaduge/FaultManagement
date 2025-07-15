@@ -1,175 +1,156 @@
-// backend/routes/auth.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
-const db = require('../config/database');
-const rateLimit = require('express-rate-limit');
-
-// Rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later'
-});
-
+const sql = require('mssql');
 const router = express.Router();
+const database = require('../config/database');
+require('dotenv').config();
+
+const jwtSecret = process.env.JWT_SECRET || 'default-secret-please-change-in-production';
+const saltRounds = 10;
+
+if (!process.env.JWT_SECRET) {
+  console.warn('JWT_SECRET not set in environment variables. Using default secret.');
+}
 
 // Input validation middleware
-const validate = validations => {
-  return async (req, res, next) => {
-    await Promise.all(validations.map(validation => validation.run(req)));
+const validateRegisterInput = (req, res, next) => {
+  const { username, email, password, role } = req.body;
 
-    const errors = validationResult(req);
-    if (errors.isEmpty()) {
-      return next();
-    }
+  if (!username || !email || !password || !role) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
 
-    res.status(400).json({ errors: errors.array() });
-  };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address.' });
+  }
+
+  if (password.length < 6 || password.length > 100) {
+    return res.status(400).json({ message: 'Password must be between 6 and 100 characters.' });
+  }
+
+  if (username.length > 50) {
+    return res.status(400).json({ message: 'Username must be 50 characters or less.' });
+  }
+
+  if (!['admin', 'user', 'technician'].includes(role)) {
+    return res.status(400).json({ message: 'Invalid role specified.' });
+  }
+
+  next();
 };
 
-// JWT token generation
-const generateToken = (user) => {
-  return jwt.sign(
-    { 
-      userId: user.id, 
-      username: user.username, 
-      role: user.role 
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
-  );
-};
-
-// Register route
-router.post('/register', authLimiter, validate([
-  body('username')
-    .trim()
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Username must be 3-50 characters')
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage('Username can only contain letters, numbers and underscores'),
-  body('email')
-    .isEmail()
-    .withMessage('Please provide a valid email')
-    .normalizeEmail(),
-  body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number and one special character'),
-  body('role')
-    .optional()
-    .isIn(['user', 'admin'])
-    .withMessage('Role must be user or admin')
-]), async (req, res) => {
+// REGISTER USER
+router.post('/register', validateRegisterInput, async (req, res) => {
   try {
-    const { username, email, password, role = 'user' } = req.body;
+    const { username, email, password, role } = req.body;
+    const pool = await database.getPool();
 
-    // Check if user exists
-    const existingUser = await db.query(
-      'SELECT id FROM tblUsers WHERE username = @param0 OR email = @param1',
-      [username, email]
-    );
+    // Check for existing user
+    const checkResult = await pool.request()
+      .input('username', sql.NVarChar(50), username)
+      .input('email', sql.NVarChar(255), email)
+      .query(`
+        SELECT username, email FROM tblUsers 
+        WHERE username = @username OR email = @email
+      `);
 
-    if (existingUser.recordset.length > 0) {
-      return res.status(409).json({ 
-        message: 'Username or email already exists' 
+    if (checkResult.recordset.length > 0) {
+      const existing = checkResult.recordset[0];
+      return res.status(409).json({
+        message: existing.username === username 
+          ? 'Username already exists.' 
+          : 'Email already exists.'
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Hash password and create user
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const now = new Date();
 
-    // Create user
-    const result = await db.query(
-      `INSERT INTO tblUsers 
-       (username, email, password_hash, role) 
-       OUTPUT INSERTED.id, INSERTED.username, INSERTED.email, INSERTED.role
-       VALUES (@param0, @param1, @param2, @param3)`,
-      [username, email, hashedPassword, role]
-    );
+    await pool.request()
+      .input('username', sql.NVarChar(50), username)
+      .input('email', sql.NVarChar(255), email)
+      .input('password_hash', sql.NVarChar(255), hashedPassword)
+      .input('role', sql.NVarChar(20), role)
+      .input('is_active', sql.Bit, true)
+      .input('created_at', sql.DateTime, now)
+      .input('updated_at', sql.DateTime, now)
+      .query(`
+        INSERT INTO tblUsers 
+        (username, email, password_hash, role, is_active, created_at, updated_at)
+        VALUES (@username, @email, @password_hash, @role, @is_active, @created_at, @updated_at)
+      `);
 
-    const newUser = result.recordset[0];
-    const token = generateToken(newUser);
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        role: newUser.role
-      }
+    res.status(201).json({ 
+      message: 'User registered successfully.',
+      user: { username, email, role }
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Register Error:', error);
+    
+    if (error.number === 2627) { // Unique constraint violation
+      return res.status(409).json({ message: 'Username or email already exists.' });
+    }
+    
     res.status(500).json({ 
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : null
+      message: 'Registration failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-// Login route
-router.post('/login', authLimiter, validate([
-  body('username').trim().notEmpty().withMessage('Username is required'),
-  body('password').notEmpty().withMessage('Password is required')
-]), async (req, res) => {
+// LOGIN USER
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Find user
-    const result = await db.query(
-      `SELECT id, username, email, password_hash, role, is_active 
-       FROM tblUsers 
-       WHERE username = @param0`,
-      [username]
-    );
-
-    if (result.recordset.length === 0) {
-      return res.status(401).json({ 
-        message: 'Invalid credentials' 
-      });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required.' });
     }
+
+    if (username.length > 50 || password.length > 100) {
+      return res.status(400).json({ message: 'Input exceeds maximum length.' });
+    }
+
+    const pool = await database.getPool();
+    const result = await pool.request()
+      .input('username', sql.NVarChar(50), username)
+      .query(`
+        SELECT id, username, email, password_hash, role, is_active
+        FROM tblUsers WHERE username = @username
+      `);
 
     const user = result.recordset[0];
 
-    // Check if account is active
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
     if (!user.is_active) {
       return res.status(403).json({ 
-        message: 'Account is disabled. Please contact support.' 
+        message: 'Account inactive. Please contact support.',
+        is_active: false
       });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    if (!isValidPassword) {
-      return res.status(401).json({ 
-        message: 'Invalid credentials' 
-      });
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // Generate tokens
-    const token = generateToken(user);
-    const refreshToken = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
+    const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
+    const token = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+      jwtSecret,
+      { expiresIn }
     );
 
-    // Set refresh token as HTTP-only cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
-    // Return response
     res.json({
       message: 'Login successful',
       token,
@@ -177,97 +158,67 @@ router.post('/login', authLimiter, validate([
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login Error:', error);
     res.status(500).json({ 
-      message: 'Login failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : null
+      message: 'Login failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-// Get current user
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT id, username, email, role FROM tblUsers WHERE id = @param0',
-      [req.user.userId]
-    );
-
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ 
-        message: 'User not found' 
-      });
-    }
-
-    res.json({
-      user: result.recordset[0]
-    });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch user',
-      error: process.env.NODE_ENV === 'development' ? error.message : null
-    });
-  }
-});
-
-// Refresh token
-router.post('/refresh', async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) return res.sendStatus(401);
-
-  try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    
-    const result = await db.query(
-      'SELECT id, username, role FROM tblUsers WHERE id = @param0',
-      [decoded.userId]
-    );
-
-    if (result.recordset.length === 0) {
-      return res.sendStatus(403);
-    }
-
-    const user = result.recordset[0];
-    const newToken = generateToken(user);
-
-    res.json({
-      token: newToken
-    });
-  } catch (error) {
-    console.error('Refresh token error:', error);
-    res.sendStatus(403);
-  }
-});
-
-// Logout
-router.post('/logout', (req, res) => {
-  res.clearCookie('refreshToken');
-  res.json({ 
-    message: 'Logout successful' 
-  });
-});
-
-// Token verification middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// Authentication middleware
+const authenticateToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
   
-  if (!token) return res.sendStatus(401);
+  if (!token) {
+    return res.status(401).json({ message: 'Authentication required.' });
+  }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      console.error('JWT verification error:', err);
-      return res.sendStatus(403);
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    const pool = await database.getPool();
+    
+    const result = await pool.request()
+      .input('id', sql.Int, decoded.id)
+      .query(`
+        SELECT id, username, email, role, created_at 
+        FROM tblUsers 
+        WHERE id = @id AND is_active = 1
+      `);
+
+    if (!result.recordset[0]) {
+      return res.status(404).json({ message: 'User not found or inactive.' });
     }
-    req.user = user;
+
+    req.user = result.recordset[0];
     next();
-  });
-}
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired.' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token.' });
+    }
+    res.status(500).json({ message: 'Authentication failed.' });
+  }
+};
+
+// GET USER PROFILE
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    res.json({ user: req.user });
+  } catch (error) {
+    console.error('Profile Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get profile.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
 module.exports = router;
