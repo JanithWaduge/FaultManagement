@@ -10,68 +10,373 @@ import {
   Tab,
   Modal,
   Form,
+  Alert,
+  Spinner,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 
+// New Fault Modal Component
+function NewFaultModal({
+  show,
+  handleClose,
+  handleAdd,
+  assignablePersons = [],
+  initialData = null,
+}) {
+  const [formData, setFormData] = useState({
+    SystemID: "",
+    SectionID: "",
+    ReportedBy: "",
+    Location: "",
+    DescFault: "",
+    Status: "Open",
+    AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [validated, setValidated] = useState(false);
+
+  useEffect(() => {
+    const emptyForm = {
+      SystemID: "",
+      SectionID: "",
+      ReportedBy: "",
+      Location: "",
+      DescFault: "",
+      Status: "Open",
+      AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
+    };
+
+    if (initialData) {
+      setFormData({
+        ...emptyForm,
+        ...initialData,
+        SystemID: initialData.SystemID || "",
+        SectionID: initialData.SectionID || "",
+        ReportedBy: initialData.ReportedBy || "",
+        Location: initialData.Location || "",
+        DescFault: initialData.DescFault || "",
+        Status: initialData.Status || "Open",
+        AssignTo: initialData.AssignTo || (assignablePersons.length > 0 ? assignablePersons[0] : "")
+      });
+    } else {
+      setFormData(emptyForm);
+    }
+    
+    setValidated(false);
+    setError("");
+    setIsSubmitting(false);
+  }, [initialData, assignablePersons, show]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    
+    if (error) {
+      setError("");
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const form = e.currentTarget;
+    
+    if (form.checkValidity() === false) {
+      setValidated(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const dataToSubmit = {
+        ...formData,
+        id: initialData ? initialData.id : undefined,
+        SystemID: parseInt(formData.SystemID, 10),
+        SectionID: parseInt(formData.SectionID, 10)
+      };
+      const success = await handleAdd(dataToSubmit);
+      if (success) {
+        handleClose();
+        setFormData({
+          SystemID: "",
+          SectionID: "",
+          ReportedBy: "",
+          Location: "",
+          DescFault: "",
+          Status: "Open",
+          AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
+        });
+        setValidated(false);
+      }
+    } catch (error) {
+      setError(error.message || "Failed to submit form. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    if (!isSubmitting) {
+      handleClose();
+    }
+  };
+
+  return (
+    <Modal show={show} onHide={handleModalClose} centered backdrop={isSubmitting ? "static" : true}>
+      <Modal.Header closeButton={!isSubmitting}>
+        <Modal.Title>
+          {initialData ? "Edit Fault Report" : "New Fault Report"}
+        </Modal.Title>
+      </Modal.Header>
+      
+      <Modal.Body>
+        {error && (
+          <Alert variant="danger" dismissible onClose={() => setError("")}>
+            {error}
+          </Alert>
+        )}
+        
+        <Form noValidate validated={validated} onSubmit={handleSubmit}>
+          <div className="row">
+            <div className="col-md-6 mb-3">
+              <Form.Group controlId="formSystemID">
+                <Form.Label>System ID <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                  type="number"
+                  name="SystemID"
+                  value={formData.SystemID}
+                  onChange={handleChange}
+                  placeholder="Enter system ID"
+                  required
+                  min="1"
+                  disabled={isSubmitting}
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a valid system ID.
+                </Form.Control.Feedback>
+              </Form.Group>
+            </div>
+
+            <div className="col-md-6 mb-3">
+              <Form.Group controlId="formSectionID">
+                <Form.Label>Section ID <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                  type="number"
+                  name="SectionID"
+                  value={formData.SectionID}
+                  onChange={handleChange}
+                  placeholder="Enter section ID"
+                  required
+                  min="1"
+                  disabled={isSubmitting}
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a valid section ID.
+                </Form.Control.Feedback>
+              </Form.Group>
+            </div>
+          </div>
+
+          <Form.Group className="mb-3" controlId="formReportedBy">
+            <Form.Label>Reported By <span className="text-danger">*</span></Form.Label>
+            <Form.Control
+              type="text"
+              name="ReportedBy"
+              value={formData.ReportedBy}
+              onChange={handleChange}
+              placeholder="Enter reporter name"
+              required
+              maxLength="100"
+              disabled={isSubmitting}
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide the reporter's name.
+            </Form.Control.Feedback>
+          </Form.Group>
+
+          <Form.Group className="mb-3" controlId="formLocation">
+            <Form.Label>Location <span className="text-danger">*</span></Form.Label>
+            <Form.Control
+              type="text"
+              name="Location"
+              value={formData.Location}
+              onChange={handleChange}
+              placeholder="Enter location"
+              required
+              maxLength="200"
+              disabled={isSubmitting}
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide the location.
+            </Form.Control.Feedback>
+          </Form.Group>
+
+          <Form.Group className="mb-3" controlId="formDescFault">
+            <Form.Label>Description <span className="text-danger">*</span></Form.Label>
+            <Form.Control
+              name="DescFault"
+              as="textarea"
+              rows={3}
+              value={formData.DescFault}
+              onChange={handleChange}
+              placeholder="Describe the fault in detail"
+              required
+              maxLength="500"
+              disabled={isSubmitting}
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide a description of the fault.
+            </Form.Control.Feedback>
+            <Form.Text className="text-muted">
+              {formData.DescFault.length}/500 characters
+            </Form.Text>
+          </Form.Group>
+
+          <div className="row">
+            {initialData && (
+              <div className="col-md-6 mb-3">
+                <Form.Group controlId="formStatus">
+                  <Form.Label>Status <span className="text-danger">*</span></Form.Label>
+                  <Form.Select
+                    name="Status"
+                    value={formData.Status}
+                    onChange={handleChange}
+                    required
+                    disabled={isSubmitting}
+                  >
+                    <option value="Open">Open</option>
+                    <option value="Closed">Closed</option>
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    Please select a status.
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </div>
+            )}
+
+            <div className={`col-md-${initialData ? '6' : '12'} mb-3`}>
+              <Form.Group controlId="formAssignTo">
+                <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
+                <Form.Select
+                  name="AssignTo"
+                  value={formData.AssignTo}
+                  onChange={handleChange}
+                  required
+                  disabled={assignablePersons.length === 0 || isSubmitting}
+                >
+                  {assignablePersons.length === 0 ? (
+                    <option value="" disabled>No persons available</option>
+                  ) : (
+                    assignablePersons.map((person) => (
+                      <option key={person} value={person}>
+                        {person}
+                      </option>
+                    ))
+                  )}
+                </Form.Select>
+                <Form.Control.Feedback type="invalid">
+                  Please select an assignee.
+                </Form.Control.Feedback>
+              </Form.Group>
+            </div>
+          </div>
+
+          <Modal.Footer className="px-0">
+            <Button 
+              variant="secondary" 
+              onClick={handleModalClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              type="submit"
+              disabled={isSubmitting || assignablePersons.length === 0}
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner as="span" animation="border" size="sm" className="me-2" />
+                  {initialData ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                initialData ? "Update Fault" : "Create Fault"
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal.Body>
+    </Modal>
+  );
+}
+
+// Main Dashboard Component
 export default function DashboardViewOnly({
   userInfo,
-  faults,
   notifications,
   setNotifications,
   onLogout,
-  onNewFault, // Receive onNewFault prop
 }) {
   const [showFooterInfo, setShowFooterInfo] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showNewFaultModal, setShowNewFaultModal] = useState(false); // Modal control
   const notifRef = useRef();
-
+  const [showNewFaultModal, setShowNewFaultModal] = useState(false);
+  const [faults, setFaults] = useState([]);
+  const [error, setError] = useState("");
+  const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterUrgency, setFilterUrgency] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // New Fault form state
-  const [newFaultData, setNewFaultData] = useState({
-    SystemID: "",
-    SectionID: "",
-    ReportedBy: userInfo?.name || "", // Default to current user
-    Location: "",
-    DescFault: "",
-    Urgency: "medium",
-    Status: "open",
-    AssignTo: "",
-  });
-
-  // Debug: Log faults to console
+  // Fetch faults on component mount and refresh
   useEffect(() => {
-    console.log("Faults received:", faults);
-    if (faults && faults.length > 0) {
-      console.log("Sample fault:", faults[0]);
-    } else {
-      console.log("No faults data available or faults is undefined");
-    }
-  }, [faults]);
+    const fetchFaults = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        return;
+      }
+      try {
+        const response = await fetch('http://localhost:5000/api/faults', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const mappedFaults = data.map(fault => ({
+            id: fault.id,
+            SystemID: fault.SystemID,
+            SectionID: fault.SectionID,
+            ReportedBy: fault.ReportedBy,
+            Location: fault.Location,
+            DescFault: fault.DescFault,
+            Status: fault.Status,
+            AssignTo: fault.AssignTo,
+            DateTime: fault.DateTime
+          }));
+          setFaults(mappedFaults);
+          setError("");
+        } else {
+          const errorData = await response.json();
+          setError(`Failed to fetch faults: ${errorData.message || response.statusText}`);
+        }
+      } catch (error) {
+        setError(`Error fetching faults: ${error.message}`);
+      }
+    };
+    fetchFaults();
+  }, []);
 
-  // Filter faults based on search, urgency, and status
-  const filteredFaults = faults?.filter((fault) => {
-    if (!fault || typeof fault !== "object") return false;
-    const description = fault.DescFault || "";
-    const location = fault.Location || "";
-    const reportedBy = fault.ReportedBy || "";
-
-    const matchesSearch =
-      !searchTerm ||
-      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesUrgency = filterUrgency === "all" || fault.Urgency === filterUrgency;
-    const matchesStatus = filterStatus === "all" || fault.Status === filterStatus;
-
-    return matchesSearch && matchesUrgency && matchesStatus;
-  }) || [];
-
+  // Handle click outside for notifications
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -82,138 +387,135 @@ export default function DashboardViewOnly({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Mark notifications as read
   useEffect(() => {
     if (showNotifications && notifications.some((n) => !n.isRead)) {
       setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
     }
   }, [showNotifications, notifications, setNotifications]);
 
-  // Handle new fault form input change
-  const handleNewFaultChange = (e) => {
-    const { name, value } = e.target;
-    setNewFaultData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Handle new fault submission
-  const handleAddNewFault = () => {
-    // Basic validation
-    if (
-      !newFaultData.SystemID.trim() ||
-      !newFaultData.SectionID.trim() ||
-      !newFaultData.ReportedBy.trim() ||
-      !newFaultData.Location.trim() ||
-      !newFaultData.DescFault.trim() ||
-      !newFaultData.Urgency.trim() ||
-      !newFaultData.Status.trim()
-    ) {
-      alert("Please fill in all required fields");
-      return;
+  const handleNewFaultSubmit = async (data) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError("No authentication token found. Please log in.");
+      throw new Error("Authentication required");
     }
-
-    onNewFault(newFaultData);
-    setShowNewFaultModal(false);
-    // Reset form
-    setNewFaultData({
-      SystemID: "",
-      SectionID: "",
-      ReportedBy: userInfo?.name || "",
-      Location: "",
-      DescFault: "",
-      Urgency: "medium",
-      Status: "open",
-      AssignTo: "",
-    });
+    try {
+      const response = await fetch('http://localhost:5000/api/faults', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          SystemID: parseInt(data.SystemID),
+          Location: data.Location,
+          LocFaultID: null,
+          DescFault: data.DescFault,
+          ReportedBy: data.ReportedBy,
+          ExtNo: null,
+          AssignTo: data.AssignTo,
+          Status: data.Status,
+          SectionID: parseInt(data.SectionID),
+          FaultForwardID: null
+        })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setFaults([...faults, result.fault]);
+        return true;
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create fault');
+      }
+    } catch (error) {
+      throw new Error(`Error creating fault: ${error.message}`);
+    }
   };
+
+  const filteredFaults = faults.filter((fault) => {
+    if (!fault || typeof fault !== 'object') return false;
+    const description = fault.DescFault || '';
+    const location = fault.Location || '';
+    const reportedBy = fault.ReportedBy || '';
+
+    const matchesSearch =
+      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === "all" || (fault.Status && fault.Status.toLowerCase() === filterStatus);
+
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <>
-      <nav
-        className="navbar navbar-dark fixed-top shadow-sm"
-        style={{ height: 60, backgroundColor: "#001f3f" }}
-      >
+      <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
           <div style={{ width: 120 }}></div>
-          <span className="navbar-brand mb-0 h1 mx-auto">
-            ⚡ N F M System Version 1.0.1 (View Only)
-          </span>
+          <span className="navbar-brand mb-0 h1 mx-auto">⚡ N F M System Version 1.0.1</span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
-              <Button
-                variant="link"
-                className="text-white p-0"
-                onClick={() => setShowNotifications(!showNotifications)}
-                style={{ fontSize: "1.3rem" }}
-              >
+              <Button variant="link" className="text-white p-0" onClick={() => setShowNotifications(!showNotifications)} style={{ fontSize: "1.3rem" }}>
                 <BellFill />
                 {notifications.filter((n) => !n.isRead).length > 0 && (
-                  <span
-                    className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
-                    style={{ fontSize: "0.7rem", lineHeight: "1", fontWeight: "bold" }}
-                  >
+                  <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: "1", fontWeight: "bold" }}>
                     {notifications.filter((n) => !n.isRead).length}
                   </span>
                 )}
               </Button>
               {showNotifications && (
-                <div
-                  className="position-absolute"
-                  style={{
-                    top: "35px",
-                    right: 0,
-                    backgroundColor: "white",
-                    color: "#222",
-                    width: "280px",
-                    maxHeight: "300px",
-                    overflowY: "auto",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    borderRadius: "8px",
-                    zIndex: 1500,
-                  }}
-                >
+                <div className="position-absolute" style={{
+                  top: "35px",
+                  right: 0,
+                  backgroundColor: "white",
+                  color: "#222",
+                  width: "280px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  borderRadius: "8px",
+                  zIndex: 1500,
+                }}>
                   {notifications.length === 0 ? (
                     <div style={{ padding: "10px" }}>No notifications</div>
                   ) : (
                     notifications.map((note) => (
-                      <div
-                        key={note.id}
-                        style={{
-                          padding: "10px",
-                          borderBottom: "1px solid #eee",
-                          backgroundColor: note.isRead ? "#f8f9fa" : "white",
-                          fontWeight: note.isRead ? "normal" : "600",
-                        }}
-                      >
-                        {note.message}
-                      </div>
+                      <div key={note.id} style={{
+                        padding: "10px",
+                        borderBottom: "1px solid #eee",
+                        backgroundColor: note.isRead ? "#f8f9fa" : "white",
+                        fontWeight: note.isRead ? "normal" : "600",
+                      }}>{note.message}</div>
                     ))
                   )}
                 </div>
               )}
             </div>
-            <Button className="glass-button" size="sm" onClick={onLogout}>
-              Logout
-            </Button>
+            <Button className="glass-button" size="sm" onClick={onLogout}>Logout</Button>
             <UserProfileDisplay user={userInfo} />
           </div>
         </Container>
       </nav>
 
       <Container fluid className="pt-5 mt-4">
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+            <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
+          </div>
+        )}
         <Row className="mb-3 align-items-center">
           <Col>
             <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
-              <Tab
-                eventKey="faults"
-                title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}
-              >
-                {/* Add New Fault Button */}
-                <div className="d-flex justify-content-end mb-2 px-3">
+              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+                <div className="text-end mt-3 mb-2">
                   <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
                     + New Fault
                   </Button>
                 </div>
-
-                <Row className="mb-3 px-3 pt-3">
+                <Row className="mb-3 px-3">
                   <Col md={4} className="mb-2">
                     <input
                       type="text"
@@ -222,18 +524,6 @@ export default function DashboardViewOnly({
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                  </Col>
-                  <Col md={3} className="mb-2">
-                    <select
-                      className="form-select"
-                      value={filterUrgency}
-                      onChange={(e) => setFilterUrgency(e.target.value)}
-                    >
-                      <option value="all">All Urgencies</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
                   </Col>
                   <Col md={3} className="mb-2">
                     <select
@@ -248,15 +538,9 @@ export default function DashboardViewOnly({
                   </Col>
                 </Row>
 
-                <Card className="shadow-sm mt-3">
+                <Card className="shadow-sm">
                   <Card.Body className="p-0">
-                    <Table
-                      striped
-                      bordered
-                      hover
-                      responsive
-                      className="table-fixed-header table-lg mb-0"
-                    >
+                    <Table striped bordered hover responsive className="table-fixed-header table-lg mb-0">
                       <thead className="sticky-top bg-light">
                         <tr>
                           <th>ID</th>
@@ -265,74 +549,44 @@ export default function DashboardViewOnly({
                           <th>Reported By</th>
                           <th>Location</th>
                           <th>Description</th>
-                          <th>Urgency</th>
                           <th>Status</th>
                           <th>Assigned To</th>
                           <th>Reported At</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredFaults.length > 0 ? (
-                          filteredFaults.map((fault) => (
-                            <tr key={fault.id} className="table-row-hover">
-                              <td>{fault.id}</td>
-                              <td>{fault.SystemID}</td>
-                              <td>{fault.SectionID}</td>
-                              <td>{fault.ReportedBy}</td>
-                              <td>{fault.Location}</td>
-                              <td className="description-col">{fault.DescFault}</td>
-                              <td>
-                                <span className={`badge bg-${getUrgencyColor(fault.Urgency)}`}>
-                                  {fault.Urgency}
-                                </span>
-                              </td>
-                              <td>{fault.Status}</td>
-                              <td>{fault.AssignTo || "Unassigned"}</td>
-                              <td>{new Date(fault.DateTime).toLocaleString()}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan="10" className="text-center py-3">
-                              No faults found. Check console for debug info.
-                            </td>
+                        {filteredFaults.map((fault) => (
+                          <tr key={fault.id} className="table-row-hover">
+                            <td>{fault.id}</td>
+                            <td>{fault.SystemID}</td>
+                            <td>{fault.SectionID}</td>
+                            <td>{fault.ReportedBy}</td>
+                            <td>{fault.Location}</td>
+                            <td className="description-col">{fault.DescFault}</td>
+                            <td>{fault.Status}</td>
+                            <td>{fault.AssignTo}</td>
+                            <td>{new Date(fault.DateTime).toLocaleString()}</td>
                           </tr>
-                        )}
+                        ))}
                       </tbody>
                     </Table>
                   </Card.Body>
                 </Card>
-                {/* Debug: Display raw faults if filtering fails */}
-                {faults && faults.length > 0 && filteredFaults.length === 0 && (
-                  <div className="alert alert-warning mt-3">
-                    Filtering excluded all faults. Raw data: {JSON.stringify(faults)}
-                  </div>
-                )}
               </Tab>
             </Tabs>
           </Col>
         </Row>
       </Container>
 
-      <footer
-        className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow"
-        style={{ backgroundColor: "#001f3f" }}
-      >
+      <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
-          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>
-            Support
-          </Button>
+          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Faults: {faults?.length || 0} | Unread Notifications:{" "}
-          {notifications.filter((n) => !n.isRead).length}
+          Total Faults: {faults.length} | Unread Notifications: {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
-          <Button
-            className="glass-button"
-            size="sm"
-            onClick={() => setShowFooterInfo(!showFooterInfo)}
-          >
+          <Button className="glass-button" size="sm" onClick={() => setShowFooterInfo(!showFooterInfo)}>
             {showFooterInfo ? "Hide Info" : "Show Info"}
           </Button>
           {showFooterInfo && (
@@ -343,121 +597,12 @@ export default function DashboardViewOnly({
         </div>
       </footer>
 
-      {/* New Fault Modal */}
-      <Modal
+      <NewFaultModal
         show={showNewFaultModal}
-        onHide={() => setShowNewFaultModal(false)}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Fault</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-2" controlId="formSystemID">
-              <Form.Label>System ID <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                type="number"
-                name="SystemID"
-                value={newFaultData.SystemID}
-                onChange={handleNewFaultChange}
-                placeholder="Enter system ID"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formSectionID">
-              <Form.Label>Section ID <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                type="number"
-                name="SectionID"
-                value={newFaultData.SectionID}
-                onChange={handleNewFaultChange}
-                placeholder="Enter section ID"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formReportedBy">
-              <Form.Label>Reported By <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                type="text"
-                name="ReportedBy"
-                value={newFaultData.ReportedBy}
-                onChange={handleNewFaultChange}
-                placeholder="Enter reporter name"
-                required
-                disabled
-              />
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formLocation">
-              <Form.Label>Location <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                type="text"
-                name="Location"
-                value={newFaultData.Location}
-                onChange={handleNewFaultChange}
-                placeholder="Enter location"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formDescription">
-              <Form.Label>Description <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                name="DescFault"
-                value={newFaultData.DescFault}
-                onChange={handleNewFaultChange}
-                placeholder="Enter description"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formUrgency">
-              <Form.Label>Urgency <span className="text-danger">*</span></Form.Label>
-              <Form.Select
-                name="Urgency"
-                value={newFaultData.Urgency}
-                onChange={handleNewFaultChange}
-                required
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formStatus">
-              <Form.Label>Status <span className="text-danger">*</span></Form.Label>
-              <Form.Select
-                name="Status"
-                value={newFaultData.Status}
-                onChange={handleNewFaultChange}
-                required
-              >
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2" controlId="formAssignedTo">
-              <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
-              <Form.Control
-                type="text"
-                name="AssignTo"
-                value={newFaultData.AssignTo}
-                onChange={handleNewFaultChange}
-                placeholder="Enter assignee name"
-                required
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowNewFaultModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleAddNewFault}>
-            Add Fault
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        handleClose={() => setShowNewFaultModal(false)}
+        handleAdd={handleNewFaultSubmit}
+        assignablePersons={assignablePersons}
+      />
 
       <style>{`
         .glass-button {
@@ -522,23 +667,7 @@ export default function DashboardViewOnly({
           font-size: 1rem;
           border-radius: 8px;
         }
-        .badge {
-          text-transform: capitalize;
-        }
       `}</style>
     </>
   );
-}
-
-function getUrgencyColor(level) {
-  switch (level) {
-    case "high":
-      return "danger";
-    case "medium":
-      return "warning";
-    case "low":
-      return "secondary";
-    default:
-      return "light";
-  }
 }
