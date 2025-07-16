@@ -259,103 +259,127 @@ export default function Dashboard({
           </div>
         </Container>
       </nav>
+    <Container fluid className="pt-5 mt-4">
+  {error && (
+    <div className="alert alert-danger" role="alert">
+      {error}
+      <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
+    </div>
+  )}
+  <Row>
+    {/* Sidebar */}
+    <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: "60px", left: 0, zIndex: 1040 }}>
 
-      <Container fluid className="pt-5 mt-4">
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-            <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
-          </div>
-        )}
-        <Row className="mb-3 align-items-center">
-          <Col>
-            <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
-              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
-                <div className="text-end mt-3 mb-2">
-                  <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
-                    + New Fault
-                  </Button>
-                </div>
-                <Row className="mb-3 px-3">
-                  <Col md={4} className="mb-2">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Search faults..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </Col>
-                  <Col md={3} className="mb-2">
-                    <select
-                      className="form-select"
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="open">Open</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                  </Col>
-                </Row>
+      <h5>Dashboard</h5>
+      <ul className="nav flex-column">
+        <li className="nav-item mb-2"><a className="nav-link text-white" href="#">Home</a></li>
+        <li className="nav-item mb-2">
+          <a className="nav-link text-white" href="#" onClick={() => setShowNewFaultModal(true)}>
+            + Add Fault
+          </a>
+        </li>
+        <li className="nav-item mb-2"><a className="nav-link text-white" href="#">Settings</a></li>
+        <li className="nav-item"><Button size="sm" variant="outline-light" onClick={onLogout}>Logout</Button></li>
+      </ul>
+    </Col>
 
-                <Card className="shadow-sm">
-                  <Card.Body className="p-0">
-                    <Table striped bordered hover responsive className="table-fixed-header table-lg mb-0">
-                      <thead className="sticky-top bg-light">
-                        <tr>
-                          <th>ID</th>
-                          <th>System ID</th>
-                          <th>Section ID</th>
-                          <th>Reported By</th>
-                          <th>Location</th>
-                          <th>Description</th>
-                          <th>Status</th>
-                          <th>Assigned To</th>
-                          <th>Reported At</th>
-                          <th>Actions</th>
+    {/* Main Dashboard Content */}
+    <Col className="ms-auto" style={{ marginLeft: "16.6666667%" }}>
+
+      <Row className="mb-3 align-items-center">
+        <Col>
+          <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
+            <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+              {/* <div className="text-end mt-3 mb-2">
+                <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
+                  + New Fault
+                </Button>
+              </div>*/}
+
+              <Row className="mb-3 px-3">
+                <Col md={4} className="mb-2">
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search faults..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </Col>
+                <Col md={3} className="mb-2">
+                  <select
+                    className="form-select"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </Col>
+              </Row>
+
+              <Card className="shadow-sm">
+                <Card.Body className="p-0">
+                  <Table striped bordered hover responsive className="table-fixed-header table-lg mb-0">
+                    <thead className="sticky-top bg-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>System ID</th>
+                        <th>Section ID</th>
+                        <th>Reported By</th>
+                        <th>Location</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Reported At</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFaults.map((fault) => (
+                        <tr key={fault.id} className="table-row-hover">
+                          <td>{fault.id}</td>
+                          <td>{fault.SystemID}</td>
+                          <td>{fault.SectionID}</td>
+                          <td>{fault.ReportedBy}</td>
+                          <td>{fault.Location}</td>
+                          <td className="description-col">{fault.DescFault}</td>
+                          <td>{fault.Status}</td>
+                          <td>{fault.AssignTo}</td>
+                          <td>{new Date(fault.DateTime).toLocaleString()}</td>
+                          <td>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="me-1 mb-1"
+                              onClick={() => setEditFault(fault)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => handleDeleteFault(fault.id)}
+                            >
+                              Delete
+                            </Button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {filteredFaults.map((fault) => (
-                          <tr key={fault.id} className="table-row-hover">
-                            <td>{fault.id}</td>
-                            <td>{fault.SystemID}</td>
-                            <td>{fault.SectionID}</td>
-                            <td>{fault.ReportedBy}</td>
-                            <td>{fault.Location}</td>
-                            <td className="description-col">{fault.DescFault}</td>
-                            <td>{fault.Status}</td>
-                            <td>{fault.AssignTo}</td>
-                            <td>{new Date(fault.DateTime).toLocaleString()}</td>
-                            <td>
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                className="me-1 mb-1"
-                                onClick={() => setEditFault(fault)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => handleDeleteFault(fault.id)}
-                              >
-                                Delete
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </Card.Body>
-                </Card>
-              </Tab>
-            </Tabs>
-          </Col>
-        </Row>
-      </Container>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Card.Body>
+              </Card>
+            </Tab>
+          </Tabs>
+        </Col>
+      </Row>
+    </Col>
+  </Row>
+</Container>
+
+      
 
       <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
@@ -450,6 +474,21 @@ export default function Dashboard({
           font-size: 1rem;
           border-radius: 8px;
         }
+
+        .sidebar {
+          background-color: #001f3f !important;
+  height: 100vh;
+  position: fixed;
+  top: 60px; /* navbar height */
+  left: 0;
+  z-index: 1040;
+  overflow-y: auto;
+  width: 16.6666667%; /* Same as 2/12 columns */
+      }
+        .sidebar .nav-link:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+     }
       `}</style>
     </>
   );
