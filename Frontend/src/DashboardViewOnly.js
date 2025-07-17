@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Table,
   Button,
@@ -332,9 +332,80 @@ export default function DashboardViewOnly({
   const [showNewFaultModal, setShowNewFaultModal] = useState(false);
   const [faults, setFaults] = useState([]);
   const [error, setError] = useState("");
+
   const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showTable, setShowTable] = useState(false);
+  const [resolvedFaults, setResolvedFaults] = useState([]);
+  const [view, setView] = useState(""); // '', 'faults', or 'resolved'
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const handleViewChange = async (newView) => {
+    setView(newView);
+    setCurrentPage(1);
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const url =
+        newView === "resolved"
+          ? "http://localhost:5000/api/faults?status=closed"
+          : "http://localhost:5000/api/faults?status=open";
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (newView === "resolved") setResolvedFaults(data);
+      else setFaults(data);
+
+      setView(newView);
+    } catch (err) {
+      setError("Error fetching faults: " + err.message);
+    }
+  };
+
+  // Pagination calculations
+  const filteredFaults = faults.filter((fault) => {
+    if (!fault || typeof fault !== "object") return false;
+    const description = fault.DescFault || "";
+    const location = fault.Location || "";
+    const reportedBy = fault.ReportedBy || "";
+
+    const matchesSearch =
+      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      filterStatus === "all" ||
+      (filterStatus === "open" && fault.Status.toLowerCase() !== "closed") ||
+      fault.Status.toLowerCase() === filterStatus;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredFaults.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentFaults = filteredFaults.slice(indexOfFirstItem, indexOfLastItem);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus]);
+
+  const handleFilterClick = (status) => {
+    if (filterStatus === status && showTable) {
+      setShowTable(false);
+    } else {
+      setFilterStatus(status);
+      setShowTable(true);
+      setSearchTerm("");
+    }
+  };
 
   // Fetch faults on component mount and refresh
   useEffect(() => {
@@ -433,24 +504,9 @@ export default function DashboardViewOnly({
     }
   };
 
-  const filteredFaults = faults.filter((fault) => {
-    if (!fault || typeof fault !== 'object') return false;
-    const description = fault.DescFault || '';
-    const location = fault.Location || '';
-    const reportedBy = fault.ReportedBy || '';
-
-    const matchesSearch =
-      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = filterStatus === "all" || (fault.Status && fault.Status.toLowerCase() === filterStatus);
-
-    return matchesSearch && matchesStatus;
-  });
-
   return (
     <>
+      {/* Navbar */}
       <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
           <div style={{ width: 120 }}></div>
@@ -499,6 +555,7 @@ export default function DashboardViewOnly({
         </Container>
       </nav>
 
+      {/* Main Content */}
       <Container fluid className="pt-5 mt-4">
         {error && (
           <div className="alert alert-danger" role="alert">
@@ -506,78 +563,181 @@ export default function DashboardViewOnly({
             <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
           </div>
         )}
-        <Row className="mb-3 align-items-center">
-          <Col>
-            <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
-              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
-                <div className="text-end mt-3 mb-2">
-                  <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
-                    + New Fault
-                  </Button>
-                </div>
-                <Row className="mb-3 px-3">
-                  <Col md={4} className="mb-2">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Search faults..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </Col>
-                  <Col md={3} className="mb-2">
-                    <select
-                      className="form-select"
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="open">Open</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                  </Col>
-                </Row>
+        <Row>
+          {/* Sidebar */}
+          <Col
+            xs={2}
+            className="bg-dark text-white sidebar p-3 position-fixed vh-100"
+            style={{ top: 60, left: 0, zIndex: 1040 }}
+          >
+            <div className="glass-sidebar-title mb-4 text-center">
+              <span className="sidebar-title-text">Dashboard</span>
+            </div>
+            <ul className="nav flex-column">
+              <li className="nav-item mb-2">
+                <button
+                  className="nav-link btn btn-link text-white p-0"
+                  onClick={() => setShowNewFaultModal(true)}
+                >
+                  + Add Fault
+                </button>
+              </li>
+              <li className="nav-item mb-2">
+                <button
+                  className="nav-link btn btn-link text-white p-0"
+                  onClick={() => {
+                    handleViewChange("faults");
+                    setShowTable(true);
+                  }}
+                >
+                   📋 Fault Review Panel
+                </button>
+                <button
+                  className="nav-link btn btn-link text-white p-0"
+                  onClick={() => {
+                    handleViewChange("resolved");
+                    setShowTable(true);
+                  }}
+                >
+                  ✅ Resolved Faults
+                </button>
+              </li>
+            </ul>
+          </Col>
 
-                <Card className="shadow-sm">
-                  <Card.Body className="p-0">
-                    <Table striped bordered hover responsive className="table-fixed-header table-lg mb-0">
-                      <thead className="sticky-top bg-light">
-                        <tr>
-                          <th>ID</th>
-                          <th>System ID</th>
-                          <th>Section ID</th>
-                          <th>Reported By</th>
-                          <th>Location</th>
-                          <th>Description</th>
-                          <th>Status</th>
-                          <th>Assigned To</th>
-                          <th>Reported At</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredFaults.map((fault) => (
-                          <tr key={fault.id} className="table-row-hover">
-                            <td>{fault.id}</td>
-                            <td>{fault.SystemID}</td>
-                            <td>{fault.SectionID}</td>
-                            <td>{fault.ReportedBy}</td>
-                            <td>{fault.Location}</td>
-                            <td className="description-col">{fault.DescFault}</td>
-                            <td>{fault.Status}</td>
-                            <td>{fault.AssignTo}</td>
-                            <td>{new Date(fault.DateTime).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </Card.Body>
-                </Card>
-              </Tab>
-            </Tabs>
+          {/* Main Dashboard Content */}
+          <Col
+            className="ms-auto d-flex flex-column"
+            style={{
+              marginLeft: "16.6666667%",
+              width: "calc(100% - 16.6666667%)",
+              height: "calc(100vh - 60px)",
+              overflow: "hidden",
+              paddingLeft: 0,
+              maxWidth: "82%",
+            }}
+          >
+            <Row className="mb-3 align-items-center flex-shrink-0">
+              <Col>
+                {showTable && view === "faults" && (
+                  <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
+                    <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+                      <Row className="mb-3 px-3">
+                        <Col md={4} className="mb-2">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Search faults..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            aria-label="Search faults"
+                          />
+                        </Col>
+                      </Row>
+
+                      <div className="mb-2 px-3">
+                        <strong>Total Faults:</strong> {filteredFaults.length}
+                      </div>
+
+                      <Row style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}>
+                        <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
+                          <Card.Body className="p-0 d-flex flex-column">
+                            <Table
+                              striped
+                              bordered
+                              hover
+                              responsive
+                              className="table-fixed-header table-fit table-lg mb-0 flex-grow-1 align-middle custom-align-table"
+                              aria-label="Faults Table"
+                            >
+                              <colgroup>
+                                <col style={{ width: '4%', textAlign: 'center' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '12%' }} />
+                                <col style={{ width: '12%' }} />
+                                <col style={{ width: '22%' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '12%' }} />
+                                <col style={{ width: '14%' }} />
+                              </colgroup>
+                              <thead className="sticky-top bg-light">
+                                <tr>
+                                  <th className="text-center">ID</th>
+                                  <th className="text-center">System ID</th>
+                                  <th className="text-center">Section ID</th>
+                                  <th>Reported By</th>
+                                  <th>Location</th>
+                                  <th>Description</th>
+                                  <th className="text-center">Status</th>
+                                  <th>Assigned To</th>
+                                  <th>Reported At</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentFaults.map((fault) => (
+                                  <tr key={fault.id} className="table-row-hover">
+                                    <td className="text-center">{fault.id}</td>
+                                    <td className="text-center">{fault.SystemID}</td>
+                                    <td className="text-center">{fault.SectionID}</td>
+                                    <td>{fault.ReportedBy}</td>
+                                    <td>{fault.Location}</td>
+                                    <td className="description-col">{fault.DescFault}</td>
+                                    <td className="text-center">{fault.Status}</td>
+                                    <td>{fault.AssignTo}</td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>{fault.DateTime ? new Date(fault.DateTime).toLocaleString() : ""}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </Table>
+
+                            {/* Pagination Controls */}
+                            <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
+                              <ul className="pagination justify-content-center mb-0">
+                                <li className={`page-item ${currentPage === 1 ? "disabled" : ""}`}>
+                                  <button className="page-link" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} aria-label="Previous page">
+                                    Previous
+                                  </button>
+                                </li>
+
+                                {[...Array(totalPages)].map((_, idx) => {
+                                  const pageNum = idx + 1;
+                                  return (
+                                    <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
+                                      <button className="page-link" onClick={() => setCurrentPage(pageNum)} aria-current={currentPage === pageNum ? "page" : undefined}>
+                                        {pageNum}
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+
+                                <li className={`page-item ${(currentPage === totalPages || totalPages === 0) ? "disabled" : ""}`}>
+                                  <button className="page-link" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} aria-label="Next page">
+                                    Next
+                                  </button>
+                                </li>
+                              </ul>
+                            </nav>
+                          </Card.Body>
+                        </Card>
+                      </Row>
+                    </Tab>
+                  </Tabs>
+                )}
+              </Col>
+            </Row>
           </Col>
         </Row>
       </Container>
 
+      {/* Resolved Faults Table */}
+      {showTable && view === "resolved" && (
+        <div style={{ height: "calc(100vh - 60px - 130px - 80px)", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Blank tab for resolved faults */}
+        </div>
+      )}
+
+      {/* Footer */}
       <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
           <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
@@ -641,22 +801,37 @@ export default function DashboardViewOnly({
           border-bottom: 2px solid #dee2e6;
         }
         .table-lg td, .table-lg th {
-          font-size: 1.15rem;
-          padding: 1rem 1.25rem;
+          font-size: 1.13rem;
+          padding: 0.7rem 1rem;
+          vertical-align: middle;
+        }
+        .table-fit td, .table-fit th {
+          font-size: 0.98rem;
+          padding: 0.45rem 0.5rem;
           vertical-align: middle;
         }
         .tab-title-lg {
-          font-size: 1.6rem;
+          font-size: 1.35rem;
           font-weight: 700;
           color: #001f3f;
           letter-spacing: 0.5px;
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
         }
         .description-col {
-          max-width: 300px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          max-width: 180px;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
+        .custom-align-table td.description-col {
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
+        .custom-align-table td.description-col {
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: break-word;
         }
         .table-row-hover:hover {
           background-color: #e6f0ff;
@@ -666,6 +841,53 @@ export default function DashboardViewOnly({
         .form-control, .form-select {
           font-size: 1rem;
           border-radius: 8px;
+        }
+        .sidebar {
+          background-color: #001f3f !important;
+          height: 100vh;
+          position: fixed;
+          top: 60px;
+          left: 0;
+          z-index: 1040;
+          overflow-y: auto;
+          width: 16.6666667%;
+        }
+        .sidebar .nav-link.btn-link {
+          font-size: 1rem;
+          padding: 0.35rem 0.7rem;
+          height: 2.1rem;
+          border-radius: 8px;
+          font-weight: 600;
+          letter-spacing: 0.2px;
+        }
+        .sidebar .nav-link.btn-link:hover,
+        .sidebar .nav-link.btn-link:focus {
+          background-color: rgba(255, 255, 255, 0.18);
+          color: #0072ff;
+        }
+        .glass-sidebar-title {
+          background: rgba(255, 255, 255, 0.13);
+          border: 1.5px solid rgba(255, 255, 255, 0.35);
+          border-radius: 16px;
+          backdrop-filter: blur(8px);
+          color: #001f3f;
+          font-weight: 700;
+          font-size: 1.5rem;
+          padding: 0.7rem 0.5rem 0.7rem 0.5rem;
+          margin-bottom: 1.2rem;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+        }
+        .sidebar-title-text {
+          color: #dfe3e7ff;
+          font-weight: 600;
+          font-size: 1.50rem;
+          letter-spacing: 0.5px;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
+        }
+        button.nav-link.btn-link {
+          cursor: pointer;
+          text-align: left;
+          width: 100%;
         }
       `}</style>
     </>
