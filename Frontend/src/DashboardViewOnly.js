@@ -1,549 +1,135 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import {
-  Table,
-  Button,
-  Container,
-  Row,
-  Col,
-  Card,
-  Tabs,
-  Tab,
-  Modal,
-  Form,
-  Alert,
-  Spinner,
-} from "react-bootstrap";
+import React, { useEffect, useState, useRef } from "react";
+import { Table, Button, Container, Row, Col, Card, Tabs, Tab } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
+import NewFaultModal from "./NewFaultModal";
 
-// New Fault Modal Component
-function NewFaultModal({
-  show,
-  handleClose,
-  handleAdd,
-  assignablePersons = [],
-  initialData = null,
-}) {
-  const [formData, setFormData] = useState({
-    SystemID: "",
-    SectionID: "",
-    ReportedBy: "",
-    Location: "",
-    DescFault: "",
-    Status: "Open",
-    AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
-  });
+const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [validated, setValidated] = useState(false);
+function useMultiFaults() {
+  const [open, setOpen] = useState([]);
+  const [resolved, setResolved] = useState([]);
+  const [err, setErr] = useState("");
+  const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    const emptyForm = {
-      SystemID: "",
-      SectionID: "",
-      ReportedBy: "",
-      Location: "",
-      DescFault: "",
-      Status: "Open",
-      AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
-    };
-
-    if (initialData) {
-      setFormData({
-        ...emptyForm,
-        ...initialData,
-        SystemID: initialData.SystemID || "",
-        SectionID: initialData.SectionID || "",
-        ReportedBy: initialData.ReportedBy || "",
-        Location: initialData.Location || "",
-        DescFault: initialData.DescFault || "",
-        Status: initialData.Status || "Open",
-        AssignTo: initialData.AssignTo || (assignablePersons.length > 0 ? assignablePersons[0] : "")
-      });
-    } else {
-      setFormData(emptyForm);
-    }
-    
-    setValidated(false);
-    setError("");
-    setIsSubmitting(false);
-  }, [initialData, assignablePersons, show]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    
-    if (error) {
-      setError("");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const form = e.currentTarget;
-    
-    if (form.checkValidity() === false) {
-      setValidated(true);
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError("");
-
+  // Initial fetch
+  const fetchOpen = async () => {
+    if (!token) return setErr("No authentication token.");
     try {
-      const dataToSubmit = {
-        ...formData,
-        id: initialData ? initialData.id : undefined,
-        SystemID: parseInt(formData.SystemID, 10),
-        SectionID: parseInt(formData.SectionID, 10)
-      };
-      const success = await handleAdd(dataToSubmit);
-      if (success) {
-        handleClose();
-        setFormData({
-          SystemID: "",
-          SectionID: "",
-          ReportedBy: "",
-          Location: "",
-          DescFault: "",
-          Status: "Open",
-          AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
-        });
-        setValidated(false);
-      }
-    } catch (error) {
-      setError(error.message || "Failed to submit form. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleModalClose = () => {
-    if (!isSubmitting) {
-      handleClose();
-    }
-  };
-
-  return (
-    <Modal show={show} onHide={handleModalClose} centered backdrop={isSubmitting ? "static" : true}>
-      <Modal.Header closeButton={!isSubmitting}>
-        <Modal.Title>
-          {initialData ? "Edit Fault Report" : "New Fault Report"}
-        </Modal.Title>
-      </Modal.Header>
-      
-      <Modal.Body>
-        {error && (
-          <Alert variant="danger" dismissible onClose={() => setError("")}>
-            {error}
-          </Alert>
-        )}
-        
-        <Form noValidate validated={validated} onSubmit={handleSubmit}>
-          <div className="row">
-            <div className="col-md-6 mb-3">
-              <Form.Group controlId="formSystemID">
-                <Form.Label>System ID <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="number"
-                  name="SystemID"
-                  value={formData.SystemID}
-                  onChange={handleChange}
-                  placeholder="Enter system ID"
-                  required
-                  min="1"
-                  disabled={isSubmitting}
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a valid system ID.
-                </Form.Control.Feedback>
-              </Form.Group>
-            </div>
-
-            <div className="col-md-6 mb-3">
-              <Form.Group controlId="formSectionID">
-                <Form.Label>Section ID <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="number"
-                  name="SectionID"
-                  value={formData.SectionID}
-                  onChange={handleChange}
-                  placeholder="Enter section ID"
-                  required
-                  min="1"
-                  disabled={isSubmitting}
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a valid section ID.
-                </Form.Control.Feedback>
-              </Form.Group>
-            </div>
-          </div>
-
-          <Form.Group className="mb-3" controlId="formReportedBy">
-            <Form.Label>Reported By <span className="text-danger">*</span></Form.Label>
-            <Form.Control
-              type="text"
-              name="ReportedBy"
-              value={formData.ReportedBy}
-              onChange={handleChange}
-              placeholder="Enter reporter name"
-              required
-              maxLength="100"
-              disabled={isSubmitting}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide the reporter's name.
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="formLocation">
-            <Form.Label>Location <span className="text-danger">*</span></Form.Label>
-            <Form.Control
-              type="text"
-              name="Location"
-              value={formData.Location}
-              onChange={handleChange}
-              placeholder="Enter location"
-              required
-              maxLength="200"
-              disabled={isSubmitting}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide the location.
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="formDescFault">
-            <Form.Label>Description <span className="text-danger">*</span></Form.Label>
-            <Form.Control
-              name="DescFault"
-              as="textarea"
-              rows={3}
-              value={formData.DescFault}
-              onChange={handleChange}
-              placeholder="Describe the fault in detail"
-              required
-              maxLength="500"
-              disabled={isSubmitting}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide a description of the fault.
-            </Form.Control.Feedback>
-            <Form.Text className="text-muted">
-              {formData.DescFault.length}/500 characters
-            </Form.Text>
-          </Form.Group>
-
-          <div className="row">
-            {initialData && (
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formStatus">
-                  <Form.Label>Status <span className="text-danger">*</span></Form.Label>
-                  <Form.Select
-                    name="Status"
-                    value={formData.Status}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                  >
-                    <option value="Open">Open</option>
-                    <option value="Closed">Closed</option>
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a status.
-                  </Form.Control.Feedback>
-                </Form.Group>
-              </div>
-            )}
-
-            <div className={`col-md-${initialData ? '6' : '12'} mb-3`}>
-              <Form.Group controlId="formAssignTo">
-                <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
-                <Form.Select
-                  name="AssignTo"
-                  value={formData.AssignTo}
-                  onChange={handleChange}
-                  required
-                  disabled={assignablePersons.length === 0 || isSubmitting}
-                >
-                  {assignablePersons.length === 0 ? (
-                    <option value="" disabled>No persons available</option>
-                  ) : (
-                    assignablePersons.map((person) => (
-                      <option key={person} value={person}>
-                        {person}
-                      </option>
-                    ))
-                  )}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  Please select an assignee.
-                </Form.Control.Feedback>
-              </Form.Group>
-            </div>
-          </div>
-
-          <Modal.Footer className="px-0">
-            <Button 
-              variant="secondary" 
-              onClick={handleModalClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="primary" 
-              type="submit"
-              disabled={isSubmitting || assignablePersons.length === 0}
-            >
-              {isSubmitting ? (
-                <>
-                  <Spinner as="span" animation="border" size="sm" className="me-2" />
-                  {initialData ? "Updating..." : "Creating..."}
-                </>
-              ) : (
-                initialData ? "Update Fault" : "Create Fault"
-              )}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal.Body>
-    </Modal>
-  );
-}
-
-// Main Dashboard Component
-export default function DashboardViewOnly({
-  userInfo,
-  notifications,
-  setNotifications,
-  onLogout,
-}) {
-  const [showFooterInfo, setShowFooterInfo] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const notifRef = useRef();
-  const [showNewFaultModal, setShowNewFaultModal] = useState(false);
-  const [faults, setFaults] = useState([]);
-  const [error, setError] = useState("");
-
-  const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [showTable, setShowTable] = useState(false);
-  const [resolvedFaults, setResolvedFaults] = useState([]);
-  const [view, setView] = useState(""); // '', 'faults', or 'resolved'
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
-  const handleViewChange = async (newView) => {
-    setView(newView);
-    setCurrentPage(1);
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      const url =
-        newView === "resolved"
-          ? "http://localhost:5000/api/faults?status=closed"
-          : "http://localhost:5000/api/faults?status=open";
-
-      const res = await fetch(url, {
+      const res = await fetch("http://localhost:5000/api/faults?status=open", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-
-      if (newView === "resolved") setResolvedFaults(data);
-      else setFaults(data);
-
-      setView(newView);
-    } catch (err) {
-      setError("Error fetching faults: " + err.message);
+      if (!res.ok) throw new Error("Failed to fetch open faults");
+      setOpen(await res.json());
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
     }
   };
 
-  // Pagination calculations
-  const filteredFaults = faults.filter((fault) => {
-    if (!fault || typeof fault !== "object") return false;
-    const description = fault.DescFault || "";
-    const location = fault.Location || "";
-    const reportedBy = fault.ReportedBy || "";
-
-    const matchesSearch =
-      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      filterStatus === "all" ||
-      (filterStatus === "open" && fault.Status.toLowerCase() !== "closed") ||
-      fault.Status.toLowerCase() === filterStatus;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const totalPages = Math.ceil(filteredFaults.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentFaults = filteredFaults.slice(indexOfFirstItem, indexOfLastItem);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterStatus]);
-
-  const handleFilterClick = (status) => {
-    if (filterStatus === status && showTable) {
-      setShowTable(false);
-    } else {
-      setFilterStatus(status);
-      setShowTable(true);
-      setSearchTerm("");
-    }
-  };
-
-  // Fetch faults on component mount and refresh
-  useEffect(() => {
-    const fetchFaults = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError("No authentication token found. Please log in.");
-        return;
-      }
-      try {
-        const response = await fetch('http://localhost:5000/api/faults', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const mappedFaults = data.map(fault => ({
-            id: fault.id,
-            SystemID: fault.SystemID,
-            SectionID: fault.SectionID,
-            ReportedBy: fault.ReportedBy,
-            Location: fault.Location,
-            DescFault: fault.DescFault,
-            Status: fault.Status,
-            AssignTo: fault.AssignTo,
-            DateTime: fault.DateTime
-          }));
-          setFaults(mappedFaults);
-          setError("");
-        } else {
-          const errorData = await response.json();
-          setError(`Failed to fetch faults: ${errorData.message || response.statusText}`);
-        }
-      } catch (error) {
-        setError(`Error fetching faults: ${error.message}`);
-      }
-    };
-    fetchFaults();
-  }, []);
-
-  // Handle click outside for notifications
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Mark notifications as read
-  useEffect(() => {
-    if (showNotifications && notifications.some((n) => !n.isRead)) {
-      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
-    }
-  }, [showNotifications, notifications, setNotifications]);
-
-  const handleNewFaultSubmit = async (data) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError("No authentication token found. Please log in.");
-      throw new Error("Authentication required");
-    }
+  const fetchResolved = async () => {
+    if (!token) return setErr("No authentication token.");
     try {
-      const response = await fetch('http://localhost:5000/api/faults', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          SystemID: parseInt(data.SystemID),
-          Location: data.Location,
-          LocFaultID: null,
-          DescFault: data.DescFault,
-          ReportedBy: data.ReportedBy,
-          ExtNo: null,
-          AssignTo: data.AssignTo,
-          Status: data.Status,
-          SectionID: parseInt(data.SectionID),
-          FaultForwardID: null
-        })
+      const res = await fetch("http://localhost:5000/api/faults?status=closed", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (response.ok) {
-        const result = await response.json();
-        setFaults([...faults, result.fault]);
-        return true;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create fault');
-      }
-    } catch (error) {
-      throw new Error(`Error creating fault: ${error.message}`);
+      if (!res.ok) throw new Error("Failed to fetch resolved faults");
+      const data = await res.json();
+      setResolved(data.filter(f => f.Status.toLowerCase() === "closed"));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
     }
   };
+
+  // Only fetch open and resolved on mount
+  useEffect(() => {
+    fetchOpen();
+    fetchResolved();
+  }, []);
+
+  // Create a new fault
+  const create = async (data) => {
+    if (!token) throw new Error("Authentication required.");
+    const resp = await fetch("http://localhost:5000/api/faults", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to create fault");
+    }
+    const result = await resp.json();
+    if (result.fault.Status.toLowerCase() === "closed") {
+      setResolved(r => [...r, result.fault]);
+    } else {
+      setOpen(o => [...o, result.fault]);
+    }
+    return true;
+  };
+
+  return { open, resolved, create, err, setErr };
+}
+
+function usePagination(list, perPage = 10) {
+  const [page, setPage] = useState(1);
+  const max = Math.ceil(list.length / perPage);
+  const current = list.slice((page - 1) * perPage, page * perPage);
+  React.useEffect(() => setPage(1), [list]);
+  return { current, page, setPage, max };
+}
+
+export default function DashboardViewOnly({ userInfo, notifications, setNotifications, onLogout }) {
+  const [modal, setModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState("faults"); // 'faults' or 'resolved'
+  const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef();
+  const [footerInfo, setFooterInfo] = useState(false);
+
+  const { open, resolved, create, err, setErr } = useMultiFaults();
+
+  // Notifications dropdown & mark read
+  useEffect(() => {
+    if (showNotif) setNotifications(n => n.map(e => ({ ...e, isRead: true })));
+    function outside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false);
+    }
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [showNotif, setNotifications]);
+
+  const currentFaultArr = view === "faults" ? open : resolved;
+  const filtered = currentFaultArr.filter(f => {
+    if (!f) return false;
+    const haystack = [f.DescFault, f.Location, f.ReportedBy].join(" ").toLowerCase();
+    return haystack.includes(search.toLowerCase());
+  });
+  const { current, page, setPage, max } = usePagination(filtered);
 
   return (
     <>
       {/* Navbar */}
       <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
-          <div style={{ width: 120 }}></div>
+          <div style={{ width: 120 }} />
           <span className="navbar-brand mb-0 h1 mx-auto">⚡ N F M System Version 1.0.1</span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
-              <Button variant="link" className="text-white p-0" onClick={() => setShowNotifications(!showNotifications)} style={{ fontSize: "1.3rem" }}>
+              <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }} aria-label="Toggle Notifications">
                 <BellFill />
-                {notifications.filter((n) => !n.isRead).length > 0 && (
-                  <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: "1", fontWeight: "bold" }}>
-                    {notifications.filter((n) => !n.isRead).length}
-                  </span>
-                )}
+                {notifications.some(n => !n.isRead) && <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>{notifications.filter(n => !n.isRead).length}</span>}
               </Button>
-              {showNotifications && (
-                <div className="position-absolute" style={{
-                  top: "35px",
-                  right: 0,
-                  backgroundColor: "white",
-                  color: "#222",
-                  width: "280px",
-                  maxHeight: "300px",
-                  overflowY: "auto",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                  borderRadius: "8px",
-                  zIndex: 1500,
-                }}>
+              {showNotif && (
+                <div className="position-absolute" style={{ top: 35, right: 0, backgroundColor: "white", color: "#222", width: 280, maxHeight: 300, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", borderRadius: 8, zIndex: 1500 }}>
                   {notifications.length === 0 ? (
-                    <div style={{ padding: "10px" }}>No notifications</div>
+                    <div style={{ padding: 10 }}>No notifications</div>
                   ) : (
-                    notifications.map((note) => (
-                      <div key={note.id} style={{
-                        padding: "10px",
-                        borderBottom: "1px solid #eee",
-                        backgroundColor: note.isRead ? "#f8f9fa" : "white",
-                        fontWeight: note.isRead ? "normal" : "600",
-                      }}>{note.message}</div>
+                    notifications.map(note => (
+                      <div key={note.id} style={{ padding: 10, borderBottom: "1px solid #eee", backgroundColor: note.isRead ? "#f8f9fa" : "white", fontWeight: note.isRead ? "normal" : "600" }}>
+                        {note.message}
+                      </div>
                     ))
                   )}
                 </div>
@@ -555,215 +141,74 @@ export default function DashboardViewOnly({
         </Container>
       </nav>
 
-      {/* Main Content */}
       <Container fluid className="pt-5 mt-4">
-        {error && (
+        {err && (
           <div className="alert alert-danger" role="alert">
-            {error}
-            <button type="button" className="btn-close float-end" onClick={() => setError("")}></button>
+            {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
           </div>
         )}
         <Row>
           {/* Sidebar */}
-          <Col
-            xs={2}
-            className="bg-dark text-white sidebar p-3 position-fixed vh-100"
-            style={{ top: 60, left: 0, zIndex: 1040 }}
-          >
-            <div className="glass-sidebar-title mb-4 text-center">
-              <span className="sidebar-title-text">Dashboard</span>
-            </div>
+          <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
+            <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
             <ul className="nav flex-column">
+              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => setModal(true)}>+ Add Fault</button></li>
               <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => setShowNewFaultModal(true)}
-                >
-                  + Add Fault
-                </button>
-              </li>
-              <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => {
-                    handleViewChange("faults");
-                    setShowTable(true);
-                  }}
-                >
-                   📋 Fault Review Panel
-                </button>
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => {
-                    handleViewChange("resolved");
-                    setShowTable(true);
-                  }}
-                >
-                  ✅ Resolved Faults
-                </button>
+                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>📋 Fault Review Panel</button>
+                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>✅ Resolved Faults</button>
               </li>
             </ul>
           </Col>
 
-          {/* Main Dashboard Content */}
-          <Col
-            className="ms-auto d-flex flex-column"
-            style={{
-              marginLeft: "16.6666667%",
-              width: "calc(100% - 16.6666667%)",
-              height: "calc(100vh - 60px)",
-              overflow: "hidden",
-              paddingLeft: 0,
-              maxWidth: "82%",
-            }}
-          >
-            <Row className="mb-3 align-items-center flex-shrink-0">
-              <Col>
-                {showTable && view === "faults" && (
-                  <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
-                    <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
-                      <Row className="mb-3 px-3">
-                        <Col md={4} className="mb-2">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Search faults..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            aria-label="Search faults"
-                          />
-                        </Col>
-                      </Row>
+          {/* Main Content */}
+          <Col className="ms-auto d-flex flex-column" style={{ marginLeft: "16.666667%", width: "calc(100% - 16.666667%)", height: "calc(100vh - 60px)", overflow: "hidden", paddingLeft: 0, maxWidth: "82%" }}>
+            <Tabs activeKey={view} className="custom-tabs" justify>
+              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+                {view === "faults" && <>
+                  <Row className="mb-3 px-3">
+                    <Col md={4} className="mb-2">
+                      <input type="text" className="form-control" placeholder="Search faults..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search faults" />
+                    </Col>
+                  </Row>
+                  <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
+                  <FaultsTable faults={current} isResolved={false} page={page} setPage={setPage} max={max} />
+                </>}
+              </Tab>
 
-                      <div className="mb-2 px-3">
-                        <strong>Total Faults:</strong> {filteredFaults.length}
-                      </div>
-
-                      <Row style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}>
-                        <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
-                          <Card.Body className="p-0 d-flex flex-column">
-                            <Table
-                              striped
-                              bordered
-                              hover
-                              responsive
-                              className="table-fixed-header table-fit table-lg mb-0 flex-grow-1 align-middle custom-align-table"
-                              aria-label="Faults Table"
-                            >
-                              <colgroup>
-                                <col style={{ width: '4%', textAlign: 'center' }} />
-                                <col style={{ width: '8%' }} />
-                                <col style={{ width: '8%' }} />
-                                <col style={{ width: '12%' }} />
-                                <col style={{ width: '12%' }} />
-                                <col style={{ width: '22%' }} />
-                                <col style={{ width: '8%' }} />
-                                <col style={{ width: '12%' }} />
-                                <col style={{ width: '14%' }} />
-                              </colgroup>
-                              <thead className="sticky-top bg-light">
-                                <tr>
-                                  <th className="text-center">ID</th>
-                                  <th className="text-center">System ID</th>
-                                  <th className="text-center">Section ID</th>
-                                  <th>Reported By</th>
-                                  <th>Location</th>
-                                  <th>Description</th>
-                                  <th className="text-center">Status</th>
-                                  <th>Assigned To</th>
-                                  <th>Reported At</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {currentFaults.map((fault) => (
-                                  <tr key={fault.id} className="table-row-hover">
-                                    <td className="text-center">{fault.id}</td>
-                                    <td className="text-center">{fault.SystemID}</td>
-                                    <td className="text-center">{fault.SectionID}</td>
-                                    <td>{fault.ReportedBy}</td>
-                                    <td>{fault.Location}</td>
-                                    <td className="description-col">{fault.DescFault}</td>
-                                    <td className="text-center">{fault.Status}</td>
-                                    <td>{fault.AssignTo}</td>
-                                    <td style={{ whiteSpace: 'nowrap' }}>{fault.DateTime ? new Date(fault.DateTime).toLocaleString() : ""}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </Table>
-
-                            {/* Pagination Controls */}
-                            <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
-                              <ul className="pagination justify-content-center mb-0">
-                                <li className={`page-item ${currentPage === 1 ? "disabled" : ""}`}>
-                                  <button className="page-link" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} aria-label="Previous page">
-                                    Previous
-                                  </button>
-                                </li>
-
-                                {[...Array(totalPages)].map((_, idx) => {
-                                  const pageNum = idx + 1;
-                                  return (
-                                    <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
-                                      <button className="page-link" onClick={() => setCurrentPage(pageNum)} aria-current={currentPage === pageNum ? "page" : undefined}>
-                                        {pageNum}
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-
-                                <li className={`page-item ${(currentPage === totalPages || totalPages === 0) ? "disabled" : ""}`}>
-                                  <button className="page-link" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} aria-label="Next page">
-                                    Next
-                                  </button>
-                                </li>
-                              </ul>
-                            </nav>
-                          </Card.Body>
-                        </Card>
-                      </Row>
-                    </Tab>
-                  </Tabs>
-                )}
-              </Col>
-            </Row>
+              <Tab eventKey="resolved" title={<span className="tab-title-lg">✅ Resolved Faults</span>}>
+                {view === "resolved" && <>
+                  <Row className="mb-3 px-3">
+                    <Col md={4} className="mb-2">
+                      <input type="text" className="form-control" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search resolved faults" />
+                    </Col>
+                  </Row>
+                  <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
+                  <FaultsTable faults={current} isResolved={true} page={page} setPage={setPage} max={max} />
+                </>}
+              </Tab>
+            </Tabs>
           </Col>
         </Row>
       </Container>
-
-      {/* Resolved Faults Table */}
-      {showTable && view === "resolved" && (
-        <div style={{ height: "calc(100vh - 60px - 130px - 80px)", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {/* Blank tab for resolved faults */}
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
           <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
         </div>
-        <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Faults: {faults.length} | Unread Notifications: {notifications.filter((n) => !n.isRead).length}
+        <div className="text-center flex-grow-1 mb-2 mb-sm-0" aria-live="polite">
+          Total Open: {open.length} | Resolved: {resolved.length} | Unread Notifications: {notifications.filter(n => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
-          <Button className="glass-button" size="sm" onClick={() => setShowFooterInfo(!showFooterInfo)}>
-            {showFooterInfo ? "Hide Info" : "Show Info"}
-          </Button>
-          {showFooterInfo && (
-            <div className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-              © 2025 Network Fault Management System. All rights reserved.
-            </div>
-          )}
+          <Button className="glass-button" size="sm" onClick={() => setFooterInfo(v => !v)} aria-expanded={footerInfo} aria-controls="footer-info">{footerInfo ? "Hide Info" : "Show Info"}</Button>
+          {footerInfo && <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>© 2025 Network Fault Management System. All rights reserved.</div>}
         </div>
       </footer>
 
-      <NewFaultModal
-        show={showNewFaultModal}
-        handleClose={() => setShowNewFaultModal(false)}
-        handleAdd={handleNewFaultSubmit}
-        assignablePersons={assignablePersons}
-      />
+      {/* New Fault Modal */}
+      <NewFaultModal show={modal} handleClose={() => setModal(false)} handleAdd={create} assignablePersons={assignablePersons} />
 
+      {/* Styles */}
       <style>{`
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
@@ -800,15 +245,27 @@ export default function DashboardViewOnly({
           background-color: #f8f9fa;
           border-bottom: 2px solid #dee2e6;
         }
-        .table-lg td, .table-lg th {
-          font-size: 1.13rem;
-          padding: 0.7rem 1rem;
-          vertical-align: middle;
-        }
         .table-fit td, .table-fit th {
           font-size: 0.98rem;
           padding: 0.45rem 0.5rem;
           vertical-align: middle;
+        }
+        .custom-align-table th, .custom-align-table td {
+          vertical-align: middle !important;
+          text-align: left;
+        }
+        .custom-align-table th.text-center, .custom-align-table td.text-center {
+          text-align: center !important;
+        }
+        .custom-align-table td {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .custom-align-table td.description-col {
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: break-word;
         }
         .tab-title-lg {
           font-size: 1.35rem;
@@ -819,16 +276,6 @@ export default function DashboardViewOnly({
         }
         .description-col {
           max-width: 180px;
-          white-space: normal;
-          overflow-wrap: break-word;
-          word-break: break-word;
-        }
-        .custom-align-table td.description-col {
-          white-space: normal;
-          overflow-wrap: break-word;
-          word-break: break-word;
-        }
-        .custom-align-table td.description-col {
           white-space: normal;
           overflow-wrap: break-word;
           word-break: break-word;
@@ -884,12 +331,89 @@ export default function DashboardViewOnly({
           letter-spacing: 0.5px;
           text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
         }
-        button.nav-link.btn-link {
-          cursor: pointer;
-          text-align: left;
-          width: 100%;
-        }
       `}</style>
     </>
+  );
+}
+
+function FaultsTable({ faults, isResolved, page, setPage, max }) {
+  return (
+    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
+      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
+        <Card.Body className="p-0 d-flex flex-column">
+          <Table
+            striped bordered hover responsive
+            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
+            aria-label="Faults Table"
+          >
+            <colgroup>
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
+            <thead className="sticky-top bg-light">
+              <tr>
+                <th className="text-center">ID</th>
+                <th className="text-center">System ID</th>
+                <th className="text-center">Section ID</th>
+                <th>Reported By</th>
+                <th>Location</th>
+                <th>Description</th>
+                <th className="text-center">Status</th>
+                <th>Assigned To</th>
+                <th>Reported At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {faults.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center text-muted py-4">No faults.</td>
+                </tr>
+              ) : (
+                faults.map(f => (
+                  <tr key={f.id} className="table-row-hover">
+                    <td className="text-center">{f.id}</td>
+                    <td className="text-center">{f.SystemID}</td>
+                    <td className="text-center">{f.SectionID}</td>
+                    <td>{f.ReportedBy}</td>
+                    <td>{f.Location}</td>
+                    <td className="description-col">{f.DescFault}</td>
+                    <td className="text-center">{f.Status}</td>
+                    <td>{f.AssignTo}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </Table>
+          <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
+            <ul className="pagination justify-content-center mb-0">
+              <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
+              </li>
+              {Array.from({ length: max }).map((_, idx) => {
+                const pageNum = idx + 1;
+                return (
+                  <li key={pageNum} className={`page-item ${page === pageNum ? "active" : ""}`}>
+                    <button className="page-link" onClick={() => setPage(pageNum)} aria-current={page === pageNum ? "page" : undefined}>
+                      {pageNum}
+                    </button>
+                  </li>
+                );
+              })}
+              <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
+              </li>
+            </ul>
+          </nav>
+        </Card.Body>
+      </Card>
+    </Row>
   );
 }

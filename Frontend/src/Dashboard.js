@@ -1,14 +1,5 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import {
-  Table,
-  Button,
-  Container,
-  Row,
-  Col,
-  Card,
-  Tabs,
-  Tab,
-} from "react-bootstrap";
+import React, { useEffect, useRef, useState } from "react";
+import { Table, Button, Container, Row, Col, Card, Tabs, Tab } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
@@ -17,366 +8,227 @@ const assignablePersons = [
   "John Doe",
   "Jane Smith",
   "Alex Johnson",
-  "Emily Davis",
+  "Emily Davis"
 ];
 
-export default function Dashboard({
-  userInfo,
-  notifications,
-  setNotifications,
-  onLogout,
-}) {
-  const [showFooterInfo, setShowFooterInfo] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const notifRef = useRef();
-
-  const [showNewFaultModal, setShowNewFaultModal] = useState(false);
-  const [editFault, setEditFault] = useState(null);
-
-  const [faults, setFaults] = useState([]);
-  const [error, setError] = useState("");
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [showTable, setShowTable] = useState(false);
-  const [resolvedFaults, setResolvedFaults] = useState([]);
-  const [view, setView] = useState(""); // '', 'faults', or 'resolved'
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // adjust items per page here
-  const handleViewChange = async (newView) => {
-  
-  setView(newView);
-  setCurrentPage(1);
+function useMultiFaults() {
+  const [open, setOpen] = useState([]);
+  const [resolved, setResolved] = useState([]);
+  const [err, setErr] = useState("");
   const token = localStorage.getItem("token");
-  if (!token) return;
 
-  try {
-    const url =
-      newView === "resolved"
-        ? "http://localhost:5000/api/faults?status=closed"
-        : "http://localhost:5000/api/faults?status=open";
+  // Initial fetch
+  const fetchOpen = async () => {
+    if (!token) return setErr("No authentication token.");
+    try {
+      const res = await fetch("http://localhost:5000/api/faults?status=open", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch open faults");
+      setOpen(await res.json());
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
 
-    const res = await fetch(url, {
+  const fetchResolved = async () => {
+    if (!token) return setErr("No authentication token.");
+    try {
+      const res = await fetch("http://localhost:5000/api/faults?status=closed", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch resolved faults");
+      const data = await res.json();
+      // Only keep faults with Status 'Closed' just in case
+      setResolved(data.filter(f => f.Status.toLowerCase() === "closed"));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  // Only fetch open and resolved on mount
+  useEffect(() => {
+    fetchOpen();
+    fetchResolved();
+  }, []);
+
+  // Create a new fault, then add it to open faults list directly (expect new fault will be 'Open' status)
+  const create = async (data) => {
+    if (!token) throw new Error("Authentication required.");
+    const resp = await fetch("http://localhost:5000/api/faults", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to create fault");
+    }
+    const result = await resp.json();
+    if (result.fault.Status.toLowerCase() === "closed") {
+      setResolved(r => [...r, result.fault]);
+    } else {
+      setOpen(o => [...o, result.fault]);
+    }
+    return true;
+  };
+
+  // Update a fault, if status updated to closed, move to resolved list from open, else update in open
+  const update = async (data) => {
+    if (!token) throw new Error("Authentication required.");
+
+    const resp = await fetch(`http://localhost:5000/api/faults/${data.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to update fault");
+    }
+    const result = await resp.json();
+    const updatedFault = result.fault;
+
+    if (updatedFault.Status.toLowerCase() === "closed") {
+      // Remove from open list
+      setOpen(o => o.filter(f => f.id !== updatedFault.id));
+      // Add or update in resolved list
+      setResolved(r => {
+        const exists = r.some(f => f.id === updatedFault.id);
+        if (exists) {
+          return r.map(f => (f.id === updatedFault.id ? updatedFault : f));
+        }
+        return [...r, updatedFault];
+      });
+    } else {
+      setOpen(o => o.map(f => (f.id === updatedFault.id ? updatedFault : f)));
+      // Optional: remove from resolved if status changed back to open
+      setResolved(r => r.filter(f => f.id !== updatedFault.id));
+    }
+    return true;
+  };
+
+  // Remove fault from both lists
+  const remove = async (id) => {
+    if (!token) return;
+    const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
+      method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json();
-
-    if (newView === "resolved") setResolvedFaults(data);
-    else setFaults(data);
-
-    setView(newView); // update view state
-  } catch (err) {
-    console.error("Error fetching faults:", err);
-  }
-};
-
-
-  // Helper to get token & handle missing token error
-  const getTokenOrError = () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("No authentication token found. Please log in.");
-      return null;
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to delete fault");
     }
-    return token;
+    setOpen(o => o.filter(f => f.id !== id));
+    setResolved(r => r.filter(f => f.id !== id));
   };
 
-  // Fetch faults
-  const fetchFaults = useCallback(async () => {
-    const token = getTokenOrError();
-    if (!token) return;
-
+  // Mark fault as resolved:
+  // - update backend fault status = closed
+  // - remove from open list
+  // - add to resolved list with updated data
+  const resolve = async (id) => {
+    if (!token) return setErr("No authentication token.");
     try {
-      const response = await fetch("http://localhost:5000/api/faults", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const fault = open.find(f => f.id === id);
+      if (!fault) throw new Error("Fault not found in open list.");
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || response.statusText);
-      }
+      const payload = {
+        SystemID: fault.SystemID,
+        Location: fault.Location,
+        DescFault: fault.DescFault,
+        ReportedBy: fault.ReportedBy,
+        AssignTo: fault.AssignTo,
+        SectionID: fault.SectionID,
+        Status: "Closed",
+      };
 
-      const data = await response.json();
-      setFaults(
-        data.map((fault) => ({
-          id: fault.id,
-          SystemID: fault.SystemID,
-          SectionID: fault.SectionID,
-          ReportedBy: fault.ReportedBy,
-          Location: fault.Location,
-          DescFault: fault.DescFault,
-          Status: fault.Status,
-          AssignTo: fault.AssignTo,
-          DateTime: fault.DateTime,
-        }))
-      );
-      setError("");
-    } catch (err) {
-      setError(`Error fetching faults: ${err.message}`);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFaults();
-  }, [fetchFaults]);
-
-  // Close notifications dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Mark notifications as read when notifications dropdown opens
-  useEffect(() => {
-    if (showNotifications && notifications.some((n) => !n.isRead)) {
-      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
-    }
-  }, [showNotifications, notifications, setNotifications]);
-
-  // Delete fault handler
-  const handleDeleteFault = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this fault?")) return;
-
-    const token = getTokenOrError();
-    if (!token) return;
-
-    try {
-      const response = await fetch(`http://localhost:5000/api/faults/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || response.statusText);
-      }
-
-      setFaults((prev) => prev.filter((f) => f.id !== id));
-      setError("");
-    } catch (err) {
-      setError(`Error deleting fault: ${err.message}`);
-    }
-  };
-
-  // Update fault handler
-  const handleUpdateFault = async (data) => {
-    const token = getTokenOrError();
-    if (!token) throw new Error("Authentication required");
-
-    try {
-      const response = await fetch(`http://localhost:5000/api/faults/${data.id}`, {
+      const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          SystemID: parseInt(data.SystemID, 10),
-          Location: data.Location,
-          DescFault: data.DescFault,
-          ReportedBy: data.ReportedBy,
-          AssignTo: data.AssignTo,
-          Status: data.Status,
-          SectionID: parseInt(data.SectionID, 10),
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update fault");
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to mark as resolved");
       }
+      const result = await resp.json();
 
-      const result = await response.json();
-      setFaults((prev) =>
-        prev.map((f) => (f.id === result.fault.id ? result.fault : f))
-      );
-      setEditFault(null);
-      return true;
-    } catch (err) {
-      setError(`Error updating fault: ${err.message}`);
-      throw err;
+      setOpen(o => o.filter(f => f.id !== id));
+      setResolved(r => {
+        // Avoid duplicate
+        if (r.some(f => f.id === id)) return r;
+        return [...r, result.fault];
+      });
+    } catch (error) {
+      setErr(error.message);
     }
   };
 
-  // Mark fault resolved
-  const handleMarkResolved = async (id) => {
-    const token = getTokenOrError();
-    if (!token) return;
+  return { open, resolved, create, update, remove, resolve, err, setErr };
+}
 
-    try {
-      const response = await fetch(`http://localhost:5000/api/faults/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          Status: "closed",
-        }),
-      });
+function usePagination(list, perPage = 10) {
+  const [page, setPage] = useState(1);
+  const max = Math.ceil(list.length / perPage);
+  const current = list.slice((page - 1) * perPage, page * perPage);
+  React.useEffect(() => setPage(1), [list]);
+  return { current, page, setPage, max };
+}
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || response.statusText);
-      }
+export default function Dashboard({ userInfo, notifications, setNotifications, onLogout }) {
+  const [modal, setModal] = useState(false);
+  const [edit, setEdit] = useState(null);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState("faults"); // 'faults' or 'resolved'
+  const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef();
+  const [footerInfo, setFooterInfo] = useState(false);
 
-      const result = await response.json();
-      setFaults((prev) =>
-         prev.filter((f) => f.id !== id)
-      );
-      
-      setError("");
-    } catch (err) {
-      setError(`Error marking as resolved: ${err.message}`);
+  const { open, resolved, create, update, remove, resolve, err, setErr } = useMultiFaults();
+
+  // Notifications dropdown & mark read
+  useEffect(() => {
+    if (showNotif) setNotifications(n => n.map(e => ({ ...e, isRead: true })));
+    function outside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false);
     }
-  };
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [showNotif, setNotifications]);
 
-  // Create new fault handler
-  const handleNewFaultSubmit = async (data) => {
-    const token = getTokenOrError();
-    if (!token) throw new Error("Authentication required");
-
-    try {
-      const response = await fetch("http://localhost:5000/api/faults", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          SystemID: parseInt(data.SystemID, 10),
-          Location: data.Location,
-          LocFaultID: null,
-          DescFault: data.DescFault,
-          ReportedBy: data.ReportedBy,
-          ExtNo: null,
-          AssignTo: data.AssignTo,
-          Status: data.Status,
-          SectionID: parseInt(data.SectionID, 10),
-          FaultForwardID: null,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create fault");
-      }
-
-      const result = await response.json();
-      setFaults((prev) => [...prev, result.fault]);
-      return true;
-    } catch (err) {
-      throw new Error(`Error creating fault: ${err.message}`);
-    }
-  };
-
-  // Filter faults for display
-  const filteredFaults = faults.filter((fault) => {
-    if (!fault || typeof fault !== "object") return false;
-    const description = fault.DescFault || "";
-    const location = fault.Location || "";
-    const reportedBy = fault.ReportedBy || "";
-
-    const matchesSearch =
-      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      filterStatus === "all" ||
-      (filterStatus === "open" && fault.Status.toLowerCase() !== "closed") ||
-      fault.Status.toLowerCase() === filterStatus;
-
-    return matchesSearch && matchesStatus;
+  const currentFaultArr = view === "faults" ? open : resolved;
+  const filtered = currentFaultArr.filter(f => {
+    if (!f) return false;
+    const haystack = [f.DescFault, f.Location, f.ReportedBy].join(" ").toLowerCase();
+    return haystack.includes(search.toLowerCase());
   });
+  const { current, page, setPage, max } = usePagination(filtered);
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredFaults.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentFaults = filteredFaults.slice(indexOfFirstItem, indexOfLastItem);
-
-  // Reset page when search or filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterStatus]);
-
-  // Sidebar link click handler helper
-  const handleFilterClick = (status) => {
-    if (filterStatus === status && showTable) {
-      setShowTable(false);
-    } else {
-      setFilterStatus(status);
-      setShowTable(true);
-      setSearchTerm("");
-    }
-  };
-    return (
+  return (
     <>
       {/* Navbar */}
-      <nav
-        className="navbar navbar-dark fixed-top shadow-sm"
-        style={{ height: 60, backgroundColor: "#001f3f" }}
-      >
+      <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
-          <div style={{ width: 120 }}></div>
-          <span className="navbar-brand mb-0 h1 mx-auto">
-            ⚡ N F M System Version 1.0.1
-          </span>
+          <div style={{ width: 120 }} />
+          <span className="navbar-brand mb-0 h1 mx-auto">⚡ N F M System Version 1.0.1</span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
-              <Button
-                variant="link"
-                className="text-white p-0"
-                onClick={() => setShowNotifications((v) => !v)}
-                style={{ fontSize: "1.3rem" }}
-                aria-label="Toggle Notifications"
-              >
+              <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }} aria-label="Toggle Notifications">
                 <BellFill />
-                {notifications.some((n) => !n.isRead) && (
-                  <span
-                    className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
-                    style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}
-                  >
-                    {notifications.filter((n) => !n.isRead).length}
-                  </span>
-                )}
+                {notifications.some(n => !n.isRead) && <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>{notifications.filter(n => !n.isRead).length}</span>}
               </Button>
-              {showNotifications && (
-                <div
-                  className="position-absolute"
-                  style={{
-                    top: 35,
-                    right: 0,
-                    backgroundColor: "white",
-                    color: "#222",
-                    width: 280,
-                    maxHeight: 300,
-                    overflowY: "auto",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    borderRadius: 8,
-                    zIndex: 1500,
-                  }}
-                >
+              {showNotif && (
+                <div className="position-absolute" style={{ top: 35, right: 0, backgroundColor: "white", color: "#222", width: 280, maxHeight: 300, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", borderRadius: 8, zIndex: 1500 }}>
                   {notifications.length === 0 ? (
                     <div style={{ padding: 10 }}>No notifications</div>
                   ) : (
-                    notifications.map((note) => (
-                      <div
-                        key={note.id}
-                        style={{
-                          padding: 10,
-                          borderBottom: "1px solid #eee",
-                          backgroundColor: note.isRead ? "#f8f9fa" : "white",
-                          fontWeight: note.isRead ? "normal" : "600",
-                        }}
-                      >
+                    notifications.map(note => (
+                      <div key={note.id} style={{ padding: 10, borderBottom: "1px solid #eee", backgroundColor: note.isRead ? "#f8f9fa" : "white", fontWeight: note.isRead ? "normal" : "600" }}>
                         {note.message}
                       </div>
                     ))
@@ -384,326 +236,82 @@ export default function Dashboard({
                 </div>
               )}
             </div>
-            <Button className="glass-button" size="sm" onClick={onLogout}>
-              Logout
-            </Button>
+            <Button className="glass-button" size="sm" onClick={onLogout}>Logout</Button>
             <UserProfileDisplay user={userInfo} />
           </div>
         </Container>
       </nav>
 
-      {/* Main Content */}
       <Container fluid className="pt-5 mt-4">
-        {error && (
+        {err && (
           <div className="alert alert-danger" role="alert">
-            {error}
-            <button
-              type="button"
-              className="btn-close float-end"
-              onClick={() => setError("")}
-              aria-label="Close"
-            />
+            {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
           </div>
         )}
         <Row>
           {/* Sidebar */}
-          <Col
-            xs={2}
-            className="bg-dark text-white sidebar p-3 position-fixed vh-100"
-            style={{ top: 60, left: 0, zIndex: 1040 }}
-          >
-            <div className="glass-sidebar-title mb-4 text-center">
-              <span className="sidebar-title-text">Dashboard</span>
-            </div>
+          <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
+            <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
             <ul className="nav flex-column">
+              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => setModal(true)}>+ Add Fault</button></li>
               <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => setShowNewFaultModal(true)}
-                >
-                  + Add Fault
-                </button>
-              </li>
-              <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => {
-                    handleViewChange("faults");
-                    setShowTable(true);
-                  }}
-                >
-                  📋 Fault Review Panel
-                </button>
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => {
-                    handleViewChange("resolved");
-                    setShowTable(true);
-                  }}
-                >
-                  ✅ Resolved Faults
-                </button>
+                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>📋 Fault Review Panel</button>
+                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>✅ Resolved Faults</button>
               </li>
             </ul>
           </Col>
 
-          {/* Main Dashboard Content */}
-          <Col
-            className="ms-auto d-flex flex-column"
-            style={{
-              marginLeft: "16.6666667%",
-              width: "calc(100% - 16.6666667%)",
-              height: "calc(100vh - 60px)",
-              overflow: "hidden",
-              paddingLeft: 0,
-              maxWidth: "82%",
-            }}
-          >
-            {/* Conditionally show faults table or resolved faults table */}
-            {showTable && view === "faults" && (
-              <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
-                <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+          {/* Main Content */}
+          <Col className="ms-auto d-flex flex-column" style={{ marginLeft: "16.666667%", width: "calc(100% - 16.666667%)", height: "calc(100vh - 60px)", overflow: "hidden", paddingLeft: 0, maxWidth: "82%" }}>
+            <Tabs activeKey={view} className="custom-tabs" justify>
+              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
+                {view === "faults" && <>
                   <Row className="mb-3 px-3">
                     <Col md={4} className="mb-2">
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Search faults..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        aria-label="Search faults"
-                      />
+                      <input type="text" className="form-control" placeholder="Search faults..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search faults" />
                     </Col>
                   </Row>
-                  <div className="mb-2 px-3">
-                    <strong>Total Faults:</strong> {filteredFaults.length}
-                  </div>
-                  <Row style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}>
-                    <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
-                      <Card.Body className="p-0 d-flex flex-column">
-                        <Table
-                          striped
-                          bordered
-                          hover
-                          responsive
-                          className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
-                          aria-label="Faults Table"
-                        >
-                          <colgroup>
-                            <col style={{ width: "3.5%", textAlign: "center" }} />
-                            <col style={{ width: "6%" }} />
-                            <col style={{ width: "6%" }} />
-                            <col style={{ width: "10%" }} />
-                            <col style={{ width: "10%" }} />
-                            <col style={{ width: "18%" }} />
-                            <col style={{ width: "7%" }} />
-                            <col style={{ width: "10%" }} />
-                            <col style={{ width: "12%" }} />
-                            <col style={{ width: "7.5%" }} />
-                          </colgroup>
-                          <thead className="sticky-top bg-light">
-                            <tr>
-                              <th className="text-center">ID</th>
-                              <th className="text-center">System ID</th>
-                              <th className="text-center">Section ID</th>
-                              <th>Reported By</th>
-                              <th>Location</th>
-                              <th>Description</th>
-                              <th className="text-center">Status</th>
-                              <th>Assigned To</th>
-                              <th>Reported At</th>
-                              <th className="text-center">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {currentFaults.map((fault) => (
-                              <tr key={fault.id} className="table-row-hover">
-                                <td className="text-center">{fault.id}</td>
-                                <td className="text-center">{fault.SystemID}</td>
-                                <td className="text-center">{fault.SectionID}</td>
-                                <td>{fault.ReportedBy}</td>
-                                <td>{fault.Location}</td>
-                                <td className="description-col">{fault.DescFault}</td>
-                                <td className="text-center">{fault.Status}</td>
-                                <td>{fault.AssignTo}</td>
-                                <td style={{ whiteSpace: "nowrap" }}>
-                                  {fault.DateTime
-                                    ? new Date(fault.DateTime).toLocaleString()
-                                    : ""}
-                                </td>
-                                <td className="text-center">
-                                  <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    className="me-1 mb-1"
-                                    onClick={() => setEditFault(fault)}
-                                    aria-label={`Edit fault ${fault.id}`}
-                                  >
-                                    Edit
-                                  </Button>
+                  <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
+                  <FaultsTable faults={current} onEdit={setEdit} onDelete={remove} onMarkResolved={resolve} isResolved={false} page={page} setPage={setPage} max={max} />
+                </>}
+              </Tab>
 
-                                  {fault.Status.toLowerCase() !== "closed" && (
-                                    <Button
-                                      variant="outline-success"
-                                      size="sm"
-                                      className="me-1 mb-1"
-                                      onClick={() => handleMarkResolved(fault.id)}
-                                      aria-label={`Mark fault ${fault.id} as resolved`}
-                                    >
-                                      Mark as Resolved
-                                    </Button>
-                                  )}
-
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => handleDeleteFault(fault.id)}
-                                    aria-label={`Delete fault ${fault.id}`}
-                                  >
-                                    Delete
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </Table>
-
-                        {/* Pagination Controls */}
-                        <nav
-                          aria-label="Fault pagination"
-                          className="mt-3 px-3"
-                          style={{ flexShrink: 0 }}
-                        >
-                          <ul className="pagination justify-content-center mb-0">
-                            <li
-                              className={`page-item ${
-                                currentPage === 1 ? "disabled" : ""
-                              }`}
-                            >
-                              <button
-                                className="page-link"
-                                onClick={() =>
-                                  setCurrentPage((prev) => Math.max(prev - 1, 1))
-                                }
-                                aria-label="Previous page"
-                              >
-                                Previous
-                              </button>
-                            </li>
-
-                            {[...Array(totalPages)].map((_, idx) => {
-                              const pageNum = idx + 1;
-                              return (
-                                <li
-                                  key={pageNum}
-                                  className={`page-item ${
-                                    currentPage === pageNum ? "active" : ""
-                                  }`}
-                                >
-                                  <button
-                                    className="page-link"
-                                    onClick={() => setCurrentPage(pageNum)}
-                                    aria-current={
-                                      currentPage === pageNum ? "page" : undefined
-                                    }
-                                  >
-                                    {pageNum}
-                                  </button>
-                                </li>
-                              );
-                            })}
-
-                            <li
-                              className={`page-item ${
-                                currentPage === totalPages || totalPages === 0
-                                  ? "disabled"
-                                  : ""
-                              }`}
-                            >
-                              <button
-                                className="page-link"
-                                onClick={() =>
-                                  setCurrentPage((prev) =>
-                                    Math.min(prev + 1, totalPages)
-                                  )
-                                }
-                                aria-label="Next page"
-                              >
-                                Next
-                              </button>
-                            </li>
-                          </ul>
-                        </nav>
-                      </Card.Body>
-                    </Card>
+              <Tab eventKey="resolved" title={<span className="tab-title-lg">✅ Resolved Faults</span>}>
+                {view === "resolved" && <>
+                  <Row className="mb-3 px-3">
+                    <Col md={4} className="mb-2">
+                      <input type="text" className="form-control" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search resolved faults" />
+                    </Col>
                   </Row>
-                </Tab>
-              </Tabs>
-            )}
-
-            {showTable && view === "resolved" && <></>}
-              
-              
-            
+                  <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
+                  <FaultsTable faults={current} onDelete={remove} isResolved={true} page={page} setPage={setPage} max={max} />
+                </>}
+              </Tab>
+            </Tabs>
           </Col>
         </Row>
       </Container>
 
       {/* Footer */}
-      <footer
-        className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow"
-        style={{ backgroundColor: "#001f3f" }}
-      >
+      <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
         <div className="mb-2 mb-sm-0">
-          <Button
-            className="glass-button"
-            size="sm"
-            onClick={() => alert("Contact support at support@nfm.lk")}
-            aria-label="Contact support"
-          >
-            Support
-          </Button>
+          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0" aria-live="polite">
-          Total Faults: {faults.length} | Unread Notifications:{" "}
-          {notifications.filter((n) => !n.isRead).length}
+          Total Open: {open.length} | Resolved: {resolved.length} | Unread Notifications: {notifications.filter(n => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
-          <Button
-            className="glass-button"
-            size="sm"
-            onClick={() => setShowFooterInfo((v) => !v)}
-            aria-expanded={showFooterInfo}
-            aria-controls="footer-info"
-          >
-            {showFooterInfo ? "Hide Info" : "Show Info"}
-          </Button>
-          {showFooterInfo && (
-            <div
-              id="footer-info"
-              className="mt-1"
-              style={{ fontSize: "0.75rem", opacity: 0.8 }}
-            >
-              © 2025 Network Fault Management System. All rights reserved.
-            </div>
-          )}
+          <Button className="glass-button" size="sm" onClick={() => setFooterInfo(v => !v)} aria-expanded={footerInfo} aria-controls="footer-info">{footerInfo ? "Hide Info" : "Show Info"}</Button>
+          {footerInfo && <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>© 2025 Network Fault Management System. All rights reserved.</div>}
         </div>
       </footer>
 
-      {/* New / Edit Fault Modal */}
-      <NewFaultModal
-        show={showNewFaultModal || Boolean(editFault)}
-        handleClose={() => {
-          setShowNewFaultModal(false);
-          setEditFault(null);
-        }}
-        handleAdd={editFault ? handleUpdateFault : handleNewFaultSubmit}
-        assignablePersons={assignablePersons}
-        initialData={editFault}
-      />
+      {/* New/Edit Fault Modal */}
+      <NewFaultModal show={modal || Boolean(edit)} handleClose={() => { setModal(false); setEdit(null); }} handleAdd={edit ? update : create} assignablePersons={assignablePersons} initialData={edit} />
 
-      {/* Styles */}
+      {/* Your styles (same as your original styles) */}
       <style>{`
+        
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
           border: 1.5px solid rgba(255, 255, 255, 0.4);
@@ -830,3 +438,104 @@ export default function Dashboard({
   );
 }
 
+// FaultsTable component (unchanged from before)
+function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max }) {
+  return (
+    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
+      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
+        <Card.Body className="p-0 d-flex flex-column">
+          <Table
+            striped bordered hover responsive
+            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
+            aria-label="Faults Table"
+          >
+            <colgroup>
+              <col style={{ width: '3.5%', textAlign: 'center' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '7.5%' }} />
+            </colgroup>
+            <thead className="sticky-top bg-light">
+              <tr>
+                <th className="text-center">ID</th>
+                <th className="text-center">System ID</th>
+                <th className="text-center">Section ID</th>
+                <th>Reported By</th>
+                <th>Location</th>
+                <th>Description</th>
+                <th className="text-center">Status</th>
+                <th>Assigned To</th>
+                <th>Reported At</th>
+                <th className="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {faults.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-center text-muted py-4">No faults.</td>
+                </tr>
+              ) : (
+                faults.map(f => (
+                  <tr key={f.id} className="table-row-hover">
+                    <td className="text-center">{f.id}</td>
+                    <td className="text-center">{f.SystemID}</td>
+                    <td className="text-center">{f.SectionID}</td>
+                    <td>{f.ReportedBy}</td>
+                    <td>{f.Location}</td>
+                    <td className="description-col">{f.DescFault}</td>
+                    <td className="text-center">{f.Status}</td>
+                    <td>{f.AssignTo}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
+                    <td className="text-center">
+                      {!isResolved && onEdit && (
+                        <Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => onEdit(f)} aria-label={`Edit fault ${f.id}`}>
+                          Edit
+                        </Button>
+                      )}
+                      {!isResolved && onMarkResolved && (
+                        <Button variant="outline-success" size="sm" className="me-1 mb-1" onClick={() => onMarkResolved(f.id)} aria-label={`Mark fault ${f.id} as resolved`}>
+                          Mark as Resolved
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button variant="outline-danger" size="sm" onClick={() => onDelete(f.id)} aria-label={`Delete fault ${f.id}`}>
+                          Delete
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </Table>
+          <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
+            <ul className="pagination justify-content-center mb-0">
+              <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
+              </li>
+              {Array.from({ length: max }).map((_, idx) => {
+                const pageNum = idx + 1;
+                return (
+                  <li key={pageNum} className={`page-item ${page === pageNum ? "active" : ""}`}>
+                    <button className="page-link" onClick={() => setPage(pageNum)} aria-current={page === pageNum ? "page" : undefined}>
+                      {pageNum}
+                    </button>
+                  </li>
+                );
+              })}
+              <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
+              </li>
+            </ul>
+          </nav>
+        </Card.Body>
+      </Card>
+    </Row>
+  );
+}
