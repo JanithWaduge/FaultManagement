@@ -1,6 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Alert, Spinner } from "react-bootstrap";
 
+const locationOptions = ["BIA", "BDA", "JIA", "MRIA", "RMA"];
+const systemOptions = [
+    "NETWORK",
+    "PBX",
+    "CCTV",
+    "IP-PABX",
+    "FIDS",
+    "VDGS",
+    "IT",
+    "FIRE",
+    "CLOCK",
+    "EGB",
+    "ERP"
+];
+const faultLocationOptions = [
+    "Admin-IT",
+    "Terminal-A",
+    "Terminal-B",
+    "Cargo Building",
+    "Terminal Car Park",
+    "Pier Building"
+];
+
 export default function NewFaultModal({
   show,
   handleClose,
@@ -9,10 +32,10 @@ export default function NewFaultModal({
   initialData = null,
 }) {
   const [formData, setFormData] = useState({
-    SystemID: "",
-    SectionID: "",
+    SystemID: systemOptions[0], // Default to first system
     ReportedBy: "",
-    Location: "",
+    Location: locationOptions[0],
+    LocationOfFault: "", // Default to empty for optional field
     DescFault: "",
     Status: "Open",
     AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
@@ -24,10 +47,10 @@ export default function NewFaultModal({
 
   useEffect(() => {
     const emptyForm = {
-      SystemID: "",
-      SectionID: "",
+      SystemID: systemOptions[0],
       ReportedBy: "",
-      Location: "",
+      Location: locationOptions[0],
+      LocationOfFault: "",
       DescFault: "",
       Status: "Open",
       AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
@@ -37,18 +60,24 @@ export default function NewFaultModal({
       setFormData({
         ...emptyForm,
         ...initialData,
-        SystemID: initialData.SystemID || "",
-        SectionID: initialData.SectionID || "",
+        SystemID: systemOptions.includes(initialData.SystemID)
+          ? initialData.SystemID
+          : systemOptions[0],
         ReportedBy: initialData.ReportedBy || "",
-        Location: initialData.Location || "",
+        Location: locationOptions.includes(initialData.Location)
+          ? initialData.Location
+          : locationOptions[0],
+        LocationOfFault: initialData.LocationOfFault || "",
         DescFault: initialData.DescFault || "",
         Status: initialData.Status || "Open",
-        AssignTo: initialData.AssignTo || (assignablePersons.length > 0 ? assignablePersons[0] : "")
+        AssignTo:
+          initialData.AssignTo ||
+          (assignablePersons.length > 0 ? assignablePersons[0] : ""),
       });
     } else {
       setFormData(emptyForm);
     }
-    
+
     setValidated(false);
     setError("");
     setIsSubmitting(false);
@@ -60,7 +89,7 @@ export default function NewFaultModal({
       ...prev,
       [name]: value,
     }));
-    
+
     if (error) {
       setError("");
     }
@@ -69,9 +98,9 @@ export default function NewFaultModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const form = e.currentTarget;
-    
+
     if (form.checkValidity() === false) {
       setValidated(true);
       return;
@@ -84,17 +113,15 @@ export default function NewFaultModal({
       const dataToSubmit = {
         ...formData,
         id: initialData ? initialData.id : undefined,
-        SystemID: parseInt(formData.SystemID, 10), // Ensure base-10 parsing
-        SectionID: parseInt(formData.SectionID, 10) // Ensure base-10 parsing
       };
       const success = await handleAdd(dataToSubmit);
       if (success) {
         handleClose();
         setFormData({
-          SystemID: "",
-          SectionID: "",
+          SystemID: systemOptions[0],
           ReportedBy: "",
-          Location: "",
+          Location: locationOptions[0],
+          LocationOfFault: "",
           DescFault: "",
           Status: "Open",
           AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
@@ -115,63 +142,57 @@ export default function NewFaultModal({
   };
 
   return (
-    <Modal show={show} onHide={handleModalClose} centered backdrop={isSubmitting ? "static" : true}>
+    <Modal
+      show={show}
+      onHide={handleModalClose}
+      centered
+      backdrop={isSubmitting ? "static" : true}
+    >
       <Modal.Header closeButton={!isSubmitting}>
         <Modal.Title>
           {initialData ? "Edit Fault Report" : "New Fault Report"}
         </Modal.Title>
       </Modal.Header>
-      
+
       <Modal.Body>
         {error && (
           <Alert variant="danger" dismissible onClose={() => setError("")}>
             {error}
           </Alert>
         )}
-        
+
         <Form noValidate validated={validated} onSubmit={handleSubmit}>
           <div className="row">
             <div className="col-md-6 mb-3">
               <Form.Group controlId="formSystemID">
-                <Form.Label>System ID <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="number"
+                <Form.Label>
+                  Systems <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Select
                   name="SystemID"
                   value={formData.SystemID}
                   onChange={handleChange}
-                  placeholder="Enter system ID"
                   required
-                  min="1"
                   disabled={isSubmitting}
-                />
+                  aria-label="Select system"
+                >
+                  {systemOptions.map((system) => (
+                    <option key={system} value={system}>
+                      {system}
+                    </option>
+                  ))}
+                </Form.Select>
                 <Form.Control.Feedback type="invalid">
-                  Please provide a valid system ID.
-                </Form.Control.Feedback>
-              </Form.Group>
-            </div>
-
-            <div className="col-md-6 mb-3">
-              <Form.Group controlId="formSectionID">
-                <Form.Label>Section ID <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="number"
-                  name="SectionID"
-                  value={formData.SectionID}
-                  onChange={handleChange}
-                  placeholder="Enter section ID"
-                  required
-                  min="1"
-                  disabled={isSubmitting}
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a valid section ID.
+                  Please select a system.
                 </Form.Control.Feedback>
               </Form.Group>
             </div>
           </div>
 
           <Form.Group className="mb-3" controlId="formReportedBy">
-            <Form.Label>Reported By <span className="text-danger">*</span></Form.Label>
+            <Form.Label>
+              Reported By <span className="text-danger">*</span>
+            </Form.Label>
             <Form.Control
               type="text"
               name="ReportedBy"
@@ -187,25 +208,57 @@ export default function NewFaultModal({
             </Form.Control.Feedback>
           </Form.Group>
 
-          <Form.Group className="mb-3" controlId="formLocation">
-            <Form.Label>Location <span className="text-danger">*</span></Form.Label>
-            <Form.Control
-              type="text"
-              name="Location"
-              value={formData.Location}
-              onChange={handleChange}
-              placeholder="Enter location"
-              required
-              maxLength="200"
-              disabled={isSubmitting}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide the location.
-            </Form.Control.Feedback>
-          </Form.Group>
+          <div className="row">
+            <div className="col-md-6 mb-3">
+              <Form.Group controlId="formLocation">
+                <Form.Label>
+                  Location <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Select
+                  name="Location"
+                  value={formData.Location}
+                  onChange={handleChange}
+                  required
+                  disabled={isSubmitting}
+                  aria-label="Select location"
+                >
+                  {locationOptions.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </Form.Select>
+                <Form.Control.Feedback type="invalid">
+                  Please select the location.
+                </Form.Control.Feedback>
+              </Form.Group>
+            </div>
+
+            <div className="col-md-6 mb-3">
+              <Form.Group controlId="formLocationOfFault">
+                <Form.Label>Location of Fault</Form.Label>
+                <Form.Select
+                  name="LocationOfFault"
+                  value={formData.LocationOfFault}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                  aria-label="Select location of fault"
+                >
+                  <option value="">Select location of fault</option>
+                  {faultLocationOptions.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </div>
+          </div>
 
           <Form.Group className="mb-3" controlId="formDescFault">
-            <Form.Label>Description <span className="text-danger">*</span></Form.Label>
+            <Form.Label>
+              Description <span className="text-danger">*</span>
+            </Form.Label>
             <Form.Control
               name="DescFault"
               as="textarea"
@@ -229,7 +282,9 @@ export default function NewFaultModal({
             {initialData && (
               <div className="col-md-6 mb-3">
                 <Form.Group controlId="formStatus">
-                  <Form.Label>Status <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>
+                    Status <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Select
                     name="Status"
                     value={formData.Status}
@@ -247,9 +302,11 @@ export default function NewFaultModal({
               </div>
             )}
 
-            <div className={`col-md-${initialData ? '6' : '12'} mb-3`}>
+            <div className={`col-md-${initialData ? "6" : "12"} mb-3`}>
               <Form.Group controlId="formAssignTo">
-                <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
+                <Form.Label>
+                  Assigned To <span className="text-danger">*</span>
+                </Form.Label>
                 <Form.Select
                   name="AssignTo"
                   value={formData.AssignTo}
@@ -258,7 +315,9 @@ export default function NewFaultModal({
                   disabled={assignablePersons.length === 0 || isSubmitting}
                 >
                   {assignablePersons.length === 0 ? (
-                    <option value="" disabled>No persons available</option>
+                    <option value="" disabled>
+                      No persons available
+                    </option>
                   ) : (
                     assignablePersons.map((person) => (
                       <option key={person} value={person}>
@@ -275,25 +334,32 @@ export default function NewFaultModal({
           </div>
 
           <Modal.Footer className="px-0">
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               onClick={handleModalClose}
               disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               type="submit"
               disabled={isSubmitting || assignablePersons.length === 0}
             >
               {isSubmitting ? (
                 <>
-                  <Spinner as="span" animation="border" size="sm" className="me-2" />
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    className="me-2"
+                  />
                   {initialData ? "Updating..." : "Creating..."}
                 </>
+              ) : initialData ? (
+                "Update Fault"
               ) : (
-                initialData ? "Update Fault" : "Create Fault"
+                "Create Fault"
               )}
             </Button>
           </Modal.Footer>

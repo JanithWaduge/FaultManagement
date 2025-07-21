@@ -126,10 +126,7 @@ function useMultiFaults() {
     setResolved(r => r.filter(f => f.id !== id));
   };
 
-  // Mark fault as resolved:
-  // - update backend fault status = closed
-  // - remove from open list
-  // - add to resolved list with updated data
+  // Mark fault as resolved
   const resolve = async (id) => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -139,6 +136,7 @@ function useMultiFaults() {
       const payload = {
         SystemID: fault.SystemID,
         Location: fault.Location,
+        LocationOfFault: fault.LocationOfFault,
         DescFault: fault.DescFault,
         ReportedBy: fault.ReportedBy,
         AssignTo: fault.AssignTo,
@@ -180,6 +178,101 @@ function usePagination(list, perPage = 10) {
   return { current, page, setPage, max };
 }
 
+function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max }) {
+  return (
+    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
+      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
+        <Card.Body className="p-0 d-flex flex-column">
+          <Table
+            striped bordered hover responsive
+            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
+            aria-label="Faults Table"
+          >
+            <colgroup>
+              <col style={{ width: '3.5%', textAlign: 'center' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '7.5%' }} />
+            </colgroup>
+            <thead className="sticky-top bg-light">
+              <tr>
+                <th className="text-center">ID</th>
+                <th className="text-center">Systems</th>
+                <th>Reported By</th>
+                <th>Location</th>
+                <th>Location of Fault</th>
+                <th>Description</th>
+                <th className="text-center">Status</th>
+                <th>Assigned To</th>
+                <th>Reported At</th>
+                <th className="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {faults.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-center text-muted py-4">No faults.</td>
+                </tr>
+              ) : (
+                faults.map(f => (
+                  <tr key={f.id} className="table-row-hover">
+                    <td className="text-center">{f.id}</td>
+                    <td className="text-center">{f.SystemID}</td>
+                    <td>{f.ReportedBy}</td>
+                    <td>{f.Location}</td>
+                    <td>{f.LocationOfFault}</td>
+                    <td className="description-col">{f.DescFault}</td>
+                    <td className="text-center">{f.Status}</td>
+                    <td>{f.AssignTo}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
+                    <td className="text-center">
+                      {!isResolved && onEdit && (
+                        <Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => onEdit(f)} aria-label={`Edit fault ${f.id}`}>
+                          Edit
+                        </Button>
+                      )}
+                      {!isResolved && onMarkResolved && (
+                        <Button variant="outline-success" size="sm" className="me-1 mb-1" onClick={() => onMarkResolved(f.id)} aria-label={`Mark fault ${f.id} as resolved`}>
+                          Mark as Resolved
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </Table>
+          <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
+            <ul className="pagination justify-content-center mb-0">
+              <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
+              </li>
+              {Array.from({ length: max }).map((_, idx) => {
+                const pageNum = idx + 1;
+                return (
+                  <li key={pageNum} className={`page-item ${page === pageNum ? "active" : ""}`}>
+                    <button className="page-link" onClick={() => setPage(pageNum)} aria-current={page === pageNum ? "page" : undefined}>
+                      {pageNum}
+                    </button>
+                  </li>
+                );
+              })}
+              <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
+                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
+              </li>
+            </ul>
+          </nav>
+        </Card.Body>
+      </Card>
+    </Row>
+  );
+}
+
 export default function Dashboard({ userInfo, notifications, setNotifications, onLogout }) {
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -204,7 +297,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   const currentFaultArr = view === "faults" ? open : resolved;
   const filtered = currentFaultArr.filter(f => {
     if (!f) return false;
-    const haystack = [f.DescFault, f.Location, f.ReportedBy].join(" ").toLowerCase();
+    const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
     return haystack.includes(search.toLowerCase());
   });
   const { current, page, setPage, max } = usePagination(filtered);
@@ -311,7 +404,6 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
 
       {/* Your styles (same as your original styles) */}
       <style>{`
-        
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
           border: 1.5px solid rgba(255, 255, 255, 0.4);
@@ -435,107 +527,5 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
         }
       `}</style>
     </>
-  );
-}
-
-// FaultsTable component (unchanged from before)
-function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max }) {
-  return (
-    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
-      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
-        <Card.Body className="p-0 d-flex flex-column">
-          <Table
-            striped bordered hover responsive
-            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
-            aria-label="Faults Table"
-          >
-            <colgroup>
-              <col style={{ width: '3.5%', textAlign: 'center' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '7.5%' }} />
-            </colgroup>
-            <thead className="sticky-top bg-light">
-              <tr>
-                <th className="text-center">ID</th>
-                <th className="text-center">System ID</th>
-                <th className="text-center">Section ID</th>
-                <th>Reported By</th>
-                <th>Location</th>
-                <th>Description</th>
-                <th className="text-center">Status</th>
-                <th>Assigned To</th>
-                <th>Reported At</th>
-                <th className="text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {faults.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center text-muted py-4">No faults.</td>
-                </tr>
-              ) : (
-                faults.map(f => (
-                  <tr key={f.id} className="table-row-hover">
-                    <td className="text-center">{f.id}</td>
-                    <td className="text-center">{f.SystemID}</td>
-                    <td className="text-center">{f.SectionID}</td>
-                    <td>{f.ReportedBy}</td>
-                    <td>{f.Location}</td>
-                    <td className="description-col">{f.DescFault}</td>
-                    <td className="text-center">{f.Status}</td>
-                    <td>{f.AssignTo}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
-                    <td className="text-center">
-                      {!isResolved && onEdit && (
-                        <Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => onEdit(f)} aria-label={`Edit fault ${f.id}`}>
-                          Edit
-                        </Button>
-                      )}
-                      {!isResolved && onMarkResolved && (
-                        <Button variant="outline-success" size="sm" className="me-1 mb-1" onClick={() => onMarkResolved(f.id)} aria-label={`Mark fault ${f.id} as resolved`}>
-                          Mark as Resolved
-                        </Button>
-                      )}
-                      {onDelete && (
-                        <Button variant="outline-danger" size="sm" onClick={() => onDelete(f.id)} aria-label={`Delete fault ${f.id}`}>
-                          Delete
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
-          <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
-            <ul className="pagination justify-content-center mb-0">
-              <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
-              </li>
-              {Array.from({ length: max }).map((_, idx) => {
-                const pageNum = idx + 1;
-                return (
-                  <li key={pageNum} className={`page-item ${page === pageNum ? "active" : ""}`}>
-                    <button className="page-link" onClick={() => setPage(pageNum)} aria-current={page === pageNum ? "page" : undefined}>
-                      {pageNum}
-                    </button>
-                  </li>
-                );
-              })}
-              <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
-              </li>
-            </ul>
-          </nav>
-        </Card.Body>
-      </Card>
-    </Row>
   );
 }

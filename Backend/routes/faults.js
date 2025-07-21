@@ -9,6 +9,7 @@ const router = express.Router();
 const ALLOWED_UPDATE_FIELDS = [
     'SystemID',
     'Location',
+    'LocationOfFault',
     'LocFaultID',
     'DescFault',
     'ReportedBy',
@@ -19,11 +20,37 @@ const ALLOWED_UPDATE_FIELDS = [
     'FaultForwardID'
 ];
 
+// Allowed values for SystemID
+const VALID_SYSTEM_IDS = [
+    'NETWORK',
+    'PBX',
+    'CCTV',
+    'IP-PABX',
+    'FIDS',
+    'VDGS',
+    'IT',
+    'FIRE',
+    'CLOCK',
+    'EGB',
+    'ERP'
+];
+
+// Allowed values for LocationOfFault
+const VALID_FAULT_LOCATIONS = [
+    'Admin-IT',
+    'Terminal-A',
+    'Terminal-B',
+    'Cargo Building',
+    'Terminal Car Park',
+    'Pier Building'
+];
+
 // Create new fault
 router.post('/', [
     authenticateToken,
-    body('SystemID').isInt().withMessage('System ID must be an integer'),
+    body('SystemID').isIn(VALID_SYSTEM_IDS).withMessage('Invalid System ID'),
     body('Location').trim().notEmpty().withMessage('Location is required'),
+    body('LocationOfFault').optional().isIn(VALID_FAULT_LOCATIONS).withMessage('Invalid fault location'),
     body('DescFault').trim().notEmpty().withMessage('Description is required'),
     body('ReportedBy').trim().notEmpty().withMessage('Reporter name is required'),
     body('AssignTo').trim().notEmpty().withMessage('Assignee is required'),
@@ -43,6 +70,7 @@ router.post('/', [
         const {
             SystemID,
             Location,
+            LocationOfFault = null,
             LocFaultID = null,
             DescFault,
             ReportedBy,
@@ -56,6 +84,7 @@ router.post('/', [
         const queryParams = {
             SystemID,
             Location,
+            LocationOfFault,
             LocFaultID,
             DescFault,
             ReportedBy,
@@ -68,11 +97,11 @@ router.post('/', [
 
         const result = await db.query(`
             INSERT INTO dbo.tblFaults (
-                SystemID, Location, LocFaultID, DescFault,
+                SystemID, Location, LocationOfFault, LocFaultID, DescFault,
                 ReportedBy, ExtNo, DateTime, AssignTo,
                 Status, SectionID, FaultForwardID
             ) VALUES (
-                @SystemID, @Location, @LocFaultID, @DescFault,
+                @SystemID, @Location, @LocationOfFault, @LocFaultID, @DescFault,
                 @ReportedBy, @ExtNo, GETDATE(), @AssignTo,
                 @Status, @SectionID, @FaultForwardID
             );
@@ -114,8 +143,9 @@ router.get('/', authenticateToken, async (req, res) => {
 router.put('/:id', [
     authenticateToken,
     param('id').isInt().withMessage('Fault ID must be an integer'),
-    body('SystemID').optional().isInt().withMessage('System ID must be an integer'),
+    body('SystemID').optional().isIn(VALID_SYSTEM_IDS).withMessage('Invalid System ID'),
     body('Location').optional().trim().notEmpty().withMessage('Location is required'),
+    body('LocationOfFault').optional().isIn(VALID_FAULT_LOCATIONS).withMessage('Invalid fault location'),
     body('DescFault').optional().trim().notEmpty().withMessage('Description is required'),
     body('ReportedBy').optional().trim().notEmpty().withMessage('Reporter name is required'),
     body('AssignTo').optional().trim().notEmpty().withMessage('Assignee is required'),
