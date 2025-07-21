@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Table, Button, Container, Row, Col, Card, Tabs, Tab } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
@@ -295,12 +295,19 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   }, [showNotif, setNotifications]);
 
   const currentFaultArr = view === "faults" ? open : resolved;
-  const filtered = currentFaultArr.filter(f => {
-    if (!f) return false;
-    const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
-    return haystack.includes(search.toLowerCase());
-  });
-  const { current, page, setPage, max } = usePagination(filtered);
+  const filtered = useMemo(() => {
+    return currentFaultArr.filter(f => {
+      if (!f) return false;
+      const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
+      return haystack.includes(search.toLowerCase());
+    });
+  }, [currentFaultArr, search]);
+
+  // Only reset page when filtered list changes
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [filtered]);
+  const max = Math.ceil(filtered.length / 10);
+  const current = filtered.slice((page - 1) * 10, page * 10);
 
   return (
     <>
