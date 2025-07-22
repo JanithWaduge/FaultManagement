@@ -54,7 +54,7 @@ router.post('/', [
     body('DescFault').trim().notEmpty().withMessage('Description is required'),
     body('ReportedBy').trim().notEmpty().withMessage('Reporter name is required'),
     body('AssignTo').trim().notEmpty().withMessage('Assignee is required'),
-    body('SectionID').isInt().withMessage('Section ID must be an integer')
+    body('SectionID').optional().isInt({ allow_null: true }).withMessage('Section ID must be an integer if provided').toInt() // Explicitly allow null
 ], async (req, res) => {
     try {
         // Check if req.body is an object and not empty
@@ -64,7 +64,10 @@ router.post('/', [
 
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
+            return res.status(400).json({ 
+                message: 'Validation failed', 
+                errors: errors.array() 
+            });
         }
 
         const {
@@ -77,9 +80,11 @@ router.post('/', [
             ExtNo = null,
             AssignTo,
             Status = 'Open',
-            SectionID,
+            SectionID = null,
             FaultForwardID = null
         } = req.body;
+
+        console.log('Received data:', req.body); // Debug log
 
         const queryParams = {
             SystemID,
@@ -120,7 +125,8 @@ router.post('/', [
         console.error('Database error:', error);
         res.status(500).json({ 
             message: 'Failed to create fault',
-            error: process.env.NODE_ENV === 'development' ? error.message : null
+            error: process.env.NODE_ENV === 'development' ? error.message : null,
+            details: process.env.NODE_ENV === 'development' ? error.stack : null
         });
     }
 });
@@ -139,64 +145,85 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// Update a fault
+// Update a fault (with enhanced validation error handling)
+
 router.put('/:id', [
-    authenticateToken,
-    param('id').isInt().withMessage('Fault ID must be an integer'),
-    body('SystemID').optional().isIn(VALID_SYSTEM_IDS).withMessage('Invalid System ID'),
-    body('Location').optional().trim().notEmpty().withMessage('Location is required'),
-    body('LocationOfFault').optional().isIn(VALID_FAULT_LOCATIONS).withMessage('Invalid fault location'),
-    body('DescFault').optional().trim().notEmpty().withMessage('Description is required'),
-    body('ReportedBy').optional().trim().notEmpty().withMessage('Reporter name is required'),
-    body('AssignTo').optional().trim().notEmpty().withMessage('Assignee is required'),
-    body('SectionID').optional().isInt().withMessage('Section ID must be an integer'),
-    body('Status').optional().isIn(['Open', 'Closed']).withMessage('Status must be Open or Closed')
+  authenticateToken,
+  param('id').isInt().withMessage('Fault ID must be an integer'),
+  body('SystemID').optional().isIn(VALID_SYSTEM_IDS).withMessage('Invalid System ID'),
+  body('Location').optional().trim().notEmpty().withMessage('Location is required'),
+  body('LocationOfFault').optional().isIn(VALID_FAULT_LOCATIONS).withMessage('Invalid fault location'),
+  body('DescFault').optional().trim().notEmpty().withMessage('Description is required'),
+  body('ReportedBy').optional().trim().notEmpty().withMessage('Reporter name is required'),
+  body('AssignTo').optional().trim().notEmpty().withMessage('Assignee is required'),
+  body('SectionID').optional().custom(value => {
+    if (value === null) return true; // allow null explicitly
+    if (typeof value === 'number') return Number.isInteger(value);
+    if (typeof value === 'string' && value.trim() === '') return true; // treat empty string as null
+    throw new Error('Section ID must be an integer or null if provided');
+  }),
+  body('Status').optional().isIn(['Open', 'Closed']).withMessage('Status must be Open or Closed')
 ], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+  try {
+    const errors = validationResult(req);
 
-        const faultId = req.params.id;
-        const updates = {};
-        ALLOWED_UPDATE_FIELDS.forEach(field => {
-            if (req.body[field] !== undefined) {
-                updates[field] = req.body[field];
-            }
-        });
+    if (!errors.isEmpty()) {
+      // Log detailed error with body for debugging
+      console.error('Validation failed on update:', errors.array());
+      console.error('Request Body:', req.body);
 
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ message: 'No valid fields provided for update' });
-        }
-
-        const query = `
-            UPDATE dbo.tblFaults
-            SET ${Object.keys(updates).map(field => `${field} = @${field}`).join(', ')},
-                DateTime = GETDATE()
-            WHERE id = @id;
-            SELECT * FROM dbo.tblFaults WHERE id = @id;
-        `;
-        const queryParams = { id: faultId, ...updates };
-
-        const result = await db.query(query, queryParams);
-
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ message: 'Fault not found' });
-        }
-
-        res.status(200).json({
-            message: 'Fault updated successfully',
-            fault: result.recordset[0]
-        });
-    } catch (error) {
-        console.error('Database error:', error);
-        res.status(500).json({ 
-            message: 'Failed to update fault',
-            error: process.env.NODE_ENV === 'development' ? error.message : null
-        });
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: errors.array(),
+        receivedBody: req.body  // Optional, remove in prod for security
+      });
     }
+
+    const faultId = req.params.id;
+    const updates = {};
+    ALLOWED_UPDATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No valid fields provided for update' });
+    }
+
+    // Treat empty string SectionID as null before SQL update
+    if (updates.SectionID === '') {
+      updates.SectionID = null;
+    }
+
+    const query = `
+      UPDATE dbo.tblFaults
+      SET ${Object.keys(updates).map(field => `${field} = @${field}`).join(', ')},
+          DateTime = GETDATE()
+      WHERE id = @id;
+      SELECT * FROM dbo.tblFaults WHERE id = @id;
+    `;
+    const queryParams = { id: faultId, ...updates };
+
+    const result = await db.query(query, queryParams);
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: 'Fault not found' });
+    }
+
+    res.status(200).json({
+      message: 'Fault updated successfully',
+      fault: result.recordset[0]
+    });
+
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({
+      message: 'Failed to update fault',
+      error: process.env.NODE_ENV === 'development' ? error.message : null
+    });
+  }
 });
+
 
 // Delete a fault
 router.delete('/:id', [

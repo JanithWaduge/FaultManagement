@@ -8,7 +8,7 @@ const assignablePersons = [
   "John Doe",
   "Jane Smith",
   "Alex Johnson",
-  "Emily Davis"
+  "Emily Davis",
 ];
 
 function useMultiFaults() {
@@ -17,7 +17,7 @@ function useMultiFaults() {
   const [err, setErr] = useState("");
   const token = localStorage.getItem("token");
 
-  // Initial fetch
+  // Fetch open faults
   const fetchOpen = async () => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -32,6 +32,7 @@ function useMultiFaults() {
     }
   };
 
+  // Fetch resolved faults
   const fetchResolved = async () => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -40,7 +41,6 @@ function useMultiFaults() {
       });
       if (!res.ok) throw new Error("Failed to fetch resolved faults");
       const data = await res.json();
-      // Only keep faults with Status 'Closed' just in case
       setResolved(data.filter(f => f.Status.toLowerCase() === "closed"));
       setErr("");
     } catch (e) {
@@ -48,13 +48,13 @@ function useMultiFaults() {
     }
   };
 
-  // Only fetch open and resolved on mount
+  // Load faults on mount
   useEffect(() => {
     fetchOpen();
     fetchResolved();
   }, []);
 
-  // Create a new fault, then add it to open faults list directly (expect new fault will be 'Open' status)
+  // Create new fault
   const create = async (data) => {
     if (!token) throw new Error("Authentication required.");
     const resp = await fetch("http://localhost:5000/api/faults", {
@@ -64,7 +64,7 @@ function useMultiFaults() {
     });
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
-      throw new Error(error.message || "Failed to create fault");
+      throw new Error(error.message || "Failed to create fault. Server response: " + (error.message || "Unknown error"));
     }
     const result = await resp.json();
     if (result.fault.Status.toLowerCase() === "closed") {
@@ -75,43 +75,42 @@ function useMultiFaults() {
     return true;
   };
 
-  // Update a fault, if status updated to closed, move to resolved list from open, else update in open
+  // Update fault with the fix: convert SectionID "" to null
   const update = async (data) => {
     if (!token) throw new Error("Authentication required.");
+
+    const dataToSend = { ...data };
+    if (dataToSend.SectionID === "") dataToSend.SectionID = null;
 
     const resp = await fetch(`http://localhost:5000/api/faults/${data.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(data),
+      body: JSON.stringify(dataToSend),
     });
 
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
       throw new Error(error.message || "Failed to update fault");
     }
+
     const result = await resp.json();
     const updatedFault = result.fault;
 
     if (updatedFault.Status.toLowerCase() === "closed") {
-      // Remove from open list
       setOpen(o => o.filter(f => f.id !== updatedFault.id));
-      // Add or update in resolved list
       setResolved(r => {
         const exists = r.some(f => f.id === updatedFault.id);
-        if (exists) {
-          return r.map(f => (f.id === updatedFault.id ? updatedFault : f));
-        }
+        if (exists) return r.map(f => (f.id === updatedFault.id ? updatedFault : f));
         return [...r, updatedFault];
       });
     } else {
       setOpen(o => o.map(f => (f.id === updatedFault.id ? updatedFault : f)));
-      // Optional: remove from resolved if status changed back to open
       setResolved(r => r.filter(f => f.id !== updatedFault.id));
     }
     return true;
   };
 
-  // Remove fault from both lists
+  // Remove fault
   const remove = async (id) => {
     if (!token) return;
     const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
@@ -126,7 +125,7 @@ function useMultiFaults() {
     setResolved(r => r.filter(f => f.id !== id));
   };
 
-  // Mark fault as resolved
+  // Resolve fault
   const resolve = async (id) => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -154,11 +153,11 @@ function useMultiFaults() {
         const errorData = await resp.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to mark as resolved");
       }
+
       const result = await resp.json();
 
       setOpen(o => o.filter(f => f.id !== id));
       setResolved(r => {
-        // Avoid duplicate
         if (r.some(f => f.id === id)) return r;
         return [...r, result.fault];
       });
@@ -168,14 +167,6 @@ function useMultiFaults() {
   };
 
   return { open, resolved, create, update, remove, resolve, err, setErr };
-}
-
-function usePagination(list, perPage = 10) {
-  const [page, setPage] = useState(1);
-  const max = Math.ceil(list.length / perPage);
-  const current = list.slice((page - 1) * perPage, page * perPage);
-  React.useEffect(() => setPage(1), [list]);
-  return { current, page, setPage, max };
 }
 
 function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max }) {
@@ -198,6 +189,7 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
               <col style={{ width: '7%' }} />
               <col style={{ width: '10%' }} />
               <col style={{ width: '7.5%' }} />
+              <col style={{ width: '10%' }} />
             </colgroup>
             <thead className="sticky-top bg-light">
               <tr>
@@ -232,13 +224,40 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                     <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
                     <td className="text-center">
                       {!isResolved && onEdit && (
-                        <Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => onEdit(f)} aria-label={`Edit fault ${f.id}`}>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          className="me-1 mb-1"
+                          onClick={() => onEdit(f)}
+                          aria-label={`Edit fault ${f.id}`}
+                        >
                           Edit
                         </Button>
                       )}
                       {!isResolved && onMarkResolved && (
-                        <Button variant="outline-success" size="sm" className="me-1 mb-1" onClick={() => onMarkResolved(f.id)} aria-label={`Mark fault ${f.id} as resolved`}>
+                        <Button
+                          variant="outline-success"
+                          size="sm"
+                          className="me-1 mb-1"
+                          onClick={() => onMarkResolved(f.id)}
+                          aria-label={`Mark fault ${f.id} as resolved`}
+                        >
                           Mark as Resolved
+                        </Button>
+                      )}
+                      {isResolved && onDelete && (
+                        <Button
+                          variant="outline-danger"
+                          size="sm"
+                          className="mb-1"
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete fault #${f.id}?`)) {
+                              onDelete(f.id);
+                            }
+                          }}
+                          aria-label={`Delete fault ${f.id}`}
+                        >
+                          Delete
                         </Button>
                       )}
                     </td>
@@ -303,7 +322,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
     });
   }, [currentFaultArr, search]);
 
-  // Only reset page when filtered list changes
+  // Reset page when filtered list changes
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [filtered]);
   const max = Math.ceil(filtered.length / 10);
@@ -372,7 +391,15 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                     </Col>
                   </Row>
                   <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
-                  <FaultsTable faults={current} onEdit={setEdit} onDelete={remove} onMarkResolved={resolve} isResolved={false} page={page} setPage={setPage} max={max} />
+                  <FaultsTable
+                    faults={current}
+                    onEdit={setEdit}
+                    onMarkResolved={resolve}
+                    isResolved={false}
+                    page={page}
+                    setPage={setPage}
+                    max={max}
+                  />
                 </>}
               </Tab>
 
@@ -384,7 +411,14 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                     </Col>
                   </Row>
                   <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
-                  <FaultsTable faults={current} onDelete={remove} isResolved={true} page={page} setPage={setPage} max={max} />
+                  <FaultsTable
+                    faults={current}
+                    onDelete={remove}
+                    isResolved={true}
+                    page={page}
+                    setPage={setPage}
+                    max={max}
+                  />
                 </>}
               </Tab>
             </Tabs>
@@ -409,7 +443,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       {/* New/Edit Fault Modal */}
       <NewFaultModal show={modal || Boolean(edit)} handleClose={() => { setModal(false); setEdit(null); }} handleAdd={edit ? update : create} assignablePersons={assignablePersons} initialData={edit} />
 
-      {/* Your styles (same as your original styles) */}
+      {/* Styles */}
       <style>{`
         .glass-button {
           background: rgba(255, 255, 255, 0.1);

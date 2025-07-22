@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Alert, Spinner } from "react-bootstrap";
 
+// Your options arrays as before
 const locationOptions = ["BIA", "BDA", "JIA", "MRIA", "RMA"];
 const systemOptions = [
-    "NETWORK",
-    "PBX",
-    "CCTV",
-    "IP-PABX",
-    "FIDS",
-    "VDGS",
-    "IT",
-    "FIRE",
-    "CLOCK",
-    "EGB",
-    "ERP"
+  "NETWORK",
+  "PBX",
+  "CCTV",
+  "IP-PABX",
+  "FIDS",
+  "VDGS",
+  "IT",
+  "FIRE",
+  "CLOCK",
+  "EGB",
+  "ERP",
 ];
 const faultLocationOptions = [
-    "Admin-IT",
-    "Terminal-A",
-    "Terminal-B",
-    "Cargo Building",
-    "Terminal Car Park",
-    "Pier Building"
+  "Admin-IT",
+  "Terminal-A",
+  "Terminal-B",
+  "Cargo Building",
+  "Terminal Car Park",
+  "Pier Building",
 ];
 
 export default function NewFaultModal({
@@ -32,10 +33,11 @@ export default function NewFaultModal({
   initialData = null,
 }) {
   const [formData, setFormData] = useState({
-    SystemID: systemOptions[0], // Default to first system
+    SystemID: systemOptions[0],
+    SectionID: "",
     ReportedBy: "",
     Location: locationOptions[0],
-    LocationOfFault: "", // Default to empty for optional field
+    LocationOfFault: "",
     DescFault: "",
     Status: "Open",
     AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
@@ -48,6 +50,7 @@ export default function NewFaultModal({
   useEffect(() => {
     const emptyForm = {
       SystemID: systemOptions[0],
+      SectionID: "",
       ReportedBy: "",
       Location: locationOptions[0],
       LocationOfFault: "",
@@ -63,6 +66,7 @@ export default function NewFaultModal({
         SystemID: systemOptions.includes(initialData.SystemID)
           ? initialData.SystemID
           : systemOptions[0],
+        SectionID: initialData.SectionID || "",
         ReportedBy: initialData.ReportedBy || "",
         Location: locationOptions.includes(initialData.Location)
           ? initialData.Location
@@ -83,6 +87,7 @@ export default function NewFaultModal({
     setIsSubmitting(false);
   }, [initialData, assignablePersons, show]);
 
+  // Change handler
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -90,18 +95,45 @@ export default function NewFaultModal({
       [name]: value,
     }));
 
-    if (error) {
-      setError("");
-    }
+    if (error) setError("");
   };
 
+  // Construct clean payload, omitting unused/empty optional fields
+  function buildPayload(formData, initialData) {
+    const payload = {
+      SystemID: formData.SystemID,
+      ReportedBy: formData.ReportedBy,
+      Location: formData.Location,
+      DescFault: formData.DescFault,
+      AssignTo: formData.AssignTo,
+      Status: formData.Status,
+    };
+
+    if (formData.SectionID && formData.SectionID.trim() !== "") {
+      payload.SectionID = formData.SectionID;
+    }
+    if (formData.LocationOfFault && formData.LocationOfFault.trim() !== "") {
+      payload.LocationOfFault = formData.LocationOfFault;
+    }
+    if (initialData && initialData.id) {
+      payload.id = initialData.id;
+    }
+    return payload;
+  }
+
+  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
+    // built-in client-side validation
     const form = e.currentTarget;
-
     if (form.checkValidity() === false) {
+      setValidated(true);
+      return;
+    }
+    if (!formData.ReportedBy.trim() || !formData.DescFault.trim()) {
+      setError("Reported By and Description are required fields.");
       setValidated(true);
       return;
     }
@@ -110,15 +142,14 @@ export default function NewFaultModal({
     setError("");
 
     try {
-      const dataToSubmit = {
-        ...formData,
-        id: initialData ? initialData.id : undefined,
-      };
-      const success = await handleAdd(dataToSubmit);
+      const payload = buildPayload(formData, initialData);
+      console.log("Submitting payload:", payload);
+      const success = await handleAdd(payload);
       if (success) {
         handleClose();
         setFormData({
           SystemID: systemOptions[0],
+          SectionID: "",
           ReportedBy: "",
           Location: locationOptions[0],
           LocationOfFault: "",
@@ -128,8 +159,21 @@ export default function NewFaultModal({
         });
         setValidated(false);
       }
-    } catch (error) {
-      setError(error.message || "Failed to submit form. Please try again.");
+    } catch (err) {
+      // Try to show detailed API validation feedback if sent
+      let errorMsg = "Failed to submit form. Please try again.";
+      if (err && err.response && err.response.data) {
+        if (err.response.data.errors) {
+          errorMsg = `Validation failed: ${err.response.data.errors
+            .map((e) => e.msg)
+            .join(", ")}`;
+        } else if (err.response.data.message) {
+          errorMsg = err.response.data.message;
+        }
+        // Optionally log full error for debugging
+        console.error("API full error:", err.response.data);
+      }
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -153,7 +197,6 @@ export default function NewFaultModal({
           {initialData ? "Edit Fault Report" : "New Fault Report"}
         </Modal.Title>
       </Modal.Header>
-
       <Modal.Body>
         {error && (
           <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -166,7 +209,7 @@ export default function NewFaultModal({
             <div className="col-md-6 mb-3">
               <Form.Group controlId="formSystemID">
                 <Form.Label>
-                  Systems <span className="text-danger">*</span>
+                  System <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
                   name="SystemID"
@@ -174,7 +217,6 @@ export default function NewFaultModal({
                   onChange={handleChange}
                   required
                   disabled={isSubmitting}
-                  aria-label="Select system"
                 >
                   {systemOptions.map((system) => (
                     <option key={system} value={system}>
@@ -220,7 +262,6 @@ export default function NewFaultModal({
                   onChange={handleChange}
                   required
                   disabled={isSubmitting}
-                  aria-label="Select location"
                 >
                   {locationOptions.map((loc) => (
                     <option key={loc} value={loc}>
@@ -242,7 +283,6 @@ export default function NewFaultModal({
                   value={formData.LocationOfFault}
                   onChange={handleChange}
                   disabled={isSubmitting}
-                  aria-label="Select location of fault"
                 >
                   <option value="">Select location of fault</option>
                   {faultLocationOptions.map((loc) => (
