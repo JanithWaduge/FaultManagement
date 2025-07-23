@@ -101,11 +101,16 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
   }, [showNotif, setNotifications]);
 
   const currentFaultArr = view === "faults" ? open : resolved;
-  const filtered = currentFaultArr.filter(f => {
-    if (!f) return false;
-    const haystack = [f.DescFault, f.Location, f.ReportedBy].join(" ").toLowerCase();
-    return haystack.includes(search.toLowerCase());
-  });
+
+  const filtered = React.useMemo(() => {
+    return currentFaultArr.filter(f => {
+      if (!f) return false;
+      // Include multiple relevant fields for search
+      const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
+      return haystack.includes(search.toLowerCase());
+    });
+  }, [currentFaultArr, search]);
+
   const { current, page, setPage, max } = usePagination(filtered);
 
   return (
@@ -117,17 +122,52 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
           <span className="navbar-brand mb-0 h1 mx-auto">⚡ N F M System Version 1.0.1</span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
-              <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }} aria-label="Toggle Notifications">
+              <Button
+                variant="link"
+                className="text-white p-0"
+                onClick={() => setShowNotif(v => !v)}
+                style={{ fontSize: "1.3rem" }}
+                aria-label="Toggle Notifications"
+              >
                 <BellFill />
-                {notifications.some(n => !n.isRead) && <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>{notifications.filter(n => !n.isRead).length}</span>}
+                {notifications.some(n => !n.isRead) && (
+                  <span
+                    className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
+                    style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}
+                  >
+                    {notifications.filter(n => !n.isRead).length}
+                  </span>
+                )}
               </Button>
               {showNotif && (
-                <div className="position-absolute" style={{ top: 35, right: 0, backgroundColor: "white", color: "#222", width: 280, maxHeight: 300, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", borderRadius: 8, zIndex: 1500 }}>
+                <div
+                  className="position-absolute"
+                  style={{
+                    top: 35,
+                    right: 0,
+                    backgroundColor: "white",
+                    color: "#222",
+                    width: 280,
+                    maxHeight: 300,
+                    overflowY: "auto",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    borderRadius: 8,
+                    zIndex: 1500,
+                  }}
+                >
                   {notifications.length === 0 ? (
                     <div style={{ padding: 10 }}>No notifications</div>
                   ) : (
                     notifications.map(note => (
-                      <div key={note.id} style={{ padding: 10, borderBottom: "1px solid #eee", backgroundColor: note.isRead ? "#f8f9fa" : "white", fontWeight: note.isRead ? "normal" : "600" }}>
+                      <div
+                        key={note.id}
+                        style={{
+                          padding: 10,
+                          borderBottom: "1px solid #eee",
+                          backgroundColor: note.isRead ? "#f8f9fa" : "white",
+                          fontWeight: note.isRead ? "normal" : "600",
+                        }}
+                      >
                         {note.message}
                       </div>
                     ))
@@ -135,7 +175,9 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
                 </div>
               )}
             </div>
-            <Button className="glass-button" size="sm" onClick={onLogout}>Logout</Button>
+            <Button className="glass-button" size="sm" onClick={onLogout}>
+              Logout
+            </Button>
             <UserProfileDisplay user={userInfo} />
           </div>
         </Container>
@@ -144,47 +186,89 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
       <Container fluid className="pt-5 mt-4">
         {err && (
           <div className="alert alert-danger" role="alert">
-            {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
+            {err}{" "}
+            <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
           </div>
         )}
         <Row>
           {/* Sidebar */}
           <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
-            <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
+            <div className="glass-sidebar-title mb-4 text-center">
+              <span className="sidebar-title-text">Dashboard</span>
+            </div>
             <ul className="nav flex-column">
-              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => setModal(true)}>+ Add Fault</button></li>
               <li className="nav-item mb-2">
-                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>📋 Fault Review Panel</button>
-                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>✅ Resolved Faults</button>
+                <button className="nav-link btn btn-link text-white p-0" onClick={() => setModal(true)}>
+                  + Add Fault
+                </button>
+              </li>
+              <li className="nav-item mb-2">
+                <button
+                  className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`}
+                  onClick={() => setView("faults")}
+                >
+                  📋 Fault Review Panel
+                </button>
+                <button
+                  className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`}
+                  onClick={() => setView("resolved")}
+                >
+                  ✅ Resolved Faults
+                </button>
               </li>
             </ul>
           </Col>
 
           {/* Main Content */}
-          <Col className="ms-auto d-flex flex-column" style={{ marginLeft: "16.666667%", width: "calc(100% - 16.666667%)", height: "calc(100vh - 60px)", overflow: "hidden", paddingLeft: 0, maxWidth: "82%" }}>
+          <Col
+            className="ms-auto d-flex flex-column"
+            style={{ marginLeft: "16.666667%", width: "calc(100% - 16.666667%)", height: "calc(100vh - 60px)", overflow: "hidden", paddingLeft: 0, maxWidth: "82%" }}
+          >
             <Tabs activeKey={view} className="custom-tabs" justify>
               <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
-                {view === "faults" && <>
-                  <Row className="mb-3 px-3">
-                    <Col md={4} className="mb-2">
-                      <input type="text" className="form-control" placeholder="Search faults..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search faults" />
-                    </Col>
-                  </Row>
-                  <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
-                  <FaultsTable faults={current} isResolved={false} page={page} setPage={setPage} max={max} />
-                </>}
+                {view === "faults" && (
+                  <>
+                    <Row className="mb-3 px-3">
+                      <Col md={4} className="mb-2">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search faults..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          aria-label="Search faults"
+                        />
+                      </Col>
+                    </Row>
+                    <div className="mb-2 px-3">
+                      <strong>Total Faults:</strong> {filtered.length}
+                    </div>
+                    <FaultsTable faults={current} isResolved={false} page={page} setPage={setPage} max={max} />
+                  </>
+                )}
               </Tab>
 
               <Tab eventKey="resolved" title={<span className="tab-title-lg">✅ Resolved Faults</span>}>
-                {view === "resolved" && <>
-                  <Row className="mb-3 px-3">
-                    <Col md={4} className="mb-2">
-                      <input type="text" className="form-control" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search resolved faults" />
-                    </Col>
-                  </Row>
-                  <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
-                  <FaultsTable faults={current} isResolved={true} page={page} setPage={setPage} max={max} />
-                </>}
+                {view === "resolved" && (
+                  <>
+                    <Row className="mb-3 px-3">
+                      <Col md={4} className="mb-2">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search resolved faults..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          aria-label="Search resolved faults"
+                        />
+                      </Col>
+                    </Row>
+                    <div className="mb-2 px-3">
+                      <strong>Total Resolved Faults:</strong> {filtered.length}
+                    </div>
+                    <FaultsTable faults={current} isResolved={true} page={page} setPage={setPage} max={max} />
+                  </>
+                )}
               </Tab>
             </Tabs>
           </Col>
@@ -192,16 +276,34 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
       </Container>
 
       {/* Footer */}
-      <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
+      <footer
+        className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow"
+        style={{ backgroundColor: "#001f3f" }}
+      >
         <div className="mb-2 mb-sm-0">
-          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
+          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>
+            Support
+          </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0" aria-live="polite">
-          Total Open: {open.length} | Resolved: {resolved.length} | Unread Notifications: {notifications.filter(n => !n.isRead).length}
+          Total Open: {open.length} | Resolved: {resolved.length} | Unread Notifications:{" "}
+          {notifications.filter(n => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
-          <Button className="glass-button" size="sm" onClick={() => setFooterInfo(v => !v)} aria-expanded={footerInfo} aria-controls="footer-info">{footerInfo ? "Hide Info" : "Show Info"}</Button>
-          {footerInfo && <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>© 2025 Network Fault Management System. All rights reserved.</div>}
+          <Button
+            className="glass-button"
+            size="sm"
+            onClick={() => setFooterInfo(v => !v)}
+            aria-expanded={footerInfo}
+            aria-controls="footer-info"
+          >
+            {footerInfo ? "Hide Info" : "Show Info"}
+          </Button>
+          {footerInfo && (
+            <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+              © 2025 Network Fault Management System. All rights reserved.
+            </div>
+          )}
         </div>
       </footer>
 
@@ -338,24 +440,27 @@ export default function DashboardViewOnly({ userInfo, notifications, setNotifica
 
 function FaultsTable({ faults, isResolved, page, setPage, max }) {
   return (
-    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
+    <Row style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}>
       <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
         <Card.Body className="p-0 d-flex flex-column">
           <Table
-            striped bordered hover responsive
+            striped
+            bordered
+            hover
+            responsive
             className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
             aria-label="Faults Table"
           >
             <colgroup>
-              <col style={{ width: '4%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '22%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '14%' }} />
+              <col style={{ width: "4%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "14%" }} />
             </colgroup>
             <thead className="sticky-top bg-light">
               <tr>
@@ -373,7 +478,9 @@ function FaultsTable({ faults, isResolved, page, setPage, max }) {
             <tbody>
               {faults.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center text-muted py-4">No faults.</td>
+                  <td colSpan={9} className="text-center text-muted py-4">
+                    No faults.
+                  </td>
                 </tr>
               ) : (
                 faults.map(f => (
@@ -395,7 +502,9 @@ function FaultsTable({ faults, isResolved, page, setPage, max }) {
           <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
             <ul className="pagination justify-content-center mb-0">
               <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
+                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">
+                  Previous
+                </button>
               </li>
               {Array.from({ length: max }).map((_, idx) => {
                 const pageNum = idx + 1;
@@ -408,7 +517,9 @@ function FaultsTable({ faults, isResolved, page, setPage, max }) {
                 );
               })}
               <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
+                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">
+                  Next
+                </button>
               </li>
             </ul>
           </nav>
