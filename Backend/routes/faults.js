@@ -146,7 +146,6 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Update a fault (with enhanced validation error handling)
-
 router.put('/:id', [
   authenticateToken,
   param('id').isInt().withMessage('Fault ID must be an integer'),
@@ -162,7 +161,8 @@ router.put('/:id', [
     if (typeof value === 'string' && value.trim() === '') return true; // treat empty string as null
     throw new Error('Section ID must be an integer or null if provided');
   }),
-  body('Status').optional().isIn(['Open', 'Closed']).withMessage('Status must be Open or Closed')
+  // Updated status validation to include all statuses used in frontend
+  body('Status').optional().isIn(['Open', 'In Progress', 'Pending', 'Closed']).withMessage('Invalid status value')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -223,6 +223,7 @@ router.put('/:id', [
     });
   }
 });
+
 
 
 // Delete a fault

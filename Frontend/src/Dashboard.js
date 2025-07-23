@@ -17,7 +17,6 @@ function useMultiFaults() {
   const [err, setErr] = useState("");
   const token = localStorage.getItem("token");
 
-  // Fetch open faults
   const fetchOpen = async () => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -32,7 +31,6 @@ function useMultiFaults() {
     }
   };
 
-  // Fetch resolved faults
   const fetchResolved = async () => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -48,13 +46,11 @@ function useMultiFaults() {
     }
   };
 
-  // Load faults on mount
   useEffect(() => {
     fetchOpen();
     fetchResolved();
   }, []);
 
-  // Create new fault
   const create = async (data) => {
     if (!token) throw new Error("Authentication required.");
     const resp = await fetch("http://localhost:5000/api/faults", {
@@ -75,10 +71,8 @@ function useMultiFaults() {
     return true;
   };
 
-  // Update fault with the fix: convert SectionID "" to null
   const update = async (data) => {
     if (!token) throw new Error("Authentication required.");
-
     const dataToSend = { ...data };
     if (dataToSend.SectionID === "") dataToSend.SectionID = null;
 
@@ -110,7 +104,6 @@ function useMultiFaults() {
     return true;
   };
 
-  // Remove fault
   const remove = async (id) => {
     if (!token) return;
     const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
@@ -124,13 +117,7 @@ function useMultiFaults() {
     setOpen(o => o.filter(f => f.id !== id));
     setResolved(r => r.filter(f => f.id !== id));
   };
-  
 
-
-  
-
-
-  // Resolve fault
   const resolve = async (id) => {
     if (!token) return setErr("No authentication token.");
     try {
@@ -160,7 +147,6 @@ function useMultiFaults() {
       }
 
       const result = await resp.json();
-
       setOpen(o => o.filter(f => f.id !== id));
       setResolved(r => {
         if (r.some(f => f.id === id)) return r;
@@ -174,7 +160,7 @@ function useMultiFaults() {
   return { open, resolved, create, update, remove, resolve, err, setErr };
 }
 
-function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max }) {
+function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max, onOpenEditModal }) {
   return (
     <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
       <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
@@ -224,43 +210,51 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                     <td>{f.Location}</td>
                     <td>{f.LocationOfFault}</td>
                     <td className="description-col">{f.DescFault}</td>
-                    {/* ✅ Dropdown status menu */}
-        <td>
-          <select
-            value={f.Status}
-            onChange={(e) => onEdit ? onEdit({ ...f, Status: e.target.value }) : null}
-            className="form-select form-select-sm"
-            disabled={isResolved}
-          >
-            <option value="In Progress">In Progress</option>
-            <option value="Pending">Pending</option>
-            <option value="Closed">Closed</option>
-          </select>
-        </td>
+                    <td>
+                      <select
+                        value={f.Status}
+                        onChange={async (e) => {
+                          if (isResolved) return;
+                          const updatedFault = { ...f, Status: e.target.value };
+                          try {
+                            await onEdit(updatedFault);
+                          } catch (err) {
+                            alert("Failed to update status: " + err.message);
+                          }
+                        }}
+                        className="form-select form-select-sm"
+                        disabled={isResolved}
+                        aria-label={`Change status for fault ${f.id}`}
+                      >
+                        <option value="In Progress">In Progress</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </td>
                     <td>{f.AssignTo}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
                     <td className="text-center">
-                      {!isResolved && onEdit && (
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          className="me-1 mb-1"
-                          onClick={() => onEdit(f)}
-                          aria-label={`Edit fault ${f.id}`}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                      {!isResolved && onMarkResolved && (
-                        <Button
-                          variant="outline-success"
-                          size="sm"
-                          className="me-1 mb-1"
-                          onClick={() => onMarkResolved(f.id)}
-                          aria-label={`Mark fault ${f.id} as resolved`}
-                        >
-                          Mark as Resolved
-                        </Button>
+                      {!isResolved && (
+                        <>
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            className="me-1 mb-1"
+                            onClick={() => onOpenEditModal(f)}
+                            aria-label={`Edit fault ${f.id}`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline-success"
+                            size="sm"
+                            className="me-1 mb-1"
+                            onClick={() => onMarkResolved(f.id)}
+                            aria-label={`Mark fault ${f.id} as resolved`}
+                          >
+                            Mark as Resolved
+                          </Button>
+                        </>
                       )}
                       {isResolved && onDelete && (
                         <Button
@@ -320,7 +314,6 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
 
   const { open, resolved, create, update, remove, resolve, err, setErr } = useMultiFaults();
 
-  // Notifications dropdown & mark read
   useEffect(() => {
     if (showNotif) setNotifications(n => n.map(e => ({ ...e, isRead: true })));
     function outside(e) {
@@ -331,19 +324,30 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   }, [showNotif, setNotifications]);
 
   const currentFaultArr = view === "faults" ? open : resolved;
+
+  // Sort faults by ascending id (oldest added first)
+  const sortedFaults = useMemo(() => [...currentFaultArr].sort((a, b) => a.id - b.id), [currentFaultArr]);
+
+  // Filter by search term
   const filtered = useMemo(() => {
-    return currentFaultArr.filter(f => {
+    return sortedFaults.filter(f => {
       if (!f) return false;
       const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
       return haystack.includes(search.toLowerCase());
     });
-  }, [currentFaultArr, search]);
+  }, [sortedFaults, search]);
 
-  // Reset page when filtered list changes
+  // Pagination state
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [filtered]);
   const max = Math.ceil(filtered.length / 10);
   const current = filtered.slice((page - 1) * 10, page * 10);
+
+  // Open modal in edit mode
+  function openEditModal(fault) {
+    setEdit(fault);
+    setModal(true);
+  }
 
   return (
     <>
@@ -356,7 +360,11 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
             <div ref={notifRef} style={{ position: "relative" }}>
               <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }} aria-label="Toggle Notifications">
                 <BellFill />
-                {notifications.some(n => !n.isRead) && <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>{notifications.filter(n => !n.isRead).length}</span>}
+                {notifications.some(n => !n.isRead) && (
+                  <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>
+                    {notifications.filter(n => !n.isRead).length}
+                  </span>
+                )}
               </Button>
               {showNotif && (
                 <div className="position-absolute" style={{ top: 35, right: 0, backgroundColor: "white", color: "#222", width: 280, maxHeight: 300, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", borderRadius: 8, zIndex: 1500 }}>
@@ -389,7 +397,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
           <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
             <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
             <ul className="nav flex-column">
-              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => setModal(true)}>+ Add Fault</button></li>
+              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => { setModal(true); setEdit(null); }}>+ Add Fault</button></li>
               <li className="nav-item mb-2">
                 <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>📋 Fault Review Panel</button>
                 <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>✅ Resolved Faults</button>
@@ -410,12 +418,13 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                   <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
                   <FaultsTable
                     faults={current}
-                    onEdit={setEdit}
+                    onEdit={update}
                     onMarkResolved={resolve}
                     isResolved={false}
                     page={page}
                     setPage={setPage}
                     max={max}
+                    onOpenEditModal={openEditModal}
                   />
                 </>}
               </Tab>
@@ -458,7 +467,13 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       </footer>
 
       {/* New/Edit Fault Modal */}
-      <NewFaultModal show={modal || Boolean(edit)} handleClose={() => { setModal(false); setEdit(null); }} handleAdd={edit ? update : create} assignablePersons={assignablePersons} initialData={edit} />
+      <NewFaultModal
+        show={modal}
+        handleClose={() => { setModal(false); setEdit(null); }}
+        handleAdd={edit ? update : create}
+        assignablePersons={assignablePersons}
+        initialData={edit}
+      />
 
       {/* Styles */}
       <style>{`
