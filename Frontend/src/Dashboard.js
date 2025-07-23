@@ -124,6 +124,11 @@ function useMultiFaults() {
     setOpen(o => o.filter(f => f.id !== id));
     setResolved(r => r.filter(f => f.id !== id));
   };
+  
+
+
+  
+
 
   // Resolve fault
   const resolve = async (id) => {
@@ -219,7 +224,19 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                     <td>{f.Location}</td>
                     <td>{f.LocationOfFault}</td>
                     <td className="description-col">{f.DescFault}</td>
-                    <td className="text-center">{f.Status}</td>
+                    {/* ✅ Dropdown status menu */}
+        <td>
+          <select
+            value={f.Status}
+            onChange={(e) => onEdit ? onEdit({ ...f, Status: e.target.value }) : null}
+            className="form-select form-select-sm"
+            disabled={isResolved}
+          >
+            <option value="In Progress">In Progress</option>
+            <option value="Pending">Pending</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </td>
                     <td>{f.AssignTo}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
                     <td className="text-center">

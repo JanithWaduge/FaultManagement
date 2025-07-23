@@ -39,7 +39,7 @@ export default function NewFaultModal({
     Location: locationOptions[0],
     LocationOfFault: "",
     DescFault: "",
-    Status: "Open",
+    Status: "In Progress",
     AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
   });
 
@@ -55,7 +55,7 @@ export default function NewFaultModal({
       Location: locationOptions[0],
       LocationOfFault: "",
       DescFault: "",
-      Status: "Open",
+      Status: "In Progress",
       AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
     };
 
@@ -154,7 +154,7 @@ export default function NewFaultModal({
           Location: locationOptions[0],
           LocationOfFault: "",
           DescFault: "",
-          Status: "Open",
+          Status: "In Progress",
           AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
         });
         setValidated(false);
@@ -319,28 +319,30 @@ export default function NewFaultModal({
           </Form.Group>
 
           <div className="row">
-            {initialData && (
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formStatus">
-                  <Form.Label>
-                    Status <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="Status"
-                    value={formData.Status}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                  >
-                    <option value="Open">Open</option>
-                    <option value="Closed">Closed</option>
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a status.
-                  </Form.Control.Feedback>
-                </Form.Group>
-              </div>
-            )}
+           {initialData && (
+  <div className="col-md-6 mb-3">
+    <Form.Group controlId="formStatus">
+      <Form.Label>
+        Status <span className="text-danger">*</span>
+      </Form.Label>
+      <Form.Select
+        name="Status"
+        value={formData.Status}
+        onChange={handleChange}
+        required
+        disabled={isSubmitting}
+      >
+        <option value="In Progress">In Progress</option>
+        <option value="Pending">Pending</option>
+        <option value="Closed">Closed</option>
+      </Form.Select>
+      <Form.Control.Feedback type="invalid">
+        Please select a status.
+      </Form.Control.Feedback>
+    </Form.Group>
+  </div>
+)}
+
 
             <div className={`col-md-${initialData ? "6" : "12"} mb-3`}>
               <Form.Group controlId="formAssignTo">
