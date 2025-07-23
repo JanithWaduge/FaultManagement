@@ -131,10 +131,37 @@ router.post('/', [
     }
 });
 
-// Get all faults
+
+// Show faults conditionally based on assigned technician
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM dbo.tblFaults');
+        const username = req.user.username;
+
+        // List of specific technicians to restrict
+        const technicians = [
+            'John Doe',
+            'Jane Smith',
+            'Alex Johnson',
+            'Emily Davis'
+        ];
+
+        let result;
+
+        if (technicians.includes(username)) {
+            // If logged-in user is a technician, show only their assigned faults
+            result = await db.query(`
+                SELECT * 
+                FROM dbo.tblFaults
+                WHERE AssignTo = @username
+            `, { username });
+        } else {
+            // For others (admin, manager, etc.), show all faults
+            result = await db.query(`
+                SELECT * 
+                FROM dbo.tblFaults
+            `);
+        }
+
         res.status(200).json(result.recordset);
     } catch (error) {
         console.error('Database error:', error);
@@ -144,6 +171,7 @@ router.get('/', authenticateToken, async (req, res) => {
         });
     }
 });
+
 
 // Update a fault (with enhanced validation error handling)
 router.put('/:id', [
