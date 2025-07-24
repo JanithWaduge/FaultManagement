@@ -6,6 +6,11 @@ import NewFaultModal from "./NewFaultModal";
 
 const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
 
+// Helper: Sort faults descending by DateTime (latest first)
+function sortFaultsDescByDate(faults) {
+  return faults.slice().sort((a, b) => new Date(b.DateTime) - new Date(a.DateTime));
+}
+
 function useMultiFaults() {
   const [open, setOpen] = useState([]);
   const [resolved, setResolved] = useState([]);
@@ -20,7 +25,8 @@ function useMultiFaults() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch open faults");
-      setOpen(await res.json());
+      const openFaults = await res.json();
+      setOpen(sortFaultsDescByDate(openFaults));
       setErr("");
     } catch (e) {
       setErr(e.message);
@@ -35,14 +41,16 @@ function useMultiFaults() {
       });
       if (!res.ok) throw new Error("Failed to fetch resolved faults");
       const data = await res.json();
-      setResolved(data.filter(f => f.Status.toLowerCase() === "closed"));
+      // Filter and sort descending
+      const closedFaults = data.filter(f => f.Status.toLowerCase() === "closed");
+      setResolved(sortFaultsDescByDate(closedFaults));
       setErr("");
     } catch (e) {
       setErr(e.message);
     }
   };
 
-  // Only fetch open and resolved on mount
+  // Only fetch on mount
   useEffect(() => {
     fetchOpen();
     fetchResolved();
@@ -61,10 +69,12 @@ function useMultiFaults() {
       throw new Error(error.message || "Failed to create fault");
     }
     const result = await resp.json();
+
+    // Insert new fault into open or resolved list, keeping descending order
     if (result.fault.Status.toLowerCase() === "closed") {
-      setResolved(r => [...r, result.fault]);
+      setResolved(r => sortFaultsDescByDate([result.fault, ...r]));
     } else {
-      setOpen(o => [...o, result.fault]);
+      setOpen(o => sortFaultsDescByDate([result.fault, ...o]));
     }
     return true;
   };
