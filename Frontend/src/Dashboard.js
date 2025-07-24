@@ -162,7 +162,6 @@ function useMultiFaults() {
   return { open, resolved, create, update, remove, resolve, err, setErr };
 }
 
-
 function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max, onOpenEditModal }) {
   return (
     <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
@@ -183,7 +182,7 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
               <col style={{ width: '7%' }} />
               <col style={{ width: '10%' }} />
               <col style={{ width: '7.5%' }} />
-              <col style={{ width: '10%' }} />
+              { !isResolved && <col style={{ width: '10%' }} /> }
             </colgroup>
             <thead className="sticky-top bg-light">
               <tr>
@@ -196,13 +195,13 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                 <th className="text-center">Status</th>
                 <th>Assigned To</th>
                 <th>Reported At</th>
-                <th className="text-center">Actions</th>
+                { !isResolved && <th className="text-center">Actions</th> }
               </tr>
             </thead>
             <tbody>
               {faults.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center text-muted py-4">No faults.</td>
+                  <td colSpan={isResolved ? 9 : 10} className="text-center text-muted py-4">No faults.</td>
                 </tr>
               ) : (
                 faults.map(f => (
@@ -236,45 +235,28 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                     </td>
                     <td>{f.AssignTo}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
-                    <td className="text-center">
-                      {!isResolved && (
-                        <>
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            className="me-1 mb-1"
-                            onClick={() => onOpenEditModal(f)}
-                            aria-label={`Edit fault ${f.id}`}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline-success"
-                            size="sm"
-                            className="me-1 mb-1"
-                            onClick={() => onMarkResolved(f.id)}
-                            aria-label={`Mark fault ${f.id} as resolved`}
-                          >
-                            Mark as Resolved
-                          </Button>
-                        </>
-                      )}
-                      {isResolved && onDelete && (
+                    { !isResolved && (
+                      <td className="text-center">
                         <Button
-                          variant="outline-danger"
+                          variant="outline-primary"
                           size="sm"
-                          className="mb-1"
-                          onClick={() => {
-                            if (window.confirm(`Are you sure you want to delete fault #${f.id}?`)) {
-                              onDelete(f.id);
-                            }
-                          }}
-                          aria-label={`Delete fault ${f.id}`}
+                          className="me-1 mb-1"
+                          onClick={() => onOpenEditModal(f)}
+                          aria-label={`Edit fault ${f.id}`}
                         >
-                          Delete
+                          Edit
                         </Button>
-                      )}
-                    </td>
+                        <Button
+                          variant="outline-success"
+                          size="sm"
+                          className="me-1 mb-1"
+                          onClick={() => onMarkResolved(f.id)}
+                          aria-label={`Mark fault ${f.id} as resolved`}
+                        >
+                          Mark as Resolved
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -451,7 +433,6 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                   <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
                   <FaultsTable
                     faults={current}
-                    onDelete={remove}
                     isResolved={true}
                     page={page}
                     setPage={setPage}
