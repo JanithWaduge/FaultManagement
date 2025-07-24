@@ -60,7 +60,9 @@ function useMultiFaults() {
     });
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
-      throw new Error(error.message || "Failed to create fault. Server response: " + (error.message || "Unknown error"));
+      throw new Error(
+        error.message || "Failed to create fault. Server response: " + (error.message || "Unknown error")
+      );
     }
     const result = await resp.json();
     if (result.fault.Status.toLowerCase() === "closed") {
@@ -159,6 +161,7 @@ function useMultiFaults() {
 
   return { open, resolved, create, update, remove, resolve, err, setErr };
 }
+
 
 function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max, onOpenEditModal }) {
   return (
@@ -303,6 +306,7 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
   );
 }
 
+
 export default function Dashboard({ userInfo, notifications, setNotifications, onLogout }) {
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -325,8 +329,8 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
 
   const currentFaultArr = view === "faults" ? open : resolved;
 
-  // Sort faults by ascending id (oldest added first)
-  const sortedFaults = useMemo(() => [...currentFaultArr].sort((a, b) => a.id - b.id), [currentFaultArr]);
+  // Sort faults by descending id (Newest first)
+  const sortedFaults = useMemo(() => [...currentFaultArr].sort((a, b) => b.id - a.id), [currentFaultArr]);
 
   // Filter by search term
   const filtered = useMemo(() => {
@@ -389,7 +393,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       <Container fluid className="pt-5 mt-4">
         {err && (
           <div className="alert alert-danger" role="alert">
-            {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
+             {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
           </div>
         )}
         <Row>
@@ -397,10 +401,18 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
           <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
             <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
             <ul className="nav flex-column">
-              <li className="nav-item mb-2"><button className="nav-link btn btn-link text-white p-0" onClick={() => { setModal(true); setEdit(null); }}>+ Add Fault</button></li>
               <li className="nav-item mb-2">
-                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>📋 Fault Review Panel</button>
-                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>✅ Resolved Faults</button>
+                <button className="nav-link btn btn-link text-white p-0" onClick={() => { setModal(true); setEdit(null); }}>
+                  + Add Fault
+                </button>
+              </li>
+              <li className="nav-item mb-2">
+                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>
+                  📋 Fault Review Panel
+                </button>
+                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>
+                  ✅ Resolved Faults
+                </button>
               </li>
             </ul>
           </Col>
@@ -462,7 +474,11 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
         </div>
         <div className="text-center text-sm-end">
           <Button className="glass-button" size="sm" onClick={() => setFooterInfo(v => !v)} aria-expanded={footerInfo} aria-controls="footer-info">{footerInfo ? "Hide Info" : "Show Info"}</Button>
-          {footerInfo && <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>© 2025 Network Fault Management System. All rights reserved.</div>}
+          {footerInfo && (
+            <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+              © 2025 Network Fault Management System. All rights reserved.
+            </div>
+          )}
         </div>
       </footer>
 
