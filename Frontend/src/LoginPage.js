@@ -12,6 +12,10 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+ 
+  const technicianList = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isTechnician = technicianList.includes(user.username);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
