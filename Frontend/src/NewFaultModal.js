@@ -48,16 +48,22 @@ export default function NewFaultModal({
   const [validated, setValidated] = useState(false);
 
   useEffect(() => {
-    const emptyForm = {
-      SystemID: systemOptions[0],
-      SectionID: "",
-      ReportedBy: "",
-      Location: locationOptions[0],
-      LocationOfFault: "",
-      DescFault: "",
-      Status: "In Progress",
-      AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
-    };
+  const user = JSON.parse(localStorage.getItem("user")); // Get logged in user
+  const technicianList = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
+  const isTechnician = user && technicianList.includes(user.username);
+
+  const emptyForm = {
+    SystemID: systemOptions[0],
+    SectionID: "",
+    ReportedBy: "",
+    Location: locationOptions[0],
+    LocationOfFault: "",
+    DescFault: "",
+    Status: "In Progress",
+    AssignTo: isTechnician ? user.username : (assignablePersons[0] || ""),
+  };
+
+
 
     if (initialData) {
       setFormData({
@@ -211,7 +217,7 @@ export default function NewFaultModal({
                   System <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
-                  name="SystemID"
+                  name="SystemID" 
                   value={formData.SystemID}
                   onChange={handleChange}
                   required
@@ -365,7 +371,12 @@ export default function NewFaultModal({
                   value={formData.AssignTo}
                   onChange={handleChange}
                   required
-                  disabled={assignablePersons.length === 0 || isSubmitting}
+                  disabled={
+    assignablePersons.length === 0 ||
+    isSubmitting ||
+    ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"].includes(
+      JSON.parse(localStorage.getItem("user"))?.username
+    )}
                   aria-required="true"
                 >
                   {assignablePersons.length === 0 ? (
