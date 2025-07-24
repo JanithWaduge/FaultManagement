@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Alert, Spinner } from "react-bootstrap";
 
-// Your options arrays as before
+// Options arrays
 const locationOptions = ["BIA", "BDA", "JIA", "MRIA", "RMA"];
 const systemOptions = [
   "NETWORK",
@@ -87,18 +87,17 @@ export default function NewFaultModal({
     setIsSubmitting(false);
   }, [initialData, assignablePersons, show]);
 
-  // Change handler
+  // Change handler for inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-
     if (error) setError("");
   };
 
-  // Construct clean payload, omitting unused/empty optional fields
+  // Prepare payload for API
   function buildPayload(formData, initialData) {
     const payload = {
       SystemID: formData.SystemID,
@@ -121,12 +120,11 @@ export default function NewFaultModal({
     return payload;
   }
 
-  // Handle form submit
+  // Submit form handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // built-in client-side validation
     const form = e.currentTarget;
     if (form.checkValidity() === false) {
       setValidated(true);
@@ -143,10 +141,10 @@ export default function NewFaultModal({
 
     try {
       const payload = buildPayload(formData, initialData);
-      console.log("Submitting payload:", payload);
       const success = await handleAdd(payload);
       if (success) {
         handleClose();
+        // Reset form
         setFormData({
           SystemID: systemOptions[0],
           SectionID: "",
@@ -160,7 +158,6 @@ export default function NewFaultModal({
         setValidated(false);
       }
     } catch (err) {
-      // Try to show detailed API validation feedback if sent
       let errorMsg = "Failed to submit form. Please try again.";
       if (err && err.response && err.response.data) {
         if (err.response.data.errors) {
@@ -170,7 +167,6 @@ export default function NewFaultModal({
         } else if (err.response.data.message) {
           errorMsg = err.response.data.message;
         }
-        // Optionally log full error for debugging
         console.error("API full error:", err.response.data);
       }
       setError(errorMsg);
@@ -191,24 +187,27 @@ export default function NewFaultModal({
       onHide={handleModalClose}
       centered
       backdrop={isSubmitting ? "static" : true}
+      size="lg"
+      aria-labelledby="new-fault-modal"
     >
-      <Modal.Header closeButton={!isSubmitting}>
-        <Modal.Title>
+      <Modal.Header closeButton={!isSubmitting} className="border-bottom-0">
+        <Modal.Title id="new-fault-modal" className="fw-bold fs-5">
           {initialData ? "Edit Fault Report" : "New Fault Report"}
         </Modal.Title>
       </Modal.Header>
+
       <Modal.Body>
         {error && (
-          <Alert variant="danger" dismissible onClose={() => setError("")}>
+          <Alert variant="danger" dismissible onClose={() => setError("")} className="mb-4">
             {error}
           </Alert>
         )}
 
-        <Form noValidate validated={validated} onSubmit={handleSubmit}>
+        <Form noValidate validated={validated} onSubmit={handleSubmit} autoComplete="off">
           <div className="row">
             <div className="col-md-6 mb-3">
               <Form.Group controlId="formSystemID">
-                <Form.Label>
+                <Form.Label className="fw-semibold">
                   System <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
@@ -217,6 +216,8 @@ export default function NewFaultModal({
                   onChange={handleChange}
                   required
                   disabled={isSubmitting}
+                  aria-required="true"
+                  aria-describedby="systemHelp"
                 >
                   {systemOptions.map((system) => (
                     <option key={system} value={system}>
@@ -227,33 +228,40 @@ export default function NewFaultModal({
                 <Form.Control.Feedback type="invalid">
                   Please select a system.
                 </Form.Control.Feedback>
+                <Form.Text id="systemHelp" muted>
+                  
+                  Select the system related to the fault.
+                </Form.Text>
+              </Form.Group>
+            </div>
+
+            <div className="col-md-6 mb-3">
+              <Form.Group controlId="formReportedBy">
+                <Form.Label className="fw-semibold">
+                  Reported By <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="ReportedBy"
+                  value={formData.ReportedBy}
+                  onChange={handleChange}
+                  placeholder="Enter reporter name"
+                  required
+                  maxLength="100"
+                  disabled={isSubmitting}
+                  aria-required="true"
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide the reporter's name.
+                </Form.Control.Feedback>
               </Form.Group>
             </div>
           </div>
 
-          <Form.Group className="mb-3" controlId="formReportedBy">
-            <Form.Label>
-              Reported By <span className="text-danger">*</span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              name="ReportedBy"
-              value={formData.ReportedBy}
-              onChange={handleChange}
-              placeholder="Enter reporter name"
-              required
-              maxLength="100"
-              disabled={isSubmitting}
-            />
-            <Form.Control.Feedback type="invalid">
-              Please provide the reporter's name.
-            </Form.Control.Feedback>
-          </Form.Group>
-
           <div className="row">
             <div className="col-md-6 mb-3">
               <Form.Group controlId="formLocation">
-                <Form.Label>
+                <Form.Label className="fw-semibold">
                   Location <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
@@ -262,6 +270,7 @@ export default function NewFaultModal({
                   onChange={handleChange}
                   required
                   disabled={isSubmitting}
+                  aria-required="true"
                 >
                   {locationOptions.map((loc) => (
                     <option key={loc} value={loc}>
@@ -277,7 +286,7 @@ export default function NewFaultModal({
 
             <div className="col-md-6 mb-3">
               <Form.Group controlId="formLocationOfFault">
-                <Form.Label>Location of Fault</Form.Label>
+                <Form.Label className="fw-semibold">Location of Fault</Form.Label>
                 <Form.Select
                   name="LocationOfFault"
                   value={formData.LocationOfFault}
@@ -295,58 +304,60 @@ export default function NewFaultModal({
             </div>
           </div>
 
-          <Form.Group className="mb-3" controlId="formDescFault">
-            <Form.Label>
+          <Form.Group className="mb-4" controlId="formDescFault">
+            <Form.Label className="fw-semibold">
               Description <span className="text-danger">*</span>
             </Form.Label>
             <Form.Control
               name="DescFault"
               as="textarea"
-              rows={3}
+              rows={4}
               value={formData.DescFault}
               onChange={handleChange}
               placeholder="Describe the fault in detail"
               required
               maxLength="500"
               disabled={isSubmitting}
+              aria-required="true"
+              aria-describedby="descHelp"
             />
             <Form.Control.Feedback type="invalid">
               Please provide a description of the fault.
             </Form.Control.Feedback>
-            <Form.Text className="text-muted">
+            <Form.Text id="descHelp" muted className="d-block text-end">
               {formData.DescFault.length}/500 characters
             </Form.Text>
           </Form.Group>
 
-          <div className="row">
-           {initialData && (
-  <div className="col-md-6 mb-3">
-    <Form.Group controlId="formStatus">
-      <Form.Label>
-        Status <span className="text-danger">*</span>
-      </Form.Label>
-      <Form.Select
-        name="Status"
-        value={formData.Status}
-        onChange={handleChange}
-        required
-        disabled={isSubmitting}
-      >
-        <option value="In Progress">In Progress</option>
-        <option value="Pending">Pending</option>
-        <option value="Closed">Closed</option>
-      </Form.Select>
-      <Form.Control.Feedback type="invalid">
-        Please select a status.
-      </Form.Control.Feedback>
-    </Form.Group>
-  </div>
-)}
+          <div className="row mb-4">
+            {initialData && (
+              <div className="col-md-6 mb-3 mb-md-0">
+                <Form.Group controlId="formStatus">
+                  <Form.Label className="fw-semibold">
+                    Status <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="Status"
+                    value={formData.Status}
+                    onChange={handleChange}
+                    required
+                    disabled={isSubmitting}
+                    aria-required="true"
+                  >
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Closed">Closed</option>
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    Please select a status.
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </div>
+            )}
 
-
-            <div className={`col-md-${initialData ? "6" : "12"} mb-3`}>
+            <div className={`col-md-${initialData ? "6" : "12"}`}>
               <Form.Group controlId="formAssignTo">
-                <Form.Label>
+                <Form.Label className="fw-semibold">
                   Assigned To <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
@@ -355,6 +366,7 @@ export default function NewFaultModal({
                   onChange={handleChange}
                   required
                   disabled={assignablePersons.length === 0 || isSubmitting}
+                  aria-required="true"
                 >
                   {assignablePersons.length === 0 ? (
                     <option value="" disabled>
@@ -375,11 +387,12 @@ export default function NewFaultModal({
             </div>
           </div>
 
-          <Modal.Footer className="px-0">
+          <Modal.Footer className="px-0 pt-0 border-0">
             <Button
-              variant="secondary"
+              variant="outline-secondary"
               onClick={handleModalClose}
               disabled={isSubmitting}
+              className="me-2"
             >
               Cancel
             </Button>
@@ -387,6 +400,7 @@ export default function NewFaultModal({
               variant="primary"
               type="submit"
               disabled={isSubmitting || assignablePersons.length === 0}
+              className="d-flex align-items-center justify-content-center"
             >
               {isSubmitting ? (
                 <>
@@ -395,6 +409,8 @@ export default function NewFaultModal({
                     animation="border"
                     size="sm"
                     className="me-2"
+                    role="status"
+                    aria-hidden="true"
                   />
                   {initialData ? "Updating..." : "Creating..."}
                 </>
@@ -407,6 +423,19 @@ export default function NewFaultModal({
           </Modal.Footer>
         </Form>
       </Modal.Body>
+
+      {/* Optional extra styles with styled jsx or CSS module if preferred */}
+      <style>{`
+        .fw-semibold {
+          font-weight: 600 !important;
+        }
+        /* Customize modal scrolling */
+        .modal-body {
+          max-height: 70vh;
+          overflow-y: auto;
+          padding-right: 1.25rem;
+        }
+      `}</style>
     </Modal>
   );
 }
