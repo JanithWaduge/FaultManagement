@@ -61,7 +61,7 @@ export default function Register({ onRegisterSuccess, onCancel }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/register`,
+        `${process.env.REACT_APP_BACKEND_URL}/api/auth/register`,
         {
           method: "POST",
           headers: {
@@ -87,7 +87,7 @@ export default function Register({ onRegisterSuccess, onCancel }) {
 
       // Automatically log in the user after successful registration
       const loginResponse = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/login`,
+        `${process.env.REACT_APP_BACKEND_URL}/api/auth/login`,
         {
           method: "POST",
           headers: {
