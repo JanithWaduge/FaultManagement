@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { Table, Button, Container, Row, Col, Card, Tabs, Tab } from "react-bootstrap";
+import {
+  Table,
+  Button,
+  Container,
+  Row,
+  Col,
+  Card,
+  Tabs,
+  Tab,
+} from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
@@ -20,9 +29,12 @@ function useMultiFaults() {
   const fetchOpen = async () => {
     if (!token) return setErr("No authentication token.");
     try {
-      const res = await fetch("http://localhost:5000/api/faults?status=open", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=open`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (!res.ok) throw new Error("Failed to fetch open faults");
       setOpen(await res.json());
       setErr("");
@@ -34,12 +46,15 @@ function useMultiFaults() {
   const fetchResolved = async () => {
     if (!token) return setErr("No authentication token.");
     try {
-      const res = await fetch("http://localhost:5000/api/faults?status=closed", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=closed`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (!res.ok) throw new Error("Failed to fetch resolved faults");
       const data = await res.json();
-      setResolved(data.filter(f => f.Status.toLowerCase() === "closed"));
+      setResolved(data.filter((f) => f.Status.toLowerCase() === "closed"));
       setErr("");
     } catch (e) {
       setErr(e.message);
@@ -53,22 +68,30 @@ function useMultiFaults() {
 
   const create = async (data) => {
     if (!token) throw new Error("Authentication required.");
-    const resp = await fetch("http://localhost:5000/api/faults", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(data),
-    });
+    const resp = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/api/faults`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      }
+    );
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
       throw new Error(
-        error.message || "Failed to create fault. Server response: " + (error.message || "Unknown error")
+        error.message ||
+          "Failed to create fault. Server response: " +
+            (error.message || "Unknown error")
       );
     }
     const result = await resp.json();
     if (result.fault.Status.toLowerCase() === "closed") {
-      setResolved(r => [...r, result.fault]);
+      setResolved((r) => [...r, result.fault]);
     } else {
-      setOpen(o => [...o, result.fault]);
+      setOpen((o) => [...o, result.fault]);
     }
     return true;
   };
@@ -78,11 +101,17 @@ function useMultiFaults() {
     const dataToSend = { ...data };
     if (dataToSend.SectionID === "") dataToSend.SectionID = null;
 
-    const resp = await fetch(`http://localhost:5000/api/faults/${data.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(dataToSend),
-    });
+    const resp = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/api/faults/${data.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(dataToSend),
+      }
+    );
 
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
@@ -93,37 +122,43 @@ function useMultiFaults() {
     const updatedFault = result.fault;
 
     if (updatedFault.Status.toLowerCase() === "closed") {
-      setOpen(o => o.filter(f => f.id !== updatedFault.id));
-      setResolved(r => {
-        const exists = r.some(f => f.id === updatedFault.id);
-        if (exists) return r.map(f => (f.id === updatedFault.id ? updatedFault : f));
+      setOpen((o) => o.filter((f) => f.id !== updatedFault.id));
+      setResolved((r) => {
+        const exists = r.some((f) => f.id === updatedFault.id);
+        if (exists)
+          return r.map((f) => (f.id === updatedFault.id ? updatedFault : f));
         return [...r, updatedFault];
       });
     } else {
-      setOpen(o => o.map(f => (f.id === updatedFault.id ? updatedFault : f)));
-      setResolved(r => r.filter(f => f.id !== updatedFault.id));
+      setOpen((o) =>
+        o.map((f) => (f.id === updatedFault.id ? updatedFault : f))
+      );
+      setResolved((r) => r.filter((f) => f.id !== updatedFault.id));
     }
     return true;
   };
 
   const remove = async (id) => {
     if (!token) return;
-    const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const resp = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/api/faults/${id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({}));
       throw new Error(error.message || "Failed to delete fault");
     }
-    setOpen(o => o.filter(f => f.id !== id));
-    setResolved(r => r.filter(f => f.id !== id));
+    setOpen((o) => o.filter((f) => f.id !== id));
+    setResolved((r) => r.filter((f) => f.id !== id));
   };
 
   const resolve = async (id) => {
     if (!token) return setErr("No authentication token.");
     try {
-      const fault = open.find(f => f.id === id);
+      const fault = open.find((f) => f.id === id);
       if (!fault) throw new Error("Fault not found in open list.");
 
       const payload = {
@@ -137,11 +172,17 @@ function useMultiFaults() {
         Status: "Closed",
       };
 
-      const resp = await fetch(`http://localhost:5000/api/faults/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
+      const resp = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/faults/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
@@ -149,9 +190,9 @@ function useMultiFaults() {
       }
 
       const result = await resp.json();
-      setOpen(o => o.filter(f => f.id !== id));
-      setResolved(r => {
-        if (r.some(f => f.id === id)) return r;
+      setOpen((o) => o.filter((f) => f.id !== id));
+      setResolved((r) => {
+        if (r.some((f) => f.id === id)) return r;
         return [...r, result.fault];
       });
     } catch (error) {
@@ -162,27 +203,42 @@ function useMultiFaults() {
   return { open, resolved, create, update, remove, resolve, err, setErr };
 }
 
-function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, page, setPage, max, onOpenEditModal }) {
+function FaultsTable({
+  faults,
+  onEdit,
+  onDelete,
+  onMarkResolved,
+  isResolved,
+  page,
+  setPage,
+  max,
+  onOpenEditModal,
+}) {
   return (
-    <Row style={{ height: 'calc(100vh - 60px - 130px - 80px)', overflowY: 'auto' }}>
+    <Row
+      style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}
+    >
       <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
         <Card.Body className="p-0 d-flex flex-column">
           <Table
-            striped bordered hover responsive
+            striped
+            bordered
+            hover
+            responsive
             className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
             aria-label="Faults Table"
           >
             <colgroup>
-              <col style={{ width: '3.5%', textAlign: 'center' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '7.5%' }} />
-              { !isResolved && <col style={{ width: '10%' }} /> }
+              <col style={{ width: "3.5%", textAlign: "center" }} />
+              <col style={{ width: "6%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "18%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "7.5%" }} />
+              {!isResolved && <col style={{ width: "10%" }} />}
             </colgroup>
             <thead className="sticky-top bg-light">
               <tr>
@@ -195,16 +251,21 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                 <th className="text-center">Status</th>
                 <th>Assigned To</th>
                 <th>Reported At</th>
-                { !isResolved && <th className="text-center">Actions</th> }
+                {!isResolved && <th className="text-center">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {faults.length === 0 ? (
                 <tr>
-                  <td colSpan={isResolved ? 9 : 10} className="text-center text-muted py-4">No faults.</td>
+                  <td
+                    colSpan={isResolved ? 9 : 10}
+                    className="text-center text-muted py-4"
+                  >
+                    No faults.
+                  </td>
                 </tr>
               ) : (
-                faults.map(f => (
+                faults.map((f) => (
                   <tr key={f.id} className="table-row-hover">
                     <td className="text-center">{f.id}</td>
                     <td className="text-center">{f.SystemID}</td>
@@ -234,8 +295,10 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
                       </select>
                     </td>
                     <td>{f.AssignTo}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
-                    { !isResolved && (
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}
+                    </td>
+                    {!isResolved && (
                       <td className="text-center">
                         <Button
                           variant="outline-primary"
@@ -262,23 +325,50 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
               )}
             </tbody>
           </Table>
-          <nav aria-label="Fault pagination" className="mt-3 px-3" style={{ flexShrink: 0 }}>
+          <nav
+            aria-label="Fault pagination"
+            className="mt-3 px-3"
+            style={{ flexShrink: 0 }}
+          >
             <ul className="pagination justify-content-center mb-0">
               <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.max(page - 1, 1))} aria-label="Previous page">Previous</button>
+                <button
+                  className="page-link"
+                  onClick={() => setPage(Math.max(page - 1, 1))}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
               </li>
               {Array.from({ length: max }).map((_, idx) => {
                 const pageNum = idx + 1;
                 return (
-                  <li key={pageNum} className={`page-item ${page === pageNum ? "active" : ""}`}>
-                    <button className="page-link" onClick={() => setPage(pageNum)} aria-current={page === pageNum ? "page" : undefined}>
+                  <li
+                    key={pageNum}
+                    className={`page-item ${page === pageNum ? "active" : ""}`}
+                  >
+                    <button
+                      className="page-link"
+                      onClick={() => setPage(pageNum)}
+                      aria-current={page === pageNum ? "page" : undefined}
+                    >
                       {pageNum}
                     </button>
                   </li>
                 );
               })}
-              <li className={`page-item ${page === max || max === 0 ? "disabled" : ""}`}>
-                <button className="page-link" onClick={() => setPage(Math.min(page + 1, max))} aria-label="Next page">Next</button>
+              <li
+                className={`page-item ${
+                  page === max || max === 0 ? "disabled" : ""
+                }`}
+              >
+                <button
+                  className="page-link"
+                  onClick={() => setPage(Math.min(page + 1, max))}
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
               </li>
             </ul>
           </nav>
@@ -288,8 +378,12 @@ function FaultsTable({ faults, onEdit, onDelete, onMarkResolved, isResolved, pag
   );
 }
 
-
-export default function Dashboard({ userInfo, notifications, setNotifications, onLogout }) {
+export default function Dashboard({
+  userInfo,
+  notifications,
+  setNotifications,
+  onLogout,
+}) {
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
   const [search, setSearch] = useState("");
@@ -298,12 +392,15 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   const notifRef = useRef();
   const [footerInfo, setFooterInfo] = useState(false);
 
-  const { open, resolved, create, update, remove, resolve, err, setErr } = useMultiFaults();
+  const { open, resolved, create, update, remove, resolve, err, setErr } =
+    useMultiFaults();
 
   useEffect(() => {
-    if (showNotif) setNotifications(n => n.map(e => ({ ...e, isRead: true })));
+    if (showNotif)
+      setNotifications((n) => n.map((e) => ({ ...e, isRead: true })));
     function outside(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false);
+      if (notifRef.current && !notifRef.current.contains(e.target))
+        setShowNotif(false);
     }
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
@@ -312,20 +409,33 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   const currentFaultArr = view === "faults" ? open : resolved;
 
   // Sort faults by descending id (Newest first)
-  const sortedFaults = useMemo(() => [...currentFaultArr].sort((a, b) => b.id - a.id), [currentFaultArr]);
+  const sortedFaults = useMemo(
+    () => [...currentFaultArr].sort((a, b) => b.id - a.id),
+    [currentFaultArr]
+  );
 
   // Filter by search term
   const filtered = useMemo(() => {
-    return sortedFaults.filter(f => {
+    return sortedFaults.filter((f) => {
       if (!f) return false;
-      const haystack = [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID].join(" ").toLowerCase();
+      const haystack = [
+        f.DescFault,
+        f.Location,
+        f.LocationOfFault,
+        f.ReportedBy,
+        f.SystemID,
+      ]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(search.toLowerCase());
     });
   }, [sortedFaults, search]);
 
   // Pagination state
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [filtered]);
+  useEffect(() => {
+    setPage(1);
+  }, [filtered]);
   const max = Math.ceil(filtered.length / 10);
   const current = filtered.slice((page - 1) * 10, page * 10);
 
@@ -338,27 +448,70 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   return (
     <>
       {/* Navbar */}
-      <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
-        <Container fluid className="d-flex justify-content-between align-items-center">
+      <nav
+        className="navbar navbar-dark fixed-top shadow-sm"
+        style={{ height: 60, backgroundColor: "#001f3f" }}
+      >
+        <Container
+          fluid
+          className="d-flex justify-content-between align-items-center"
+        >
           <div style={{ width: 120 }} />
-          <span className="navbar-brand mb-0 h1 mx-auto">⚡ N F M System Version 1.0.1</span>
+          <span className="navbar-brand mb-0 h1 mx-auto">
+            ⚡ N F M System Version 1.0.1
+          </span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
-              <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }} aria-label="Toggle Notifications">
+              <Button
+                variant="link"
+                className="text-white p-0"
+                onClick={() => setShowNotif((v) => !v)}
+                style={{ fontSize: "1.3rem" }}
+                aria-label="Toggle Notifications"
+              >
                 <BellFill />
-                {notifications.some(n => !n.isRead) && (
-                  <span className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0" style={{ fontSize: "0.7rem", lineHeight: 1, fontWeight: "bold" }}>
-                    {notifications.filter(n => !n.isRead).length}
+                {notifications.some((n) => !n.isRead) && (
+                  <span
+                    className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
+                    style={{
+                      fontSize: "0.7rem",
+                      lineHeight: 1,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {notifications.filter((n) => !n.isRead).length}
                   </span>
                 )}
               </Button>
               {showNotif && (
-                <div className="position-absolute" style={{ top: 35, right: 0, backgroundColor: "white", color: "#222", width: 280, maxHeight: 300, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", borderRadius: 8, zIndex: 1500 }}>
+                <div
+                  className="position-absolute"
+                  style={{
+                    top: 35,
+                    right: 0,
+                    backgroundColor: "white",
+                    color: "#222",
+                    width: 280,
+                    maxHeight: 300,
+                    overflowY: "auto",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    borderRadius: 8,
+                    zIndex: 1500,
+                  }}
+                >
                   {notifications.length === 0 ? (
                     <div style={{ padding: 10 }}>No notifications</div>
                   ) : (
-                    notifications.map(note => (
-                      <div key={note.id} style={{ padding: 10, borderBottom: "1px solid #eee", backgroundColor: note.isRead ? "#f8f9fa" : "white", fontWeight: note.isRead ? "normal" : "600" }}>
+                    notifications.map((note) => (
+                      <div
+                        key={note.id}
+                        style={{
+                          padding: 10,
+                          borderBottom: "1px solid #eee",
+                          backgroundColor: note.isRead ? "#f8f9fa" : "white",
+                          fontWeight: note.isRead ? "normal" : "600",
+                        }}
+                      >
                         {note.message}
                       </div>
                     ))
@@ -366,7 +519,9 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                 </div>
               )}
             </div>
-            <Button className="glass-button" size="sm" onClick={onLogout}>Logout</Button>
+            <Button className="glass-button" size="sm" onClick={onLogout}>
+              Logout
+            </Button>
             <UserProfileDisplay user={userInfo} />
           </div>
         </Container>
@@ -375,24 +530,52 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       <Container fluid className="pt-5 mt-4">
         {err && (
           <div className="alert alert-danger" role="alert">
-             {err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} aria-label="Close" />
+            {err}{" "}
+            <button
+              type="button"
+              className="btn-close float-end"
+              onClick={() => setErr("")}
+              aria-label="Close"
+            />
           </div>
         )}
         <Row>
           {/* Sidebar */}
-          <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
-            <div className="glass-sidebar-title mb-4 text-center"><span className="sidebar-title-text">Dashboard</span></div>
+          <Col
+            xs={2}
+            className="bg-dark text-white sidebar p-3 position-fixed vh-100"
+            style={{ top: 60, left: 0, zIndex: 1040 }}
+          >
+            <div className="glass-sidebar-title mb-4 text-center">
+              <span className="sidebar-title-text">Dashboard</span>
+            </div>
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
-                <button className="nav-link btn btn-link text-white p-0" onClick={() => { setModal(true); setEdit(null); }}>
+                <button
+                  className="nav-link btn btn-link text-white p-0"
+                  onClick={() => {
+                    setModal(true);
+                    setEdit(null);
+                  }}
+                >
                   + Add Fault
                 </button>
               </li>
               <li className="nav-item mb-2">
-                <button className={`nav-link btn btn-link text-white p-0${view === "faults" ? " fw-bold" : ""}`} onClick={() => setView("faults")}>
+                <button
+                  className={`nav-link btn btn-link text-white p-0${
+                    view === "faults" ? " fw-bold" : ""
+                  }`}
+                  onClick={() => setView("faults")}
+                >
                   📋 Fault Review Panel
                 </button>
-                <button className={`nav-link btn btn-link text-white p-0${view === "resolved" ? " fw-bold" : ""}`} onClick={() => setView("resolved")}>
+                <button
+                  className={`nav-link btn btn-link text-white p-0${
+                    view === "resolved" ? " fw-bold" : ""
+                  }`}
+                  onClick={() => setView("resolved")}
+                >
                   ✅ Resolved Faults
                 </button>
               </li>
@@ -400,45 +583,85 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
           </Col>
 
           {/* Main Content */}
-          <Col className="ms-auto d-flex flex-column" style={{ marginLeft: "16.666667%", width: "calc(100% - 16.666667%)", height: "calc(100vh - 60px)", overflow: "hidden", paddingLeft: 0, maxWidth: "82%" }}>
+          <Col
+            className="ms-auto d-flex flex-column"
+            style={{
+              marginLeft: "16.666667%",
+              width: "calc(100% - 16.666667%)",
+              height: "calc(100vh - 60px)",
+              overflow: "hidden",
+              paddingLeft: 0,
+              maxWidth: "82%",
+            }}
+          >
             <Tabs activeKey={view} className="custom-tabs" justify>
-              <Tab eventKey="faults" title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}>
-                {view === "faults" && <>
-                  <Row className="mb-3 px-3">
-                    <Col md={4} className="mb-2">
-                      <input type="text" className="form-control" placeholder="Search faults..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search faults" />
-                    </Col>
-                  </Row>
-                  <div className="mb-2 px-3"><strong>Total Faults:</strong> {filtered.length}</div>
-                  <FaultsTable
-                    faults={current}
-                    onEdit={update}
-                    onMarkResolved={resolve}
-                    isResolved={false}
-                    page={page}
-                    setPage={setPage}
-                    max={max}
-                    onOpenEditModal={openEditModal}
-                  />
-                </>}
+              <Tab
+                eventKey="faults"
+                title={
+                  <span className="tab-title-lg">🚧 Faults Review Panel</span>
+                }
+              >
+                {view === "faults" && (
+                  <>
+                    <Row className="mb-3 px-3">
+                      <Col md={4} className="mb-2">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search faults..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          aria-label="Search faults"
+                        />
+                      </Col>
+                    </Row>
+                    <div className="mb-2 px-3">
+                      <strong>Total Faults:</strong> {filtered.length}
+                    </div>
+                    <FaultsTable
+                      faults={current}
+                      onEdit={update}
+                      onMarkResolved={resolve}
+                      isResolved={false}
+                      page={page}
+                      setPage={setPage}
+                      max={max}
+                      onOpenEditModal={openEditModal}
+                    />
+                  </>
+                )}
               </Tab>
 
-              <Tab eventKey="resolved" title={<span className="tab-title-lg">✅ Resolved Faults</span>}>
-                {view === "resolved" && <>
-                  <Row className="mb-3 px-3">
-                    <Col md={4} className="mb-2">
-                      <input type="text" className="form-control" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} aria-label="Search resolved faults" />
-                    </Col>
-                  </Row>
-                  <div className="mb-2 px-3"><strong>Total Resolved Faults:</strong> {filtered.length}</div>
-                  <FaultsTable
-                    faults={current}
-                    isResolved={true}
-                    page={page}
-                    setPage={setPage}
-                    max={max}
-                  />
-                </>}
+              <Tab
+                eventKey="resolved"
+                title={<span className="tab-title-lg">✅ Resolved Faults</span>}
+              >
+                {view === "resolved" && (
+                  <>
+                    <Row className="mb-3 px-3">
+                      <Col md={4} className="mb-2">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          aria-label="Search resolved faults"
+                        />
+                      </Col>
+                    </Row>
+                    <div className="mb-2 px-3">
+                      <strong>Total Resolved Faults:</strong> {filtered.length}
+                    </div>
+                    <FaultsTable
+                      faults={current}
+                      isResolved={true}
+                      page={page}
+                      setPage={setPage}
+                      max={max}
+                    />
+                  </>
+                )}
               </Tab>
             </Tabs>
           </Col>
@@ -446,17 +669,42 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       </Container>
 
       {/* Footer */}
-      <footer className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow" style={{ backgroundColor: "#001f3f" }}>
+      <footer
+        className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow"
+        style={{ backgroundColor: "#001f3f" }}
+      >
         <div className="mb-2 mb-sm-0">
-          <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
+          <Button
+            className="glass-button"
+            size="sm"
+            onClick={() => alert("Contact support at support@nfm.lk")}
+          >
+            Support
+          </Button>
         </div>
-        <div className="text-center flex-grow-1 mb-2 mb-sm-0" aria-live="polite">
-          Total Open: {open.length} | Resolved: {resolved.length} | Unread Notifications: {notifications.filter(n => !n.isRead).length}
+        <div
+          className="text-center flex-grow-1 mb-2 mb-sm-0"
+          aria-live="polite"
+        >
+          Total Open: {open.length} | Resolved: {resolved.length} | Unread
+          Notifications: {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
-          <Button className="glass-button" size="sm" onClick={() => setFooterInfo(v => !v)} aria-expanded={footerInfo} aria-controls="footer-info">{footerInfo ? "Hide Info" : "Show Info"}</Button>
+          <Button
+            className="glass-button"
+            size="sm"
+            onClick={() => setFooterInfo((v) => !v)}
+            aria-expanded={footerInfo}
+            aria-controls="footer-info"
+          >
+            {footerInfo ? "Hide Info" : "Show Info"}
+          </Button>
           {footerInfo && (
-            <div id="footer-info" className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+            <div
+              id="footer-info"
+              className="mt-1"
+              style={{ fontSize: "0.75rem", opacity: 0.8 }}
+            >
               © 2025 Network Fault Management System. All rights reserved.
             </div>
           )}
@@ -466,7 +714,10 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       {/* New/Edit Fault Modal */}
       <NewFaultModal
         show={modal}
-        handleClose={() => { setModal(false); setEdit(null); }}
+        handleClose={() => {
+          setModal(false);
+          setEdit(null);
+        }}
         handleAdd={edit ? update : create}
         assignablePersons={assignablePersons}
         initialData={edit}
