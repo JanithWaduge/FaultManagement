@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
-import { Card, Button, Form, InputGroup } from 'react-bootstrap';
-import { Eye, EyeSlash } from 'react-bootstrap-icons';
-import { useNavigate } from 'react-router-dom';
-
-const API_BASE_URL = "http://localhost:5000/api/auth";
+import React, { useState } from "react";
+import { Card, Button, Form, InputGroup } from "react-bootstrap";
+import { Eye, EyeSlash } from "react-bootstrap-icons";
+import { useNavigate } from "react-router-dom";
 
 export default function Register({ onRegisterSuccess, onCancel }) {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'user'
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: "user",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
@@ -20,35 +18,35 @@ export default function Register({ onRegisterSuccess, onCancel }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const validateForm = () => {
     if (!formData.username.trim()) {
-      setError('Username is required');
+      setError("Username is required");
       return false;
     }
     if (!formData.email.trim()) {
-      setError('Email is required');
+      setError("Email is required");
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Please enter a valid email address');
+      setError("Please enter a valid email address");
       return false;
     }
     if (!formData.password) {
-      setError('Password is required');
+      setError("Password is required");
       return false;
     }
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return false;
     }
     return true;
@@ -62,53 +60,59 @@ export default function Register({ onRegisterSuccess, onCancel }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username.trim(),
-          email: formData.email.trim().toLowerCase(),
-          password: formData.password,
-          role: formData.role
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: formData.username.trim(),
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password,
+            role: formData.role,
+          }),
+        }
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
         if (response.status === 409) {
-          throw new Error(result.message || 'Username or email already exists');
+          throw new Error(result.message || "Username or email already exists");
         }
-        throw new Error(result.message || 'Registration failed');
+        throw new Error(result.message || "Registration failed");
       }
 
       // Automatically log in the user after successful registration
-      const loginResponse = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username.trim(),
-          password: formData.password,
-        }),
-      });
+      const loginResponse = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: formData.username.trim(),
+            password: formData.password,
+          }),
+        }
+      );
 
       const loginResult = await loginResponse.json();
 
       if (!loginResponse.ok) {
-        throw new Error(loginResult.message || 'Auto-login failed');
+        throw new Error(loginResult.message || "Auto-login failed");
       }
 
       if (!loginResult.user?.role) {
-        throw new Error('Invalid user data received');
+        throw new Error("Invalid user data received");
       }
 
       // Store token and user data
-      localStorage.setItem('token', loginResult.token);
-      localStorage.setItem('user', JSON.stringify(loginResult.user));
+      localStorage.setItem("token", loginResult.token);
+      localStorage.setItem("user", JSON.stringify(loginResult.user));
 
       // Call success callback
       if (onRegisterSuccess) {
@@ -116,10 +120,9 @@ export default function Register({ onRegisterSuccess, onCancel }) {
       }
 
       // Navigate to home
-      navigate('/');
-
+      navigate("/");
     } catch (err) {
-      console.error('Registration error:', err);
+      console.error("Registration error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -149,12 +152,8 @@ export default function Register({ onRegisterSuccess, onCancel }) {
         }}
       >
         <h3 className="mb-4 text-center">Create New Account</h3>
-        
-        {error && (
-          <div className="mb-3 alert alert-danger">
-            {error}
-          </div>
-        )}
+
+        {error && <div className="mb-3 alert alert-danger">{error}</div>}
 
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
@@ -216,7 +215,11 @@ export default function Register({ onRegisterSuccess, onCancel }) {
                 onClick={() => setShowPassword(!showPassword)}
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeSlash color="lightgray" /> : <Eye color="lightgray" />}
+                {showPassword ? (
+                  <EyeSlash color="lightgray" />
+                ) : (
+                  <Eye color="lightgray" />
+                )}
               </InputGroup.Text>
             </InputGroup>
           </Form.Group>
@@ -270,11 +273,15 @@ export default function Register({ onRegisterSuccess, onCancel }) {
             >
               {loading ? (
                 <>
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  ></span>
                   Registering...
                 </>
               ) : (
-                  "Register"
+                "Register"
               )}
             </Button>
 

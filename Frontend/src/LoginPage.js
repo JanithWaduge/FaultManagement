@@ -3,8 +3,6 @@ import { Card, Button, Form, InputGroup } from "react-bootstrap";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE_URL = "http://localhost:5000/api/auth";
-
 export default function LoginPage({ onLogin, onRegisterClick }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -12,8 +10,13 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
- 
-  const technicianList = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
+
+  const technicianList = [
+    "John Doe",
+    "Jane Smith",
+    "Alex Johnson",
+    "Emily Davis",
+  ];
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isTechnician = technicianList.includes(user.username);
 
@@ -28,53 +31,57 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim(),
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: username.trim(),
+            password: password.trim(),
+          }),
+        }
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
         if (response.status === 401) {
-          if (result.message.includes('inactive')) {
-            throw new Error('Your account is inactive. Please contact support.');
+          if (result.message.includes("inactive")) {
+            throw new Error(
+              "Your account is inactive. Please contact support."
+            );
           }
-          throw new Error('Invalid username or password');
+          throw new Error("Invalid username or password");
         }
-        throw new Error(result.message || 'Login failed');
+        throw new Error(result.message || "Login failed");
       }
 
       if (!result.user?.role) {
-        throw new Error('Invalid user data received');
+        throw new Error("Invalid user data received");
       }
 
       // Store token and user data
-      localStorage.setItem('token', result.token);
-      localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
 
       // Call parent callback
       if (onLogin) {
         onLogin({
           token: result.token,
-          user: result.user
+          user: result.user,
         });
       }
 
       // Navigate to home
-      navigate('/');
-
+      navigate("/");
     } catch (err) {
-      console.error('Login error:', err);
+      console.error("Login error:", err);
       setError(err.message);
-      
-      if (err.message.includes('inactive')) {
+
+      if (err.message.includes("inactive")) {
         setPassword("");
       }
     } finally {
@@ -83,30 +90,30 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
   };
 
   return (
-    <div style={{
-      backgroundColor: "#0b1e39",
-      minHeight: "100vh",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: "1rem",
-    }}>
-      <Card style={{
-        maxWidth: "500px",
-        width: "100%",
-        backgroundColor: "#12345b",
-        borderRadius: "16px",
-        padding: "2rem",
-        color: "white",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-      }}>
+    <div
+      style={{
+        backgroundColor: "#0b1e39",
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "1rem",
+      }}
+    >
+      <Card
+        style={{
+          maxWidth: "500px",
+          width: "100%",
+          backgroundColor: "#12345b",
+          borderRadius: "16px",
+          padding: "2rem",
+          color: "white",
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+        }}
+      >
         <h3 className="mb-4 text-center">Login to your account</h3>
-        
-        {error && (
-          <div className="mb-3 alert alert-danger">
-            {error}
-          </div>
-        )}
+
+        {error && <div className="mb-3 alert alert-danger">{error}</div>}
 
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
@@ -150,7 +157,11 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
                 onClick={() => setShowPassword(!showPassword)}
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeSlash color="lightgray" /> : <Eye color="lightgray" />}
+                {showPassword ? (
+                  <EyeSlash color="lightgray" />
+                ) : (
+                  <Eye color="lightgray" />
+                )}
               </InputGroup.Text>
             </InputGroup>
           </Form.Group>
@@ -158,17 +169,21 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
           <Button
             type="submit"
             variant="primary"
-            style={{ 
-              borderRadius: "8px", 
+            style={{
+              borderRadius: "8px",
               width: "100%",
               backgroundColor: "#345b96",
-              border: "none"
+              border: "none",
             }}
             disabled={loading}
           >
             {loading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
                 Logging in...
               </>
             ) : (
@@ -183,7 +198,7 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
             variant="link"
             className="p-0 text-light"
             onClick={onRegisterClick}
-            style={{ 
+            style={{
               textDecoration: "underline",
               fontSize: "0.9rem",
             }}
