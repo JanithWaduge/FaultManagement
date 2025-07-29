@@ -8,228 +8,161 @@ import {
   Card,
   Tabs,
   Tab,
+  Modal,
+  Form,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
-import NewFaultModal from "./NewFaultModal";
-
-const assignablePersons = [
-  "John Doe",
-  "Jane Smith",
-  "Alex Johnson",
-  "Emily Davis",
-];
-
-// Helper: Sort faults descending by DateTime (latest first)
-function sortFaultsDescByDate(faults) {
-  return faults
-    .slice()
-    .sort((a, b) => new Date(b.DateTime) - new Date(a.DateTime));
-}
-
-function useMultiFaults() {
-  const [open, setOpen] = useState([]);
-  const [resolved, setResolved] = useState([]);
-  const [err, setErr] = useState("");
-  const token = localStorage.getItem("token");
-
-  // Initial fetch
-  const fetchOpen = async () => {
-    if (!token) return setErr("No authentication token.");
-    try {
-      const res = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=open`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) throw new Error("Failed to fetch open faults");
-      const openFaults = await res.json();
-      setOpen(sortFaultsDescByDate(openFaults));
-      setErr("");
-    } catch (e) {
-      setErr(e.message);
-    }
-  };
-
-  const fetchResolved = async () => {
-    if (!token) return setErr("No authentication token.");
-    try {
-      const res = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=closed`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) throw new Error("Failed to fetch resolved faults");
-      const data = await res.json();
-      // Filter and sort descending
-      const closedFaults = data.filter(
-        (f) => f.Status.toLowerCase() === "closed"
-      );
-      setResolved(sortFaultsDescByDate(closedFaults));
-      setErr("");
-    } catch (e) {
-      setErr(e.message);
-    }
-  };
-
-  // Only fetch on mount
-  useEffect(() => {
-    fetchOpen();
-    fetchResolved();
-  }, []);
-
-  // Create a new fault
-  const create = async (data) => {
-    if (!token) throw new Error("Authentication required.");
-    const resp = await fetch(
-      `${process.env.REACT_APP_BACKEND_URL}/api/faults`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      }
-    );
-    if (!resp.ok) {
-      const error = await resp.json().catch(() => ({}));
-      throw new Error(error.message || "Failed to create fault");
-    }
-    const result = await resp.json();
-
-    // Insert new fault into open or resolved list, keeping descending order
-    if (result.fault.Status.toLowerCase() === "closed") {
-      setResolved((r) => sortFaultsDescByDate([result.fault, ...r]));
-    } else {
-      setOpen((o) => sortFaultsDescByDate([result.fault, ...o]));
-    }
-    return true;
-  };
-
-  return { open, resolved, create, err, setErr };
-}
-
-function usePagination(list, perPage = 10) {
-  const [page, setPage] = useState(1);
-  const max = Math.ceil(list.length / perPage);
-  const current = list.slice((page - 1) * perPage, page * perPage);
-  React.useEffect(() => setPage(1), [list]);
-  return { current, page, setPage, max };
-}
 
 export default function DashboardViewOnly({
   userInfo,
+  faults,
   notifications,
   setNotifications,
   onLogout,
+  onNewFault, // <--- Receive onNewFault prop
 }) {
-  const [modal, setModal] = useState(false);
-  const [search, setSearch] = useState("");
-  const [view, setView] = useState("faults"); // 'faults' or 'resolved'
-  const [showNotif, setShowNotif] = useState(false);
+  const [showFooterInfo, setShowFooterInfo] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNewFaultModal, setShowNewFaultModal] = useState(false); // modal control
   const notifRef = useRef();
-  const [footerInfo, setFooterInfo] = useState(false);
 
-  const { open, resolved, create, err, setErr } = useMultiFaults();
+  const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson"];
 
-  // Notifications dropdown & mark read
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterUrgency, setFilterUrgency] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  // New Fault form state
+  const [newFaultData, setNewFaultData] = useState({
+    systemID: "",
+    sectionID: "",
+    reportedBy: userInfo?.name || "", // default to current user
+    location: "",
+    description: "",
+    urgency: "medium",
+    status: "open",
+    assignedTo: "",
+  });
+
+  const filteredFaults = faults.filter((fault) => {
+    const matchesSearch =
+      fault.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fault.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fault.reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesUrgency = filterUrgency === "all" || fault.urgency === filterUrgency;
+    const matchesStatus = filterStatus === "all" || fault.status === filterStatus;
+
+    return matchesSearch && matchesUrgency && matchesStatus;
+  });
+
   useEffect(() => {
-    if (showNotif)
-      setNotifications((n) => n.map((e) => ({ ...e, isRead: true })));
-    function outside(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target))
-        setShowNotif(false);
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (showNotifications && notifications.some((n) => !n.isRead)) {
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
     }
-    document.addEventListener("mousedown", outside);
-    return () => document.removeEventListener("mousedown", outside);
-  }, [showNotif, setNotifications]);
+  }, [showNotifications, notifications, setNotifications]);
 
-  const currentFaultArr = view === "faults" ? open : resolved;
+  // Handle new fault form input change
+  const handleNewFaultChange = (e) => {
+    const { name, value } = e.target;
+    setNewFaultData((prev) => ({ ...prev, [name]: value }));
+  };
 
-  const filtered = React.useMemo(() => {
-    return currentFaultArr.filter((f) => {
-      if (!f) return false;
-      // Include multiple relevant fields for search
-      const haystack = [
-        f.DescFault,
-        f.Location,
-        f.LocationOfFault,
-        f.ReportedBy,
-        f.SystemID,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(search.toLowerCase());
+  // Handle new fault submission
+  const handleAddNewFault = () => {
+    // Basic validation
+    if (
+      !newFaultData.systemID.trim() ||
+      !newFaultData.sectionID.trim() ||
+      !newFaultData.reportedBy.trim() ||
+      !newFaultData.location.trim() ||
+      !newFaultData.description.trim() ||
+      !newFaultData.urgency.trim() ||
+      !newFaultData.status.trim()
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    onNewFault(newFaultData);
+    setShowNewFaultModal(false);
+    // Reset form
+    setNewFaultData({
+      systemID: "",
+      sectionID: "",
+      reportedBy: userInfo?.name || "",
+      location: "",
+      description: "",
+      urgency: "medium",
+      status: "open",
+      assignedTo: "",
     });
-  }, [currentFaultArr, search]);
-
-  const { current, page, setPage, max } = usePagination(filtered);
+  };
 
   return (
     <>
-      {/* Navbar */}
       <nav
         className="navbar navbar-dark fixed-top shadow-sm"
         style={{ height: 60, backgroundColor: "#001f3f" }}
       >
-        <Container
-          fluid
-          className="d-flex justify-content-between align-items-center"
-        >
-          <div style={{ width: 120 }} />
+        <Container fluid className="d-flex justify-content-between align-items-center">
+          <div style={{ width: 120 }}></div>
           <span className="navbar-brand mb-0 h1 mx-auto">
-            ⚡ N F M System Version 1.0.1
+            ⚡ N F M System Version 1.0.1 (View Only)
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
               <Button
                 variant="link"
                 className="text-white p-0"
-                onClick={() => setShowNotif((v) => !v)}
+                onClick={() => setShowNotifications(!showNotifications)}
                 style={{ fontSize: "1.3rem" }}
-                aria-label="Toggle Notifications"
               >
                 <BellFill />
-                {notifications.some((n) => !n.isRead) && (
+                {notifications.filter((n) => !n.isRead).length > 0 && (
                   <span
                     className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
-                    style={{
-                      fontSize: "0.7rem",
-                      lineHeight: 1,
-                      fontWeight: "bold",
-                    }}
+                    style={{ fontSize: "0.7rem", lineHeight: "1", fontWeight: "bold" }}
                   >
                     {notifications.filter((n) => !n.isRead).length}
                   </span>
                 )}
               </Button>
-              {showNotif && (
+              {showNotifications && (
                 <div
                   className="position-absolute"
                   style={{
-                    top: 35,
+                    top: "35px",
                     right: 0,
                     backgroundColor: "white",
                     color: "#222",
-                    width: 280,
-                    maxHeight: 300,
+                    width: "280px",
+                    maxHeight: "300px",
                     overflowY: "auto",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    borderRadius: 8,
+                    borderRadius: "8px",
                     zIndex: 1500,
                   }}
                 >
                   {notifications.length === 0 ? (
-                    <div style={{ padding: 10 }}>No notifications</div>
+                    <div style={{ padding: "10px" }}>No notifications</div>
                   ) : (
                     notifications.map((note) => (
                       <div
                         key={note.id}
                         style={{
-                          padding: 10,
+                          padding: "10px",
                           borderBottom: "1px solid #eee",
                           backgroundColor: note.isRead ? "#f8f9fa" : "white",
                           fontWeight: note.isRead ? "normal" : "600",
@@ -251,192 +184,249 @@ export default function DashboardViewOnly({
       </nav>
 
       <Container fluid className="pt-5 mt-4">
-        {err && (
-          <div className="alert alert-danger" role="alert">
-            {err}{" "}
-            <button
-              type="button"
-              className="btn-close float-end"
-              onClick={() => setErr("")}
-              aria-label="Close"
-            />
-          </div>
-        )}
-        <Row>
-          {/* Sidebar */}
-          <Col
-            xs={2}
-            className="bg-dark text-white sidebar p-3 position-fixed vh-100"
-            style={{ top: 60, left: 0, zIndex: 1040 }}
-          >
-            <div className="glass-sidebar-title mb-4 text-center">
-              <span className="sidebar-title-text">Dashboard</span>
-            </div>
-            <ul className="nav flex-column">
-              <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => setModal(true)}
-                >
-                  + Add Fault
-                </button>
-              </li>
-              <li className="nav-item mb-2">
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "faults" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("faults")}
-                >
-                  📋 Fault Review Panel
-                </button>
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "resolved" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("resolved")}
-                >
-                  ✅ Resolved Faults
-                </button>
-              </li>
-            </ul>
-          </Col>
-
-          {/* Main Content */}
-          <Col
-            className="ms-auto d-flex flex-column"
-            style={{
-              marginLeft: "16.666667%",
-              width: "calc(100% - 16.666667%)",
-              height: "calc(100vh - 60px)",
-              overflow: "hidden",
-              paddingLeft: 0,
-              maxWidth: "82%",
-            }}
-          >
-            <Tabs activeKey={view} className="custom-tabs" justify>
+        <Row className="mb-3 align-items-center">
+          <Col>
+            <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
               <Tab
                 eventKey="faults"
-                title={
-                  <span className="tab-title-lg">🚧 Faults Review Panel</span>
-                }
+                title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}
               >
-                {view === "faults" && (
-                  <>
-                    <Row className="mb-3 px-3">
-                      <Col md={4} className="mb-2">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Search faults..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          aria-label="Search faults"
-                        />
-                      </Col>
-                    </Row>
-                    <div className="mb-2 px-3">
-                      <strong>Total Faults:</strong> {filtered.length}
-                    </div>
-                    <FaultsTable
-                      faults={current}
-                      isResolved={false}
-                      page={page}
-                      setPage={setPage}
-                      max={max}
-                    />
-                  </>
-                )}
-              </Tab>
+                {/* Add New Fault Button */}
+                <div className="d-flex justify-content-end mb-2 px-3">
+                  <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
+                    + New Fault
+                  </Button>
+                </div>
 
-              <Tab
-                eventKey="resolved"
-                title={<span className="tab-title-lg">✅ Resolved Faults</span>}
-              >
-                {view === "resolved" && (
-                  <>
-                    <Row className="mb-3 px-3">
-                      <Col md={4} className="mb-2">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Search resolved faults..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          aria-label="Search resolved faults"
-                        />
-                      </Col>
-                    </Row>
-                    <div className="mb-2 px-3">
-                      <strong>Total Resolved Faults:</strong> {filtered.length}
-                    </div>
-                    <FaultsTable
-                      faults={current}
-                      isResolved={true}
-                      page={page}
-                      setPage={setPage}
-                      max={max}
+                <Row className="mb-3 px-3 pt-3">
+                  <Col md={4} className="mb-2">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Search faults..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                  </>
-                )}
+                  </Col>
+                  <Col md={3} className="mb-2">
+                    <select
+                      className="form-select"
+                      value={filterUrgency}
+                      onChange={(e) => setFilterUrgency(e.target.value)}
+                    >
+                      <option value="all">All Urgencies</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </Col>
+                  <Col md={3} className="mb-2">
+                    <select
+                      className="form-select"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="open">Open</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </Col>
+                </Row>
+
+                <Card className="shadow-sm mt-3">
+                  <Card.Body className="p-0">
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      responsive
+                      className="table-fixed-header table-lg mb-0"
+                    >
+                      <thead className="sticky-top bg-light">
+                        <tr>
+                          <th>ID</th>
+                          <th>System ID</th>
+                          <th>Section ID</th>
+                          <th>Reported By</th>
+                          <th>Location</th>
+                          <th>Description</th>
+                          <th>Urgency</th>
+                          <th>Status</th>
+                          <th>Assigned To</th>
+                          <th>Reported At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredFaults.map((fault) => (
+                          <tr key={fault.id} className="table-row-hover">
+                            <td>{fault.id}</td>
+                            <td>{fault.systemID}</td>
+                            <td>{fault.sectionID}</td>
+                            <td>{fault.reportedBy}</td>
+                            <td>{fault.location}</td>
+                            <td className="description-col">{fault.description}</td>
+                            <td>
+                              <span className={`badge bg-${getUrgencyColor(fault.urgency)}`}>
+                                {fault.urgency}
+                              </span>
+                            </td>
+                            <td>{fault.status}</td>
+                            <td>{fault.assignedTo}</td>
+                            <td>{fault.reportedAt}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </Card.Body>
+                </Card>
               </Tab>
             </Tabs>
           </Col>
         </Row>
       </Container>
 
-      {/* Footer */}
       <footer
         className="fixed-bottom text-white py-2 px-3 d-flex flex-column flex-sm-row justify-content-between align-items-center shadow"
         style={{ backgroundColor: "#001f3f" }}
       >
         <div className="mb-2 mb-sm-0">
-          <Button
-            className="glass-button"
-            size="sm"
-            onClick={() => alert("Contact support at support@nfm.lk")}
-          >
-            Support
-          </Button>
-        </div>
-        <div
-          className="text-center flex-grow-1 mb-2 mb-sm-0"
-          aria-live="polite"
-        >
-          Total Open: {open.length} | Resolved: {resolved.length} | Unread
-          Notifications: {notifications.filter((n) => !n.isRead).length}
+                  <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
+                </div>
+        <div className="text-center flex-grow-1 mb-2 mb-sm-0">
+          Total Faults: {faults.length} | Unread Notifications:{" "}
+          {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
           <Button
             className="glass-button"
             size="sm"
-            onClick={() => setFooterInfo((v) => !v)}
-            aria-expanded={footerInfo}
-            aria-controls="footer-info"
+            onClick={() => setShowFooterInfo(!showFooterInfo)}
           >
-            {footerInfo ? "Hide Info" : "Show Info"}
+            {showFooterInfo ? "Hide Info" : "Show Info"}
           </Button>
-          {footerInfo && (
-            <div
-              id="footer-info"
-              className="mt-1"
-              style={{ fontSize: "0.75rem", opacity: 0.8 }}
-            >
-              © 2025 Network Fault Management System. All rights reserved.
+          {showFooterInfo && (
+            <div className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+              &copy; 2025 Network Fault Management System. All rights reserved.
             </div>
           )}
         </div>
       </footer>
 
       {/* New Fault Modal */}
-      <NewFaultModal
-        show={modal}
-        handleClose={() => setModal(false)}
-        handleAdd={create}
-        assignablePersons={assignablePersons}
-      />
+      <Modal
+        show={showNewFaultModal}
+        onHide={() => setShowNewFaultModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Fault</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-2" controlId="formSystemID">
+              <Form.Label>System ID</Form.Label>
+              <Form.Control
+                type="text"
+                name="systemID"
+                value={newFaultData.systemID}
+                onChange={handleNewFaultChange}
+                placeholder="Enter system ID"
+              />
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formSectionID">
+              <Form.Label>Section ID</Form.Label>
+              <Form.Control
+                type="text"
+                name="sectionID"
+                value={newFaultData.sectionID}
+                onChange={handleNewFaultChange}
+                placeholder="Enter section ID"
+              />
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formReportedBy">
+              <Form.Label>Reported By</Form.Label>
+              <Form.Control
+                type="text"
+                name="reportedBy"
+                value={newFaultData.reportedBy}
+                onChange={handleNewFaultChange}
+                placeholder="Enter reporter name"
+                disabled
+              />
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formLocation">
+              <Form.Label>Location</Form.Label>
+              <Form.Control
+                type="text"
+                name="location"
+                value={newFaultData.location}
+                onChange={handleNewFaultChange}
+                placeholder="Enter location"
+              />
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formDescription">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                name="description"
+                value={newFaultData.description}
+                onChange={handleNewFaultChange}
+                placeholder="Enter description"
+              />
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formUrgency">
+              <Form.Label>Urgency</Form.Label>
+              <Form.Select
+                name="urgency"
+                value={newFaultData.urgency}
+                onChange={handleNewFaultChange}
+              >
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </Form.Select>
+            </Form.Group>
+            <Form.Group className="mb-2" controlId="formStatus">
+              <Form.Label>Status</Form.Label>
+              <Form.Select
+                name="status"
+                value={newFaultData.status}
+                onChange={handleNewFaultChange}
+              >
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </Form.Select>
+            </Form.Group>
 
-      {/* Styles */}
+            <Form.Group className="mb-3" controlId="formAssignedTo">
+              <Form.Label>Assigned To</Form.Label>
+              <Form.Select
+                name="assignedTo"
+                value={newFaultData.assignedTo}
+                onChange={handleNewFaultChange}
+              >
+                <option value="">-- Select Person --</option>
+                {assignablePersons.map((person) => (
+                  <option key={person} value={person}>
+                    {person}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowNewFaultModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleAddNewFault}>
+            Add Fault
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       <style>{`
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
@@ -473,211 +463,48 @@ export default function DashboardViewOnly({
           background-color: #f8f9fa;
           border-bottom: 2px solid #dee2e6;
         }
-        .table-fit td, .table-fit th {
-          font-size: 0.98rem;
-          padding: 0.45rem 0.5rem;
+        .table-lg td, .table-lg th {
+          font-size: 1.15rem;
+          padding: 1rem 1.25rem;
           vertical-align: middle;
         }
-        .custom-align-table th, .custom-align-table td {
-          vertical-align: middle !important;
-          text-align: left;
-        }
-        .custom-align-table th.text-center, .custom-align-table td.text-center {
-          text-align: center !important;
-        }
-        .custom-align-table td {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .custom-align-table td.description-col {
-          white-space: normal;
-          overflow-wrap: break-word;
-          word-break: break-word;
-        }
         .tab-title-lg {
-          font-size: 1.35rem;
+          font-size: 1.6rem;
           font-weight: 700;
           color: #001f3f;
           letter-spacing: 0.5px;
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
         }
         .description-col {
-          max-width: 180px;
-          white-space: normal;
-          overflow-wrap: break-word;
-          word-break: break-word;
+          max-width: 300px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .table-row-hover:hover {
           background-color: #e6f0ff;
           cursor: pointer;
           transition: background-color 0.25s ease;
         }
+
         .form-control, .form-select {
-          font-size: 1rem;
-          border-radius: 8px;
-        }
-        .sidebar {
-          background-color: #001f3f !important;
-          height: 100vh;
-          position: fixed;
-          top: 60px;
-          left: 0;
-          z-index: 1040;
-          overflow-y: auto;
-          width: 16.6666667%;
-        }
-        .sidebar .nav-link.btn-link {
-          font-size: 1rem;
-          padding: 0.35rem 0.7rem;
-          height: 2.1rem;
-          border-radius: 8px;
-          font-weight: 600;
-          letter-spacing: 0.2px;
-        }
-        .sidebar .nav-link.btn-link:hover,
-        .sidebar .nav-link.btn-link:focus {
-          background-color: rgba(255, 255, 255, 0.18);
-          color: #0072ff;
-        }
-        .glass-sidebar-title {
-          background: rgba(255, 255, 255, 0.13);
-          border: 1.5px solid rgba(255, 255, 255, 0.35);
-          border-radius: 16px;
-          backdrop-filter: blur(8px);
-          color: #001f3f;
-          font-weight: 700;
-          font-size: 1.5rem;
-          padding: 0.7rem 0.5rem 0.7rem 0.5rem;
-          margin-bottom: 1.2rem;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-        }
-        .sidebar-title-text {
-          color: #dfe3e7ff;
-          font-weight: 600;
-          font-size: 1.50rem;
-          letter-spacing: 0.5px;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
+         font-size: 1rem;
+         border-radius: 8px;
         }
       `}</style>
     </>
   );
 }
 
-function FaultsTable({ faults, isResolved, page, setPage, max }) {
-  return (
-    <Row
-      style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}
-    >
-      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
-        <Card.Body className="p-0 d-flex flex-column">
-          <Table
-            striped
-            bordered
-            hover
-            responsive
-            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
-            aria-label="Faults Table"
-          >
-            <colgroup>
-              <col style={{ width: "4%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "14%" }} />
-            </colgroup>
-            <thead className="sticky-top bg-light">
-              <tr>
-                <th className="text-center">ID</th>
-                <th className="text-center">System ID</th>
-                <th className="text-center">Section ID</th>
-                <th>Reported By</th>
-                <th>Location</th>
-                <th>Description</th>
-                <th className="text-center">Status</th>
-                <th>Assigned To</th>
-                <th>Reported At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {faults.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center text-muted py-4">
-                    No faults.
-                  </td>
-                </tr>
-              ) : (
-                faults.map((f) => (
-                  <tr key={f.id} className="table-row-hover">
-                    <td className="text-center">{f.id}</td>
-                    <td className="text-center">{f.SystemID}</td>
-                    <td className="text-center">{f.SectionID}</td>
-                    <td>{f.ReportedBy}</td>
-                    <td>{f.Location}</td>
-                    <td className="description-col">{f.DescFault}</td>
-                    <td className="text-center">{f.Status}</td>
-                    <td>{f.AssignTo}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
-          <nav
-            aria-label="Fault pagination"
-            className="mt-3 px-3"
-            style={{ flexShrink: 0 }}
-          >
-            <ul className="pagination justify-content-center mb-0">
-              <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
-                <button
-                  className="page-link"
-                  onClick={() => setPage(Math.max(page - 1, 1))}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </button>
-              </li>
-              {Array.from({ length: max }).map((_, idx) => {
-                const pageNum = idx + 1;
-                return (
-                  <li
-                    key={pageNum}
-                    className={`page-item ${page === pageNum ? "active" : ""}`}
-                  >
-                    <button
-                      className="page-link"
-                      onClick={() => setPage(pageNum)}
-                      aria-current={page === pageNum ? "page" : undefined}
-                    >
-                      {pageNum}
-                    </button>
-                  </li>
-                );
-              })}
-              <li
-                className={`page-item ${
-                  page === max || max === 0 ? "disabled" : ""
-                }`}
-              >
-                <button
-                  className="page-link"
-                  onClick={() => setPage(Math.min(page + 1, max))}
-                  aria-label="Next page"
-                >
-                  Next
-                </button>
-              </li>
-            </ul>
-          </nav>
-        </Card.Body>
-      </Card>
-    </Row>
-  );
+function getUrgencyColor(level) {
+  switch (level) {
+    case "high":
+      return "danger";
+    case "medium":
+      return "warning";
+    case "low":
+      return "secondary";
+    default:
+      return "light";
+  }
 }

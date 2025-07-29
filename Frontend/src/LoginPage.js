@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Card, Button, Form, InputGroup } from "react-bootstrap";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
 import { useNavigate } from "react-router-dom";
+import networkBg from "./assets/networkpic.jpg";
 
 export default function LoginPage({ onLogin, onRegisterClick }) {
   const [username, setUsername] = useState("");
@@ -92,7 +93,10 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
   return (
     <div
       style={{
-        backgroundColor: "#0b1e39",
+        backgroundImage: `linear-gradient(rgba(11, 30, 57, 0.85), rgba(11, 30, 57, 0.95)), url(${networkBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
@@ -111,7 +115,27 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
         }}
       >
-        <h3 className="mb-4 text-center">Login to your account</h3>
+        <div className="text-center mb-4">
+          <h2
+            style={{
+              color: "#ffffff",
+              fontWeight: "bold",
+              marginBottom: "0.5rem",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+            }}
+          >
+            NFMS
+          </h2>
+          <h4
+            style={{
+              color: "#9ab4d3",
+              fontWeight: "500",
+            }}
+          >
+            Network Fault Management System
+          </h4>
+        </div>
 
         {error && <div className="mb-3 alert alert-danger">{error}</div>}
 
