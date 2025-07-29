@@ -8,10 +8,13 @@ import {
   Card,
   Tabs,
   Tab,
+  Modal,
+  Form,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
+import Activecharts from "./components/Activecharts";
 
 const assignablePersons = [
   "John Doe",
@@ -214,6 +217,25 @@ function FaultsTable({
   max,
   onOpenEditModal,
 }) {
+  const [noteModal, setNoteModal] = useState(false);
+  const [selectedFault, setSelectedFault] = useState(null);
+  const [noteText, setNoteText] = useState("");
+
+  const handleSaveNote = async () => {
+    if (!selectedFault) return;
+    try {
+      await onEdit({
+        ...selectedFault,
+        Remarks: noteText,
+      });
+      setNoteModal(false);
+      setSelectedFault(null);
+      setNoteText("");
+    } catch (err) {
+      alert("Failed to update remarks: " + err.message);
+    }
+  };
+
   return (
     <Row
       style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}
@@ -346,7 +368,49 @@ function FaultsTable({
                         </Button>
                       </td>
                     )}
-                    <td>{f.Remarks || "-"}</td>
+                    <td>
+                      <div className="d-flex align-items-start gap-2">
+                        <div style={{ flex: 1 }}>
+                          {f.Remarks ? (
+                            <div
+                              className="text-muted"
+                              style={{
+                                fontSize: "0.9rem",
+                                maxHeight: "50px",
+                                overflowY: "auto",
+                              }}
+                            >
+                              {f.Remarks}
+                            </div>
+                          ) : (
+                            <div
+                              className="text-muted fst-italic"
+                              style={{ fontSize: "0.9rem" }}
+                            >
+                              No notes
+                            </div>
+                          )}
+                        </div>
+                        {!isResolved && (
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedFault(f);
+                              setNoteText(f.Remarks || "");
+                              setNoteModal(true);
+                            }}
+                            className="px-2 py-1"
+                            style={{
+                              whiteSpace: "nowrap",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            {f.Remarks ? "✏️ Edit" : "+ Add Note"}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -401,6 +465,35 @@ function FaultsTable({
           </nav>
         </Card.Body>
       </Card>
+
+      {/* Notes Modal */}
+      <Modal show={noteModal} onHide={() => setNoteModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {selectedFault?.Remarks ? "Edit Note" : "Add Note"}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Control
+              as="textarea"
+              rows={4}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Enter your notes here..."
+              style={{ fontSize: "0.9rem" }}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setNoteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSaveNote}>
+            Save Note
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Row>
   );
 }
@@ -728,12 +821,7 @@ export default function Dashboard({
                   title={<span className="tab-title-lg">📊 Active Chart</span>}
                 >
                   {view === "active-chart" && (
-                    <div className="p-4">
-                      <h3>Active Chart</h3>
-                      <p>
-                        Active chart visualization will be implemented here.
-                      </p>
-                    </div>
+                    <Activecharts faults={[...open, ...resolved]} />
                   )}
                 </Tab>
                 <Tab
