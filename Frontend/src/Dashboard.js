@@ -218,14 +218,21 @@ function FaultsTable({
     <Row
       style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}
     >
-      <Card className="shadow-sm w-100" style={{ minWidth: 0 }}>
-        <Card.Body className="p-0 d-flex flex-column">
+      <Card
+        className="glass-card w-100"
+        style={{
+          minWidth: 0,
+          background: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "20px",
+          boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.1)",
+        }}
+      >
+        <Card.Body className="p-3 d-flex flex-column">
           <Table
-            striped
-            bordered
-            hover
             responsive
-            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table"
+            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table table-borderless glass-table"
             aria-label="Faults Table"
           >
             <colgroup>
@@ -238,7 +245,8 @@ function FaultsTable({
               <col style={{ width: "7%" }} />
               <col style={{ width: "10%" }} />
               <col style={{ width: "7.5%" }} />
-              {!isResolved && <col style={{ width: "10%" }} />}
+              {!isResolved && <col style={{ width: "5%" }} />}
+              <col style={{ width: "10%" }} />
             </colgroup>
             <thead className="sticky-top bg-light">
               <tr>
@@ -252,13 +260,14 @@ function FaultsTable({
                 <th>Assigned To</th>
                 <th>Reported At</th>
                 {!isResolved && <th className="text-center">Actions</th>}
+                <th>Remarks</th>
               </tr>
             </thead>
             <tbody>
               {faults.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isResolved ? 9 : 10}
+                    colSpan={isResolved ? 10 : 11}
                     className="text-center text-muted py-4"
                   >
                     No faults.
@@ -266,7 +275,18 @@ function FaultsTable({
                 </tr>
               ) : (
                 faults.map((f) => (
-                  <tr key={f.id} className="table-row-hover">
+                  <tr
+                    key={f.id}
+                    className={`table-row-hover ${
+                      f.Status === "In Progress"
+                        ? "status-in-progress-row"
+                        : f.Status === "Pending"
+                        ? "status-pending-row"
+                        : f.Status === "Closed"
+                        ? "status-closed-row"
+                        : ""
+                    }`}
+                  >
                     <td className="text-center">{f.id}</td>
                     <td className="text-center">{f.SystemID}</td>
                     <td>{f.ReportedBy}</td>
@@ -285,9 +305,24 @@ function FaultsTable({
                             alert("Failed to update status: " + err.message);
                           }
                         }}
-                        className="form-select form-select-sm"
+                        className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
+                          /\s+/g,
+                          "-"
+                        )}`}
                         disabled={isResolved}
                         aria-label={`Change status for fault ${f.id}`}
+                        style={{
+                          backgroundColor:
+                            f.Status === "In Progress"
+                              ? "#fff3cd"
+                              : f.Status === "Pending"
+                              ? "#cff4fc"
+                              : f.Status === "Closed"
+                              ? "#d1e7dd"
+                              : "",
+                          color: "#000",
+                          fontWeight: "500",
+                        }}
                       >
                         <option value="In Progress">In Progress</option>
                         <option value="Pending">Pending</option>
@@ -309,17 +344,9 @@ function FaultsTable({
                         >
                           Edit
                         </Button>
-                        <Button
-                          variant="outline-success"
-                          size="sm"
-                          className="me-1 mb-1"
-                          onClick={() => onMarkResolved(f.id)}
-                          aria-label={`Mark fault ${f.id} as resolved`}
-                        >
-                          Mark as Resolved
-                        </Button>
                       </td>
                     )}
+                    <td>{f.Remarks || "-"}</td>
                   </tr>
                 ))
               )}
@@ -387,7 +414,7 @@ export default function Dashboard({
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState("faults"); // 'faults' or 'resolved'
+  const [view, setView] = useState(""); // 'faults' or 'resolved'
   const [showNotif, setShowNotif] = useState(false);
   const notifRef = useRef();
   const [footerInfo, setFooterInfo] = useState(false);
@@ -579,6 +606,26 @@ export default function Dashboard({
                   ✅ Resolved Faults
                 </button>
               </li>
+              <li className="nav-item mb-2">
+                <button
+                  className={`nav-link btn btn-link text-white p-0${
+                    view === "active-chart" ? " fw-bold" : ""
+                  }`}
+                  onClick={() => setView("active-chart")}
+                >
+                  📊 Active Chart
+                </button>
+              </li>
+              <li className="nav-item mb-2">
+                <button
+                  className={`nav-link btn btn-link text-white p-0${
+                    view === "user-performance" ? " fw-bold" : ""
+                  }`}
+                  onClick={() => setView("user-performance")}
+                >
+                  👥 User Performance
+                </button>
+              </li>
             </ul>
           </Col>
 
@@ -594,76 +641,119 @@ export default function Dashboard({
               maxWidth: "82%",
             }}
           >
-            <Tabs activeKey={view} className="custom-tabs" justify>
-              <Tab
-                eventKey="faults"
-                title={
-                  <span className="tab-title-lg">🚧 Faults Review Panel</span>
-                }
-              >
-                {view === "faults" && (
-                  <>
-                    <Row className="mb-3 px-3">
-                      <Col md={4} className="mb-2">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Search faults..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          aria-label="Search faults"
-                        />
-                      </Col>
-                    </Row>
-                    <div className="mb-2 px-3">
-                      <strong>Total Faults:</strong> {filtered.length}
-                    </div>
-                    <FaultsTable
-                      faults={current}
-                      onEdit={update}
-                      onMarkResolved={resolve}
-                      isResolved={false}
-                      page={page}
-                      setPage={setPage}
-                      max={max}
-                      onOpenEditModal={openEditModal}
-                    />
-                  </>
-                )}
-              </Tab>
+            {!view ? (
+              <div className="d-flex justify-content-center align-items-center h-100">
+                <div className="text-center text-muted">
+                  <h2 className="mb-4">👋 Welcome to NFM System</h2>
+                  <p className="lead">
+                    Please select an option from the sidebar to get started.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <Tabs activeKey={view} className="custom-tabs" justify>
+                <Tab
+                  eventKey="faults"
+                  title={
+                    <span className="tab-title-lg">🚧 Faults Review Panel</span>
+                  }
+                >
+                  {view === "faults" && (
+                    <>
+                      <Row className="mb-3 px-3">
+                        <Col md={4} className="mb-2">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Search faults..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            aria-label="Search faults"
+                          />
+                        </Col>
+                      </Row>
+                      <div className="mb-2 px-3">
+                        <strong>Total Faults:</strong> {filtered.length}
+                      </div>
+                      <FaultsTable
+                        faults={current}
+                        onEdit={update}
+                        onMarkResolved={resolve}
+                        isResolved={false}
+                        page={page}
+                        setPage={setPage}
+                        max={max}
+                        onOpenEditModal={openEditModal}
+                      />
+                    </>
+                  )}
+                </Tab>
 
-              <Tab
-                eventKey="resolved"
-                title={<span className="tab-title-lg">✅ Resolved Faults</span>}
-              >
-                {view === "resolved" && (
-                  <>
-                    <Row className="mb-3 px-3">
-                      <Col md={4} className="mb-2">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Search..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          aria-label="Search resolved faults"
-                        />
-                      </Col>
-                    </Row>
-                    <div className="mb-2 px-3">
-                      <strong>Total Resolved Faults:</strong> {filtered.length}
+                <Tab
+                  eventKey="resolved"
+                  title={
+                    <span className="tab-title-lg">✅ Resolved Faults</span>
+                  }
+                >
+                  {view === "resolved" && (
+                    <>
+                      <Row className="mb-3 px-3">
+                        <Col md={4} className="mb-2">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Search..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            aria-label="Search resolved faults"
+                          />
+                        </Col>
+                      </Row>
+                      <div className="mb-2 px-3">
+                        <strong>Total Resolved Faults:</strong>{" "}
+                        {filtered.length}
+                      </div>
+                      <FaultsTable
+                        faults={current}
+                        isResolved={true}
+                        page={page}
+                        setPage={setPage}
+                        max={max}
+                      />
+                    </>
+                  )}
+                </Tab>
+                <Tab
+                  eventKey="active-chart"
+                  title={<span className="tab-title-lg">📊 Active Chart</span>}
+                >
+                  {view === "active-chart" && (
+                    <div className="p-4">
+                      <h3>Active Chart</h3>
+                      <p>
+                        Active chart visualization will be implemented here.
+                      </p>
                     </div>
-                    <FaultsTable
-                      faults={current}
-                      isResolved={true}
-                      page={page}
-                      setPage={setPage}
-                      max={max}
-                    />
-                  </>
-                )}
-              </Tab>
-            </Tabs>
+                  )}
+                </Tab>
+                <Tab
+                  eventKey="user-performance"
+                  title={
+                    <span className="tab-title-lg">👥 User Performance</span>
+                  }
+                >
+                  {view === "user-performance" && (
+                    <div className="p-4">
+                      <h3>User Performance</h3>
+                      <p>
+                        User performance metrics and analytics will be displayed
+                        here.
+                      </p>
+                    </div>
+                  )}
+                </Tab>
+              </Tabs>
+            )}
           </Col>
         </Row>
       </Container>
@@ -725,6 +815,50 @@ export default function Dashboard({
 
       {/* Styles */}
       <style>{`
+        /* Status Colors */
+        .status-in-progress-row {
+          background-color: #fff3cd !important;
+        }
+        .status-pending-row {
+          background-color: #cff4fc !important;
+        }
+        .status-closed-row {
+          background-color: #d1e7dd !important;
+        }
+        .status-in-progress-row td {
+          background-color: #fff3cd !important;
+        }
+        .status-pending-row td {
+          background-color: #cff4fc !important;
+        }
+        .status-closed-row td {
+          background-color: #d1e7dd !important;
+        }
+        .form-select.status-in-progress {
+          border-color: #ffc107;
+          background-color: #fff3cd;
+        }
+        .form-select.status-pending {
+          border-color: #0dcaf0;
+          background-color: #cff4fc;
+        }
+        .form-select.status-closed {
+          border-color: #198754;
+          background-color: #d1e7dd;
+        }
+        .form-select.status-in-progress:focus {
+          border-color: #ffc107;
+          box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25);
+        }
+        .form-select.status-pending:focus {
+          border-color: #0dcaf0;
+          box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
+        }
+        .form-select.status-closed:focus {
+          border-color: #198754;
+          box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+        }
+        
         .glass-button {
           background: rgba(255, 255, 255, 0.1);
           border: 1.5px solid rgba(255, 255, 255, 0.4);
@@ -757,8 +891,8 @@ export default function Dashboard({
           position: sticky;
           top: 0;
           z-index: 10;
-          background-color: #f8f9fa;
-          border-bottom: 2px solid #dee2e6;
+          background: linear-gradient(180deg, #001f3f, #002952);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         .table-fit td, .table-fit th {
           font-size: 0.98rem;
@@ -796,9 +930,54 @@ export default function Dashboard({
           word-break: break-word;
         }
         .table-row-hover:hover {
-          background-color: #e6f0ff;
+          filter: brightness(95%);
           cursor: pointer;
-          transition: background-color 0.25s ease;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .glass-table {
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          border-radius: 15px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+        .glass-table thead th {
+          background: linear-gradient(180deg, #001f3f, #002952);
+          color: white;
+          font-weight: 600;
+          padding: 1rem 0.5rem;
+          border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+          text-transform: uppercase;
+          font-size: 0.9rem;
+          letter-spacing: 0.5px;
+        }
+        .glass-table tbody tr {
+          transition: all 0.3s ease;
+          border-bottom: 1px solid rgba(0, 31, 63, 0.05);
+        }
+        .glass-table tbody tr:last-child {
+          border-bottom: none;
+        }
+        .glass-table tbody td {
+          padding: 1rem 0.5rem;
+        }
+        .status-in-progress-row {
+          background: linear-gradient(145deg, rgba(255, 243, 205, 0.7), rgba(255, 243, 205, 0.9)) !important;
+          backdrop-filter: blur(5px);
+        }
+        .status-pending-row {
+          background: linear-gradient(145deg, rgba(207, 244, 252, 0.7), rgba(207, 244, 252, 0.9)) !important;
+          backdrop-filter: blur(5px);
+        }
+        .status-closed-row {
+          background: linear-gradient(145deg, rgba(209, 231, 221, 0.7), rgba(209, 231, 221, 0.9)) !important;
+          backdrop-filter: blur(5px);
+        }
+        .table-row-hover:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
         }
         .form-control, .form-select {
           font-size: 1rem;
