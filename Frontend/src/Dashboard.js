@@ -14,7 +14,9 @@ import {
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
+import NotesModal from "./NotesModal";
 import Activecharts from "./components/Activecharts";
+import { useFaultNotes } from "./useFaultNotes";
 
 const assignablePersons = [
   "John Doe",
@@ -29,35 +31,31 @@ function useMultiFaults() {
   const [err, setErr] = useState("");
   const token = localStorage.getItem("token");
 
-  const fetchOpen = async () => {
+  const fetchAllFaults = async () => {
     if (!token) return setErr("No authentication token.");
     try {
+      // Fetch all faults at once
       const res = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=open`,
+        `${process.env.REACT_APP_BACKEND_URL}/api/faults`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (!res.ok) throw new Error("Failed to fetch open faults");
-      setOpen(await res.json());
-      setErr("");
-    } catch (e) {
-      setErr(e.message);
-    }
-  };
-
-  const fetchResolved = async () => {
-    if (!token) return setErr("No authentication token.");
-    try {
-      const res = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL}/api/faults?status=closed`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) throw new Error("Failed to fetch resolved faults");
+      
+      if (!res.ok) throw new Error("Failed to fetch faults");
+      
       const data = await res.json();
-      setResolved(data.filter((f) => f.Status.toLowerCase() === "closed"));
+      
+      // Separate open and resolved faults
+      const openFaults = data.filter(fault => 
+        fault.Status && fault.Status.toLowerCase() !== "closed"
+      );
+      const resolvedFaults = data.filter(fault => 
+        fault.Status && fault.Status.toLowerCase() === "closed"
+      );
+      
+      setOpen(openFaults);
+      setResolved(resolvedFaults);
       setErr("");
     } catch (e) {
       setErr(e.message);
@@ -65,8 +63,7 @@ function useMultiFaults() {
   };
 
   useEffect(() => {
-    fetchOpen();
-    fetchResolved();
+    fetchAllFaults();
   }, []);
 
   const create = async (data) => {
@@ -203,7 +200,7 @@ function useMultiFaults() {
     }
   };
 
-  return { open, resolved, create, update, remove, resolve, err, setErr };
+  return { open, resolved, create, update, remove, resolve, err, setErr, fetchAllFaults };
 }
 
 function FaultsTable({
@@ -216,26 +213,8 @@ function FaultsTable({
   setPage,
   max,
   onOpenEditModal,
+  onOpenNotesModal,
 }) {
-  const [noteModal, setNoteModal] = useState(false);
-  const [selectedFault, setSelectedFault] = useState(null);
-  const [noteText, setNoteText] = useState("");
-
-  const handleSaveNote = async () => {
-    if (!selectedFault) return;
-    try {
-      await onEdit({
-        ...selectedFault,
-        Remarks: noteText,
-      });
-      setNoteModal(false);
-      setSelectedFault(null);
-      setNoteText("");
-    } catch (err) {
-      alert("Failed to update remarks: " + err.message);
-    }
-  };
-
   return (
     <Row
       style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}
@@ -282,7 +261,7 @@ function FaultsTable({
                 <th>Assigned To</th>
                 <th>Reported At</th>
                 {!isResolved && <th className="text-center">Actions</th>}
-                <th>Remarks</th>
+                <th>Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -369,47 +348,18 @@ function FaultsTable({
                       </td>
                     )}
                     <td>
-                      <div className="d-flex align-items-start gap-2">
-                        <div style={{ flex: 1 }}>
-                          {f.Remarks ? (
-                            <div
-                              className="text-muted"
-                              style={{
-                                fontSize: "0.9rem",
-                                maxHeight: "50px",
-                                overflowY: "auto",
-                              }}
-                            >
-                              {f.Remarks}
-                            </div>
-                          ) : (
-                            <div
-                              className="text-muted fst-italic"
-                              style={{ fontSize: "0.9rem" }}
-                            >
-                              No notes
-                            </div>
-                          )}
-                        </div>
-                        {!isResolved && (
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedFault(f);
-                              setNoteText(f.Remarks || "");
-                              setNoteModal(true);
-                            }}
-                            className="px-2 py-1"
-                            style={{
-                              whiteSpace: "nowrap",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            {f.Remarks ? "✏️ Edit" : "+ Add Note"}
-                          </Button>
-                        )}
-                      </div>
+                      <Button
+                        variant="outline-info"
+                        size="sm"
+                        onClick={() => onOpenNotesModal(f)}
+                        className="px-2 py-1"
+                        style={{
+                          whiteSpace: "nowrap",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        📝 Notes
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -465,35 +415,6 @@ function FaultsTable({
           </nav>
         </Card.Body>
       </Card>
-
-      {/* Notes Modal */}
-      <Modal show={noteModal} onHide={() => setNoteModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {selectedFault?.Remarks ? "Edit Note" : "Add Note"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Enter your notes here..."
-              style={{ fontSize: "0.9rem" }}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setNoteModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSaveNote}>
-            Save Note
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </Row>
   );
 }
@@ -509,11 +430,26 @@ export default function Dashboard({
   const [search, setSearch] = useState("");
   const [view, setView] = useState(""); // 'faults' or 'resolved'
   const [showNotif, setShowNotif] = useState(false);
+  const [notesModal, setNotesModal] = useState(false);
+  const [selectedFaultForNotes, setSelectedFaultForNotes] = useState(null);
   const notifRef = useRef();
   const [footerInfo, setFooterInfo] = useState(false);
 
-  const { open, resolved, create, update, remove, resolve, err, setErr } =
+  const { open, resolved, create, update, remove, resolve, err, setErr, fetchAllFaults } =
     useMultiFaults();
+
+  // Initialize notes hook
+  const token = localStorage.getItem("token");
+  const {
+    notes,
+    loading,
+    error: notesError,
+    fetchNotes,
+    addNote,
+    editNote,
+    deleteNote,
+    clearNotesCache,
+  } = useFaultNotes(token);
 
   useEffect(() => {
     if (showNotif)
@@ -563,6 +499,12 @@ export default function Dashboard({
   function openEditModal(fault) {
     setEdit(fault);
     setModal(true);
+  }
+
+  // Open notes modal
+  function openNotesModal(fault) {
+    setSelectedFaultForNotes(fault);
+    setNotesModal(true);
   }
 
   return (
@@ -719,6 +661,14 @@ export default function Dashboard({
                   👥 User Performance
                 </button>
               </li>
+              <li className="nav-item mb-2">
+                <button
+                  className="nav-link btn btn-link text-white p-0"
+                  onClick={fetchAllFaults}
+                >
+                  🔄 Refresh Data
+                </button>
+              </li>
             </ul>
           </Col>
 
@@ -777,6 +727,7 @@ export default function Dashboard({
                         setPage={setPage}
                         max={max}
                         onOpenEditModal={openEditModal}
+                        onOpenNotesModal={openNotesModal}
                       />
                     </>
                   )}
@@ -812,6 +763,7 @@ export default function Dashboard({
                         page={page}
                         setPage={setPage}
                         max={max}
+                        onOpenNotesModal={openNotesModal}
                       />
                     </>
                   )}
@@ -899,6 +851,23 @@ export default function Dashboard({
         handleAdd={edit ? update : create}
         assignablePersons={assignablePersons}
         initialData={edit}
+      />
+
+      {/* Notes Modal */}
+      <NotesModal
+        show={notesModal}
+        onHide={() => {
+          setNotesModal(false);
+          setSelectedFaultForNotes(null);
+        }}
+        fault={selectedFaultForNotes}
+        notes={notes}
+        loading={loading}
+        error={notesError}
+        onAddNote={addNote}
+        onEditNote={editNote}
+        onDeleteNote={deleteNote}
+        onFetchNotes={fetchNotes}
       />
 
       {/* Styles */}
