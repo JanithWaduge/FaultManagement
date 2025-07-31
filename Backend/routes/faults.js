@@ -54,10 +54,9 @@ router.post('/', [
     body('DescFault').trim().notEmpty().withMessage('Description is required'),
     body('ReportedBy').trim().notEmpty().withMessage('Reporter name is required'),
     body('AssignTo').trim().notEmpty().withMessage('Assignee is required'),
-    body('SectionID').optional().isInt({ allow_null: true }).withMessage('Section ID must be an integer if provided').toInt() // Explicitly allow null
+    body('SectionID').optional().isInt({ allow_null: true }).withMessage('Section ID must be an integer if provided').toInt()
 ], async (req, res) => {
     try {
-        // Check if req.body is an object and not empty
         if (!req.body || typeof req.body !== 'object' || Object.keys(req.body).length === 0) {
             return res.status(400).json({ message: 'Request body is empty or invalid' });
         }
@@ -84,7 +83,7 @@ router.post('/', [
             FaultForwardID = null
         } = req.body;
 
-        console.log('Received data:', req.body); // Debug log
+        console.log('Received data:', req.body);
 
         const queryParams = {
             SystemID,
@@ -131,13 +130,12 @@ router.post('/', [
     }
 });
 
-
 // Show faults conditionally based on assigned technician
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const username = req.user.username;
+        const { status } = req.query;
 
-        // List of specific technicians to restrict
         const technicians = [
             'John Doe',
             'Jane Smith',
@@ -145,23 +143,30 @@ router.get('/', authenticateToken, async (req, res) => {
             'Emily Davis'
         ];
 
-        let result;
+        let baseQuery = '';
+        let queryParams = {};
 
         if (technicians.includes(username)) {
-            // If logged-in user is a technician, show only their assigned faults
-            result = await db.query(`
-                SELECT * 
-                FROM dbo.tblFaults
-                WHERE AssignTo = @username
-            `, { username });
+            baseQuery = 'SELECT * FROM dbo.tblFaults WHERE AssignTo = @username';
+            queryParams.username = username;
         } else {
-            // For others (admin, manager, etc.), show all faults
-            result = await db.query(`
-                SELECT * 
-                FROM dbo.tblFaults
-            `);
+            baseQuery = 'SELECT * FROM dbo.tblFaults';
         }
 
+        // Add status filter if provided
+        if (status) {
+            if (Object.keys(queryParams).length > 0) {
+                baseQuery += ' AND Status = @status';
+            } else {
+                baseQuery += ' WHERE Status = @status';
+            }
+            queryParams.status = status;
+        }
+
+        // Order by newest first
+        baseQuery += ' ORDER BY DateTime DESC';
+
+        const result = await db.query(baseQuery, queryParams);
         res.status(200).json(result.recordset);
     } catch (error) {
         console.error('Database error:', error);
@@ -172,8 +177,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-
-// Update a fault (with enhanced validation error handling)
+// Update a fault
 router.put('/:id', [
   authenticateToken,
   param('id').isInt().withMessage('Fault ID must be an integer'),
@@ -184,26 +188,24 @@ router.put('/:id', [
   body('ReportedBy').optional().trim().notEmpty().withMessage('Reporter name is required'),
   body('AssignTo').optional().trim().notEmpty().withMessage('Assignee is required'),
   body('SectionID').optional().custom(value => {
-    if (value === null) return true; // allow null explicitly
+    if (value === null) return true;
     if (typeof value === 'number') return Number.isInteger(value);
-    if (typeof value === 'string' && value.trim() === '') return true; // treat empty string as null
+    if (typeof value === 'string' && value.trim() === '') return true;
     throw new Error('Section ID must be an integer or null if provided');
   }),
-  // Updated status validation to include all statuses used in frontend
   body('Status').optional().isIn(['Open', 'In Progress', 'Pending', 'Closed']).withMessage('Invalid status value')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-      // Log detailed error with body for debugging
       console.error('Validation failed on update:', errors.array());
       console.error('Request Body:', req.body);
 
       return res.status(400).json({
         message: 'Validation failed',
         errors: errors.array(),
-        receivedBody: req.body  // Optional, remove in prod for security
+        receivedBody: req.body
       });
     }
 
@@ -219,7 +221,6 @@ router.put('/:id', [
       return res.status(400).json({ message: 'No valid fields provided for update' });
     }
 
-    // Treat empty string SectionID as null before SQL update
     if (updates.SectionID === '') {
       updates.SectionID = null;
     }
@@ -252,8 +253,6 @@ router.put('/:id', [
   }
 });
 
-
-
 // Delete a fault
 router.delete('/:id', [
     authenticateToken,
@@ -285,5 +284,9 @@ router.delete('/:id', [
         });
     }
 });
+
+// Notes routes - nested under faults
+const notesRouter = require('./notes');
+router.use('/notes', notesRouter);
 
 module.exports = router;
