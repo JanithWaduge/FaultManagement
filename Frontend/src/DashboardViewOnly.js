@@ -51,8 +51,10 @@ export default function DashboardViewOnly({
       fault.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       fault.reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesUrgency = filterUrgency === "all" || fault.urgency === filterUrgency;
-    const matchesStatus = filterStatus === "all" || fault.status === filterStatus;
+    const matchesUrgency =
+      filterUrgency === "all" || fault.urgency === filterUrgency;
+    const matchesStatus =
+      filterStatus === "all" || fault.status === filterStatus;
 
     return matchesSearch && matchesUrgency && matchesStatus;
   });
@@ -116,9 +118,17 @@ export default function DashboardViewOnly({
         className="navbar navbar-dark fixed-top shadow-sm"
         style={{ height: 60, backgroundColor: "#001f3f" }}
       >
-        <Container fluid className="d-flex justify-content-between align-items-center">
+        <Container
+          fluid
+          className="d-flex justify-content-between align-items-center"
+        >
           <div style={{ width: 120 }}></div>
-          <span className="navbar-brand mb-0 h1 mx-auto">
+          <span
+            className="navbar-brand mb-0 h1 mx-auto"
+            style={{ cursor: "pointer" }}
+            onClick={() => (window.location.href = "/")}
+            title="Go to Dashboard"
+          >
             ⚡ N F M System Version 1.0.1 (View Only)
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
@@ -133,7 +143,11 @@ export default function DashboardViewOnly({
                 {notifications.filter((n) => !n.isRead).length > 0 && (
                   <span
                     className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
-                    style={{ fontSize: "0.7rem", lineHeight: "1", fontWeight: "bold" }}
+                    style={{
+                      fontSize: "0.7rem",
+                      lineHeight: "1",
+                      fontWeight: "bold",
+                    }}
                   >
                     {notifications.filter((n) => !n.isRead).length}
                   </span>
@@ -186,14 +200,25 @@ export default function DashboardViewOnly({
       <Container fluid className="pt-5 mt-4">
         <Row className="mb-3 align-items-center">
           <Col>
-            <Tabs defaultActiveKey="faults" id="fault-tabs" className="custom-tabs" justify>
+            <Tabs
+              defaultActiveKey="faults"
+              id="fault-tabs"
+              className="custom-tabs"
+              justify
+            >
               <Tab
                 eventKey="faults"
-                title={<span className="tab-title-lg">🚧 Faults Review Panel</span>}
+                title={
+                  <span className="tab-title-lg">🚧 Faults Review Panel</span>
+                }
               >
                 {/* Add New Fault Button */}
                 <div className="d-flex justify-content-end mb-2 px-3">
-                  <Button variant="primary" size="sm" onClick={() => setShowNewFaultModal(true)}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowNewFaultModal(true)}
+                  >
                     + New Fault
                   </Button>
                 </div>
@@ -264,9 +289,15 @@ export default function DashboardViewOnly({
                             <td>{fault.sectionID}</td>
                             <td>{fault.reportedBy}</td>
                             <td>{fault.location}</td>
-                            <td className="description-col">{fault.description}</td>
+                            <td className="description-col">
+                              {fault.description}
+                            </td>
                             <td>
-                              <span className={`badge bg-${getUrgencyColor(fault.urgency)}`}>
+                              <span
+                                className={`badge bg-${getUrgencyColor(
+                                  fault.urgency
+                                )}`}
+                              >
                                 {fault.urgency}
                               </span>
                             </td>
@@ -290,8 +321,14 @@ export default function DashboardViewOnly({
         style={{ backgroundColor: "#001f3f" }}
       >
         <div className="mb-2 mb-sm-0">
-                  <Button className="glass-button" size="sm" onClick={() => alert("Contact support at support@nfm.lk")}>Support</Button>
-                </div>
+          <Button
+            className="glass-button"
+            size="sm"
+            onClick={() => alert("Contact support at support@nfm.lk")}
+          >
+            Support
+          </Button>
+        </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
           Total Faults: {faults.length} | Unread Notifications:{" "}
           {notifications.filter((n) => !n.isRead).length}
@@ -414,11 +451,13 @@ export default function DashboardViewOnly({
                 ))}
               </Form.Select>
             </Form.Group>
-
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowNewFaultModal(false)}>
+          <Button
+            variant="secondary"
+            onClick={() => setShowNewFaultModal(false)}
+          >
             Cancel
           </Button>
           <Button variant="primary" onClick={handleAddNewFault}>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Pie } from "react-chartjs-2";
 import { Card, Row, Col } from "react-bootstrap";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
@@ -6,6 +7,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 const Activecharts = ({ faults }) => {
+  const navigate = useNavigate();
   // Group faults by technician and status
   const technicianStats = {
     "John Doe": { inProgress: 0, pending: 0, resolved: 0 },
@@ -139,7 +141,26 @@ const Activecharts = ({ faults }) => {
                 }}
               >
                 <Card.Body>
-                  <div style={{ height: "300px" }}>
+                  <div
+                    style={{ height: "300px", cursor: "pointer" }}
+                    title={`View details for ${technician}`}
+                    onClick={() => {
+                      const token = localStorage.getItem("token");
+                      if (!token) {
+                        alert("Please log in to view technician details");
+                        return;
+                      }
+
+                      // Use navigate to handle the routing
+                      const url = `/technician/${encodeURIComponent(
+                        technician
+                      )}`;
+
+                      // Open in new tab with full origin
+                      const fullUrl = `${window.location.origin}${url}`;
+                      window.open(fullUrl, "_blank");
+                    }}
+                  >
                     <Pie
                       data={createChartData(stats)}
                       options={chartOptions(technician)}
