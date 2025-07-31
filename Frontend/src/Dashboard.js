@@ -41,19 +41,19 @@ function useMultiFaults() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      
+
       if (!res.ok) throw new Error("Failed to fetch faults");
-      
+
       const data = await res.json();
-      
+
       // Separate open and resolved faults
-      const openFaults = data.filter(fault => 
-        fault.Status && fault.Status.toLowerCase() !== "closed"
+      const openFaults = data.filter(
+        (fault) => fault.Status && fault.Status.toLowerCase() !== "closed"
       );
-      const resolvedFaults = data.filter(fault => 
-        fault.Status && fault.Status.toLowerCase() === "closed"
+      const resolvedFaults = data.filter(
+        (fault) => fault.Status && fault.Status.toLowerCase() === "closed"
       );
-      
+
       setOpen(openFaults);
       setResolved(resolvedFaults);
       setErr("");
@@ -200,7 +200,17 @@ function useMultiFaults() {
     }
   };
 
-  return { open, resolved, create, update, remove, resolve, err, setErr, fetchAllFaults };
+  return {
+    open,
+    resolved,
+    create,
+    update,
+    remove,
+    resolve,
+    err,
+    setErr,
+    fetchAllFaults,
+  };
 }
 
 function FaultsTable({
@@ -435,8 +445,17 @@ export default function Dashboard({
   const notifRef = useRef();
   const [footerInfo, setFooterInfo] = useState(false);
 
-  const { open, resolved, create, update, remove, resolve, err, setErr, fetchAllFaults } =
-    useMultiFaults();
+  const {
+    open,
+    resolved,
+    create,
+    update,
+    remove,
+    resolve,
+    err,
+    setErr,
+    fetchAllFaults,
+  } = useMultiFaults();
 
   // Initialize notes hook
   const token = localStorage.getItem("token");
@@ -519,7 +538,12 @@ export default function Dashboard({
           className="d-flex justify-content-between align-items-center"
         >
           <div style={{ width: 120 }} />
-          <span className="navbar-brand mb-0 h1 mx-auto">
+          <span
+            className="navbar-brand mb-0 h1 mx-auto"
+            style={{ cursor: "pointer" }}
+            onClick={() => (window.location.href = "/")}
+            title="Go to Dashboard"
+          >
             ⚡ N F M System Version 1.0.1
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
@@ -608,7 +632,12 @@ export default function Dashboard({
             className="bg-dark text-white sidebar p-3 position-fixed vh-100"
             style={{ top: 60, left: 0, zIndex: 1040 }}
           >
-            <div className="glass-sidebar-title mb-4 text-center">
+            <div
+              className="glass-sidebar-title mb-4 text-center"
+              onClick={() => setView("")}
+              style={{ cursor: "pointer" }}
+              title="Return to Dashboard"
+            >
               <span className="sidebar-title-text">Dashboard</span>
             </div>
             <ul className="nav flex-column">
@@ -661,7 +690,6 @@ export default function Dashboard({
                   👥 User Performance
                 </button>
               </li>
-              
             </ul>
           </Col>
 
@@ -678,13 +706,191 @@ export default function Dashboard({
             }}
           >
             {!view ? (
-              <div className="d-flex justify-content-center align-items-center h-100">
-                <div className="text-center text-muted">
-                  <h2 className="mb-4">👋 Welcome to NFM System</h2>
-                  <p className="lead">
-                    Please select an option from the sidebar to get started.
-                  </p>
-                </div>
+              <div className="p-4">
+                <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
+                <Row>
+                  {assignablePersons.map((technician) => {
+                    const techFaults = [...open, ...resolved].filter(
+                      (f) => f.AssignTo === technician
+                    );
+                    const completedFaults = techFaults.filter(
+                      (f) => f.Status === "Closed"
+                    );
+                    const inProgressFaults = techFaults.filter(
+                      (f) => f.Status === "In Progress"
+                    );
+                    const pendingFaults = techFaults.filter(
+                      (f) => f.Status === "Pending"
+                    );
+
+                    return (
+                      <Col key={technician} md={3} className="mb-4">
+                        <Card className="glass-card h-100 performance-card">
+                          <Card.Body>
+                            <Card.Title className="d-flex align-items-center mb-3">
+                              <span className="tech-avatar">
+                                {technician
+                                  .split(" ")
+                                  .map((word) => word[0])
+                                  .join("")}
+                              </span>
+                              <span className="ms-2">{technician}</span>
+                            </Card.Title>
+                            <div className="donut-chart-container mb-3">
+                              <div className="donut-chart">
+                                <svg
+                                  viewBox="0 0 36 36"
+                                  className="circular-chart"
+                                >
+                                  {/* Background circle */}
+                                  <circle
+                                    cx="18"
+                                    cy="18"
+                                    r="15.91549430918954"
+                                    fill="transparent"
+                                    stroke="#f3f3f3"
+                                    strokeWidth="1"
+                                  />
+
+                                  {/* Completed */}
+                                  <circle
+                                    cx="18"
+                                    cy="18"
+                                    r="15.91549430918954"
+                                    fill="transparent"
+                                    stroke="#198754"
+                                    strokeWidth="3"
+                                    strokeDasharray={`${
+                                      (completedFaults.length /
+                                        techFaults.length) *
+                                        100 || 0
+                                    }, 100`}
+                                    className="donut-segment completed"
+                                  />
+
+                                  {/* In Progress */}
+                                  <circle
+                                    cx="18"
+                                    cy="18"
+                                    r="15.91549430918954"
+                                    fill="transparent"
+                                    stroke="#ffc107"
+                                    strokeWidth="3"
+                                    strokeDasharray={`${
+                                      (inProgressFaults.length /
+                                        techFaults.length) *
+                                        100 || 0
+                                    }, 100`}
+                                    strokeDashoffset={`${
+                                      -(
+                                        (completedFaults.length /
+                                          techFaults.length) *
+                                        100
+                                      ) || 0
+                                    }`}
+                                    className="donut-segment in-progress"
+                                  />
+
+                                  {/* Pending */}
+                                  <circle
+                                    cx="18"
+                                    cy="18"
+                                    r="15.91549430918954"
+                                    fill="transparent"
+                                    stroke="#0dcaf0"
+                                    strokeWidth="3"
+                                    strokeDasharray={`${
+                                      (pendingFaults.length /
+                                        techFaults.length) *
+                                        100 || 0
+                                    }, 100`}
+                                    strokeDashoffset={`${
+                                      -(
+                                        ((completedFaults.length +
+                                          inProgressFaults.length) /
+                                          techFaults.length) *
+                                        100
+                                      ) || 0
+                                    }`}
+                                    className="donut-segment pending"
+                                  />
+
+                                  {/* Center text */}
+                                  <text
+                                    x="18"
+                                    y="18.5"
+                                    textAnchor="middle"
+                                    fontSize="8"
+                                    fill="#2d3748"
+                                  >
+                                    {techFaults.length}
+                                  </text>
+                                </svg>
+                              </div>
+                              <div className="donut-legend">
+                                <div className="legend-item">
+                                  <span className="legend-dot completed"></span>
+                                  <span>Completed</span>
+                                </div>
+                                <div className="legend-item">
+                                  <span className="legend-dot in-progress"></span>
+                                  <span>In Progress</span>
+                                </div>
+                                <div className="legend-item">
+                                  <span className="legend-dot pending"></span>
+                                  <span>Pending</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="performance-stats">
+                              <div className="stat-item">
+                                <span className="stat-label">
+                                  Total Assigned
+                                </span>
+                                <span className="stat-value">
+                                  {techFaults.length}
+                                </span>
+                              </div>
+                              <div className="stat-item completed">
+                                <span className="stat-label">Completed</span>
+                                <span className="stat-value">
+                                  {completedFaults.length}
+                                </span>
+                              </div>
+                              <div className="stat-item in-progress">
+                                <span className="stat-label">In Progress</span>
+                                <span className="stat-value">
+                                  {inProgressFaults.length}
+                                </span>
+                              </div>
+                              <div className="stat-item pending">
+                                <span className="stat-label">Pending</span>
+                                <span className="stat-value">
+                                  {pendingFaults.length}
+                                </span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-label">
+                                  Completion Rate
+                                </span>
+                                <span className="stat-value">
+                                  {techFaults.length
+                                    ? Math.round(
+                                        (completedFaults.length /
+                                          techFaults.length) *
+                                          100
+                                      )
+                                    : 0}
+                                  %
+                                </span>
+                              </div>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    );
+                  })}
+                </Row>
               </div>
             ) : (
               <Tabs activeKey={view} className="custom-tabs" justify>
@@ -1067,6 +1273,16 @@ export default function Dashboard({
           padding: 0.7rem 0.5rem 0.7rem 0.5rem;
           margin-bottom: 1.2rem;
           box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+          transition: all 0.3s ease;
+          cursor: pointer;
+        }
+        .glass-sidebar-title:hover {
+          background: rgba(255, 255, 255, 0.25);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+        }
+        .glass-sidebar-title:active {
+          transform: translateY(0);
         }
         .sidebar-title-text {
           color: #dfe3e7ff;
@@ -1074,6 +1290,145 @@ export default function Dashboard({
           font-size: 1.50rem;
           letter-spacing: 0.5px;
           text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
+          pointer-events: none;
+        }
+        
+        /* Performance Card Styles */
+        .performance-card {
+          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid rgba(0, 31, 63, 0.1);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+        
+        .performance-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
+        }
+        
+        .tech-avatar {
+          background: linear-gradient(135deg, #001f3f, #0072ff);
+          color: white;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          font-size: 1.1rem;
+        }
+        
+        .performance-stats {
+          display: flex;
+          flex-direction: column;
+          gap: 0.8rem;
+        }
+        
+        .stat-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5rem;
+          background: rgba(0, 31, 63, 0.05);
+          border-radius: 8px;
+          transition: all 0.2s ease;
+        }
+        
+        .stat-item:hover {
+          background: rgba(0, 31, 63, 0.1);
+        }
+        
+        .stat-label {
+          font-size: 0.9rem;
+          color: #4a5568;
+        }
+        
+        .stat-value {
+          font-weight: bold;
+          color: #2d3748;
+        }
+        
+        .stat-item.completed {
+          background: rgba(25, 135, 84, 0.1);
+        }
+        
+        .stat-item.in-progress {
+          background: rgba(255, 193, 7, 0.1);
+        }
+        
+        .stat-item.pending {
+          background: rgba(13, 202, 240, 0.1);
+        }
+
+        /* Donut Chart Styles */
+        .donut-chart-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .donut-chart {
+          width: 120px;
+          height: 120px;
+        }
+
+        .circular-chart {
+          display: block;
+          margin: 10px auto;
+          max-width: 100%;
+          max-height: 250px;
+          transform: rotate(-90deg);
+        }
+
+        .donut-segment {
+          transition: all 0.3s ease;
+        }
+
+        .donut-segment.completed {
+          stroke: #198754;
+        }
+
+        .donut-segment.in-progress {
+          stroke: #ffc107;
+        }
+
+        .donut-segment.pending {
+          stroke: #0dcaf0;
+        }
+
+        .donut-legend {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 0.5rem;
+          font-size: 0.8rem;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+
+        .legend-dot.completed {
+          background-color: #198754;
+        }
+
+        .legend-dot.in-progress {
+          background-color: #ffc107;
+        }
+
+        .legend-dot.pending {
+          background-color: #0dcaf0;
         }
       `}</style>
     </>

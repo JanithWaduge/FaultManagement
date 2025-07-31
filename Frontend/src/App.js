@@ -10,6 +10,7 @@ import Dashboard from "./Dashboard";
 import DashboardViewOnly from "./DashboardViewOnly";
 import LoginPage from "./LoginPage";
 import Register from "./Register";
+import TechnicianDetails from "./components/TechnicianDetails";
 
 const App = () => {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -19,8 +20,8 @@ const App = () => {
 
   // Restore session from localStorage on initial load
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
     if (token && user) {
       try {
         const parsedUser = JSON.parse(user);
@@ -28,13 +29,13 @@ const App = () => {
           setUserInfo(parsedUser);
           setLoggedIn(true);
         } else {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
         }
       } catch (err) {
-        console.error('Error parsing user data:', err);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        console.error("Error parsing user data:", err);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
       }
     }
   }, []);
@@ -73,21 +74,21 @@ const App = () => {
       console.error("Login failed: missing role in user data");
       return;
     }
-    
+
     setUserInfo(authData.user);
     setLoggedIn(true);
-    
+
     if (authData.token) {
-      localStorage.setItem('token', authData.token);
-      localStorage.setItem('user', JSON.stringify(authData.user));
+      localStorage.setItem("token", authData.token);
+      localStorage.setItem("user", JSON.stringify(authData.user));
     }
   };
 
   const handleLogout = () => {
     setUserInfo(null);
     setLoggedIn(false);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
   };
 
   // Protected Route wrapper
@@ -127,11 +128,23 @@ const App = () => {
       <Routes>
         <Route
           path="/login"
-          element={loggedIn && userInfo?.role ? <Navigate to="/" replace /> : <LoginWrapper />}
+          element={
+            loggedIn && userInfo?.role ? (
+              <Navigate to="/" replace />
+            ) : (
+              <LoginWrapper />
+            )
+          }
         />
         <Route
           path="/register"
-          element={loggedIn && userInfo?.role ? <Navigate to="/" replace /> : <RegisterWrapper />}
+          element={
+            loggedIn && userInfo?.role ? (
+              <Navigate to="/" replace />
+            ) : (
+              <RegisterWrapper />
+            )
+          }
         />
         <Route
           path="/"
@@ -159,6 +172,16 @@ const App = () => {
                 />
               )}
             </RequireAuth>
+          }
+        />
+        <Route
+          path="/technician/:name"
+          element={
+            loggedIn ? (
+              <TechnicianDetails userInfo={userInfo} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
