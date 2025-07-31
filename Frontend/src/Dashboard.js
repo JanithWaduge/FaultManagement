@@ -661,14 +661,7 @@ export default function Dashboard({
                   👥 User Performance
                 </button>
               </li>
-              <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={fetchAllFaults}
-                >
-                  🔄 Refresh Data
-                </button>
-              </li>
+              
             </ul>
           </Col>
 
