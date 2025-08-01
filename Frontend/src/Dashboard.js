@@ -680,16 +680,7 @@ export default function Dashboard({
                   📊 Active Chart
                 </button>
               </li>
-              <li className="nav-item mb-2">
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "user-performance" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("user-performance")}
-                >
-                  👥 User Performance
-                </button>
-              </li>
+           
             </ul>
           </Col>
 
