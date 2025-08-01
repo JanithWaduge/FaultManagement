@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  BrowserRouter,
+ BrowserRouter,
   Routes,
   Route,
   Navigate,
@@ -114,8 +114,8 @@ const App = () => {
     const navigate = useNavigate();
     return (
       <Register
-        onRegisterSuccess={(user) => {
-          handleLogin({ user });
+        onRegisterSuccess={(user, token) => {
+          handleLogin({ user, token });
           navigate("/");
         }}
         onCancel={() => navigate("/login")}
@@ -174,16 +174,8 @@ const App = () => {
             </RequireAuth>
           }
         />
-        <Route
-          path="/technician/:name"
-          element={
-            loggedIn ? (
-              <TechnicianDetails userInfo={userInfo} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+        <Route path="/technician/:name" element={<TechnicianDetails />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

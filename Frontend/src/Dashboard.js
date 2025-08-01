@@ -680,16 +680,6 @@ export default function Dashboard({
                   📊 Active Chart
                 </button>
               </li>
-              <li className="nav-item mb-2">
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "user-performance" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("user-performance")}
-                >
-                  👥 User Performance
-                </button>
-              </li>
             </ul>
           </Col>
 
@@ -973,22 +963,6 @@ export default function Dashboard({
                 >
                   {view === "active-chart" && (
                     <Activecharts faults={[...open, ...resolved]} />
-                  )}
-                </Tab>
-                <Tab
-                  eventKey="user-performance"
-                  title={
-                    <span className="tab-title-lg">👥 User Performance</span>
-                  }
-                >
-                  {view === "user-performance" && (
-                    <div className="p-4">
-                      <h3>User Performance</h3>
-                      <p>
-                        User performance metrics and analytics will be displayed
-                        here.
-                      </p>
-                    </div>
                   )}
                 </Tab>
               </Tabs>

@@ -9,17 +9,24 @@ const router = express.Router();
 router.get("/technician/:name", authenticateToken, async (req, res) => {
   try {
     const technicianName = decodeURIComponent(req.params.name);
+
     const query = `
-            SELECT * FROM Faults 
-            WHERE AssignTo = ?
-            ORDER BY ReportedAt DESC`;
+      SELECT * FROM dbo.tblFaults
+      WHERE AssignTo = @name
+      ORDER BY DateTime DESC
+    `;
 
-    const [faults] = await db.query(query, [technicianName]);
+    const result = await db.query(query, {
+      name: technicianName,
+    });
 
-    res.json(faults);
+    res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching technician faults:", error);
-    res.status(500).json({ message: "Error fetching technician faults" });
+    res.status(500).json({
+      message: "Error fetching technician faults",
+      error: error.message,
+    });
   }
 });
 
