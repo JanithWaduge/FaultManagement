@@ -150,11 +150,7 @@ const Activecharts = ({ faults }) => {
                         alert("Please log in to view technician details");
                         return;
                       }
-                      const url = `/technician/${encodeURIComponent(
-                        technician
-                      )}`;
-                      const fullUrl = `${window.location.origin}${url}`;
-                      window.open(fullUrl, "_blank");
+                      navigate(`/technician/${encodeURIComponent(technician)}`);
                     }}
                   >
                     <Pie

@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Table, Container, Card, Row, Col, Badge } from "react-bootstrap";
-import { FaTools, FaHourglassHalf, FaClipboardList, FaCheckCircle } from "react-icons/fa";
+import {
+  FaTools,
+  FaHourglassHalf,
+  FaClipboardList,
+  FaCheckCircle,
+} from "react-icons/fa";
 
 const TechnicianDetails = () => {
   const [userInfo, setUserInfo] = useState(null);
@@ -34,7 +39,9 @@ const TechnicianDetails = () => {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:5000/api/faults/technician/${encodeURIComponent(decodedName)}`,
+          `http://localhost:5000/api/faults/technician/${encodeURIComponent(
+            decodedName
+          )}`,
           {
             method: "GET",
             headers: {
@@ -118,17 +125,35 @@ const TechnicianDetails = () => {
   };
 
   return (
-    <Container className="mt-4 p-4 rounded" style={{ backgroundColor: "#f9f9f9" }}>
+    <Container
+      className="mt-4 p-4 rounded"
+      style={{ backgroundColor: "#f9f9f9" }}
+    >
+      <div className="mb-3">
+        <button
+          className="btn btn-secondary"
+          onClick={() => navigate("/dashboard")}
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
       <Card className="mb-4 shadow-sm">
         <Card.Body>
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h2 className="mb-0">{decodedName}'s Details</h2>
             {showDetails ? (
-              <button className="btn btn-secondary" onClick={() => setShowDetails(false)}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDetails(false)}
+              >
                 Back to Summary
               </button>
             ) : (
-              <button className="btn btn-primary" onClick={() => setShowDetails(true)}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowDetails(true)}
+              >
                 View Detailed History
               </button>
             )}
@@ -196,7 +221,11 @@ const TechnicianDetails = () => {
                           <td>{fault.System || "N/A"}</td>
                           <td>{fault.Description || "No description"}</td>
                           <td>{getStatusBadge(fault.Status || "Unknown")}</td>
-                          <td>{fault.ReportedAt ? new Date(fault.ReportedAt).toLocaleString() : "N/A"}</td>
+                          <td>
+                            {fault.ReportedAt
+                              ? new Date(fault.ReportedAt).toLocaleString()
+                              : "N/A"}
+                          </td>
                           <td>
                             <Badge
                               bg={
@@ -222,7 +251,6 @@ const TechnicianDetails = () => {
                   </tbody>
                 </Table>
               </div>
-            
             </>
           ) : (
             <div className="text-center mt-5">
@@ -232,10 +260,16 @@ const TechnicianDetails = () => {
               </p>
               <div className="mt-4">
                 <h5>Resolution Rate</h5>
-                <div className="progress bg-light border" style={{ height: "25px", borderRadius: "12px" }}>
+                <div
+                  className="progress bg-light border"
+                  style={{ height: "25px", borderRadius: "12px" }}
+                >
                   <div
                     className="progress-bar bg-success"
-                    style={{ width: `${(stats.resolved / stats.total) * 100}%`, fontWeight: "bold" }}
+                    style={{
+                      width: `${(stats.resolved / stats.total) * 100}%`,
+                      fontWeight: "bold",
+                    }}
                   >
                     {Math.round((stats.resolved / stats.total) * 100)}% Resolved
                   </div>
