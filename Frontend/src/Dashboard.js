@@ -811,10 +811,14 @@ export default function Dashboard({
                                     x="18"
                                     y="18.5"
                                     textAnchor="middle"
+                                    dominantBaseline="middle"
                                     fontSize="8"
                                     fill="#2d3748"
+                                    //transform="rotate(0)"
+                                    transform="rotate(90, 18, 18.5)"
                                   >
                                     {techFaults.length}
+                  
                                   </text>
                                 </svg>
                               </div>
@@ -1409,3 +1413,4 @@ export default function Dashboard({
     </>
   );
 }
+//test comment
