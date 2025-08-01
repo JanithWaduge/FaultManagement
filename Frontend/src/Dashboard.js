@@ -680,7 +680,7 @@ export default function Dashboard({
                   📊 Active Chart
                 </button>
               </li>
-           
+
             </ul>
           </Col>
 
@@ -964,22 +964,6 @@ export default function Dashboard({
                 >
                   {view === "active-chart" && (
                     <Activecharts faults={[...open, ...resolved]} />
-                  )}
-                </Tab>
-                <Tab
-                  eventKey="user-performance"
-                  title={
-                    <span className="tab-title-lg">👥 User Performance</span>
-                  }
-                >
-                  {view === "user-performance" && (
-                    <div className="p-4">
-                      <h3>User Performance</h3>
-                      <p>
-                        User performance metrics and analytics will be displayed
-                        here.
-                      </p>
-                    </div>
                   )}
                 </Tab>
               </Tabs>

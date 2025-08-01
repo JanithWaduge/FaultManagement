@@ -150,13 +150,9 @@ const Activecharts = ({ faults }) => {
                         alert("Please log in to view technician details");
                         return;
                       }
-
-                      // Use navigate to handle the routing
                       const url = `/technician/${encodeURIComponent(
                         technician
                       )}`;
-
-                      // Open in new tab with full origin
                       const fullUrl = `${window.location.origin}${url}`;
                       window.open(fullUrl, "_blank");
                     }}

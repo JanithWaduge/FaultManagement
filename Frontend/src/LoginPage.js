@@ -63,9 +63,14 @@ export default function LoginPage({ onLogin, onRegisterClick }) {
       if (!result.user?.role) {
         throw new Error("Invalid user data received");
       }
+      // ✅ Store token and user in localStorage
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
+      console.log("Token stored:", result.token);
 
       // Store token and user data
       localStorage.setItem("token", result.token);
+      console.log("Token stored:", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
 
       // Call parent callback

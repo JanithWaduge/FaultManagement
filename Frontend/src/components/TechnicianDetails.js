@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Table, Container, Card, Row, Col, Badge } from "react-bootstrap";
 
-const TechnicianDetails = ({ userInfo }) => {
+const TechnicianDetails = () => {
+  const [userInfo, setUserInfo] = useState(null);
   const { name } = useParams();
   const decodedName = decodeURIComponent(name || "");
   const [faults, setFaults] = useState([]);
@@ -11,25 +12,29 @@ const TechnicianDetails = ({ userInfo }) => {
   const [showDetails, setShowDetails] = useState(false);
 
   // Verify authentication and parameter on mount
+
   useEffect(() => {
-    if (!userInfo) {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        setUserInfo(JSON.parse(user));
+      } catch (err) {
+        console.error("Failed to parse user", err);
+        setError("Invalid user data. Please log in again.");
+        setLoading(false);
+      }
+    } else {
       setError("Please log in to view technician details");
       setLoading(false);
-      return;
     }
-    if (!name) {
-      setError("Invalid technician name");
-      setLoading(false);
-    }
-  }, [name, userInfo]);
+  }, []);
 
   useEffect(() => {
     const fetchTechnicianFaults = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) {
-          throw new Error("Please log in to view technician details");
-        }
+        console.log("Fetched token in TechnicianDetails:", token);
+
 
         const response = await fetch(
           `http://localhost:5000/api/faults/technician/${encodeURIComponent(
@@ -37,6 +42,7 @@ const TechnicianDetails = ({ userInfo }) => {
           )}`,
           {
             method: "GET",
+
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
@@ -47,28 +53,42 @@ const TechnicianDetails = ({ userInfo }) => {
 
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error("Please log in to view technician details");
+            throw new Error("Unauthorized. Please log in again.");
           }
           throw new Error("Failed to fetch technician details");
         }
 
         const data = await response.json();
-        if (!data || !Array.isArray(data)) {
+        if (!Array.isArray(data)) {
           throw new Error("Invalid data received from server");
         }
 
-        console.log("Fetched data:", data); // Debug log
         setFaults(data);
-        setLoading(false);
       } catch (err) {
-        console.error("Error fetching data:", err); // Debug log
+        console.error("Fetch error:", err.message);
         setError(err.message);
+      } finally {
         setLoading(false);
       }
     };
 
-    if (decodedName) {
-      fetchTechnicianFaults();
+    const user = localStorage.getItem("user");
+    const token = localStorage.getItem("token");
+    console.log("Token being sent:", token);
+
+    if (user && token && decodedName) {
+      try {
+        const parsedUser = JSON.parse(user);
+        setUserInfo(parsedUser);
+        fetchTechnicianFaults(); // ✅ fetch only after userInfo is valid
+      } catch (err) {
+        console.error("User parse error:", err.message);
+        setError("Invalid user data");
+        setLoading(false);
+      }
+    } else {
+      setError("Please log in to view technician details");
+      setLoading(false);
     }
   }, [decodedName]);
 
