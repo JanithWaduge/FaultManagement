@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
- BrowserRouter,
+  BrowserRouter,
   Routes,
   Route,
   Navigate,
@@ -11,12 +11,25 @@ import DashboardViewOnly from "./DashboardViewOnly";
 import LoginPage from "./LoginPage";
 import Register from "./Register";
 import TechnicianDetails from "./components/TechnicianDetails";
+import FaultDetailsView from "./components/FaultDetailsView";
+
+// Import Layout component if you have one, or create a simple one
+const Layout = ({ children, onLogout }) => {
+  return (
+    <div className="app-layout">
+      {/* Your layout components (header, sidebar, etc) would go here */}
+      <main>{children}</main>
+    </div>
+  );
+};
 
 const App = () => {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [faults, setFaults] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [open, setOpen] = useState([]); // Add this state
+  const [resolved, setResolved] = useState([]); // Add this state
 
   // Restore session from localStorage on initial load
   useEffect(() => {
@@ -39,6 +52,14 @@ const App = () => {
       }
     }
   }, []);
+
+  // Add effect to populate open and resolved faults
+  useEffect(() => {
+    if (faults.length > 0) {
+      setOpen(faults.filter((fault) => fault.Status !== "Closed"));
+      setResolved(faults.filter((fault) => fault.Status === "Closed"));
+    }
+  }, [faults]);
 
   // Fault handlers
   const handleNewFault = (faultData) => {
@@ -123,6 +144,19 @@ const App = () => {
     );
   };
 
+  // Details wrapper with navigation
+  const DetailsWrapper = () => {
+    const navigate = useNavigate();
+    return (
+      <Layout onLogout={handleLogout}>
+        <FaultDetailsView
+          faults={[...open, ...resolved]}
+          onBackClick={() => navigate("/")}
+        />
+      </Layout>
+    );
+  };
+
   return (
     <BrowserRouter>
       <Routes>
@@ -174,8 +208,22 @@ const App = () => {
             </RequireAuth>
           }
         />
-        <Route path="/technician/:name" element={<TechnicianDetails />} />
-
+        <Route
+          path="/technician/:name"
+          element={
+            <RequireAuth>
+              <TechnicianDetails />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/details"
+          element={
+            <RequireAuth>
+              <DetailsWrapper />
+            </RequireAuth>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

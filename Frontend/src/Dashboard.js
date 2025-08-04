@@ -16,6 +16,7 @@ import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
 import NotesModal from "./NotesModal";
 import Activecharts from "./components/Activecharts";
+import TechnicianCards from "./components/TechnicianCards";
 import { useFaultNotes } from "./useFaultNotes";
 
 const assignablePersons = [
@@ -241,141 +242,153 @@ function FaultsTable({
         }}
       >
         <Card.Body className="p-3 d-flex flex-column">
-          <Table
-            responsive
-            className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table table-borderless glass-table"
-            aria-label="Faults Table"
-          >
-            <colgroup>
-              <col style={{ width: "3.5%", textAlign: "center" }} />
-              <col style={{ width: "6%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "7.5%" }} />
-              {!isResolved && <col style={{ width: "5%" }} />}
-              <col style={{ width: "10%" }} />
-            </colgroup>
-            <thead className="sticky-top bg-light">
-              <tr>
-                <th className="text-center">ID</th>
-                <th className="text-center">Systems</th>
-                <th>Reported By</th>
-                <th>Location</th>
-                <th>Location of Fault</th>
-                <th>Description</th>
-                <th className="text-center">Status</th>
-                <th>Assigned To</th>
-                <th>Reported At</th>
-                {!isResolved && <th className="text-center">Actions</th>}
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {faults.length === 0 ? (
+          <div className="table-responsive">
+            <Table
+              responsive
+              className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table table-borderless glass-table"
+              aria-label="Faults Table"
+            >
+              <colgroup className="d-none d-lg-table-column-group">
+                <col style={{ width: "3.5%", textAlign: "center" }} />
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "7.5%" }} />
+                {!isResolved && <col style={{ width: "5%" }} />}
+                <col style={{ width: "10%" }} />
+              </colgroup>
+              <thead className="sticky-top bg-light">
                 <tr>
-                  <td
-                    colSpan={isResolved ? 10 : 11}
-                    className="text-center text-muted py-4"
-                  >
-                    No faults.
-                  </td>
+                  <th className="text-center">ID</th>
+                  <th className="text-center">Systems</th>
+                  <th>Reported By</th>
+                  <th className="d-none d-md-table-cell">Location</th>
+                  <th className="d-none d-lg-table-cell">Location of Fault</th>
+                  <th>Description</th>
+                  <th className="text-center">Status</th>
+                  <th>Assigned To</th>
+                  <th className="d-none d-md-table-cell">Reported At</th>
+                  {!isResolved && <th className="text-center">Actions</th>}
+                  <th>Notes</th>
                 </tr>
-              ) : (
-                faults.map((f) => (
-                  <tr
-                    key={f.id}
-                    className={`table-row-hover ${
-                      f.Status === "In Progress"
-                        ? "status-in-progress-row"
-                        : f.Status === "Pending"
-                        ? "status-pending-row"
-                        : f.Status === "Closed"
-                        ? "status-closed-row"
-                        : ""
-                    }`}
-                  >
-                    <td className="text-center">{f.id}</td>
-                    <td className="text-center">{f.SystemID}</td>
-                    <td>{f.ReportedBy}</td>
-                    <td>{f.Location}</td>
-                    <td>{f.LocationOfFault}</td>
-                    <td className="description-col">{f.DescFault}</td>
-                    <td>
-                      <select
-                        value={f.Status}
-                        onChange={async (e) => {
-                          if (isResolved) return;
-                          const updatedFault = { ...f, Status: e.target.value };
-                          try {
-                            await onEdit(updatedFault);
-                          } catch (err) {
-                            alert("Failed to update status: " + err.message);
-                          }
-                        }}
-                        className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
-                          /\s+/g,
-                          "-"
-                        )}`}
-                        disabled={isResolved}
-                        aria-label={`Change status for fault ${f.id}`}
-                        style={{
-                          backgroundColor:
-                            f.Status === "In Progress"
-                              ? "#fff3cd"
-                              : f.Status === "Pending"
-                              ? "#cff4fc"
-                              : f.Status === "Closed"
-                              ? "#d1e7dd"
-                              : "",
-                          color: "#000",
-                          fontWeight: "500",
-                        }}
-                      >
-                        <option value="In Progress">In Progress</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Closed">Closed</option>
-                      </select>
-                    </td>
-                    <td>{f.AssignTo}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}
-                    </td>
-                    {!isResolved && (
-                      <td className="text-center">
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          className="me-1 mb-1"
-                          onClick={() => onOpenEditModal(f)}
-                          aria-label={`Edit fault ${f.id}`}
-                        >
-                          Edit
-                        </Button>
-                      </td>
-                    )}
-                    <td>
-                      <Button
-                        variant="outline-info"
-                        size="sm"
-                        onClick={() => onOpenNotesModal(f)}
-                        className="px-2 py-1"
-                        style={{
-                          whiteSpace: "nowrap",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        📝 Notes
-                      </Button>
+              </thead>
+              <tbody>
+                {faults.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={isResolved ? 10 : 11}
+                      className="text-center text-muted py-4"
+                    >
+                      No faults.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
+                ) : (
+                  faults.map((f) => (
+                    <tr
+                      key={f.id}
+                      className={`table-row-hover ${
+                        f.Status === "In Progress"
+                          ? "status-in-progress-row"
+                          : f.Status === "Pending"
+                          ? "status-pending-row"
+                          : f.Status === "Closed"
+                          ? "status-closed-row"
+                          : ""
+                      }`}
+                    >
+                      <td className="text-center">{f.id}</td>
+                      <td className="text-center">{f.SystemID}</td>
+                      <td>{f.ReportedBy}</td>
+                      <td className="d-none d-md-table-cell">{f.Location}</td>
+                      <td className="d-none d-lg-table-cell">
+                        {f.LocationOfFault}
+                      </td>
+                      <td className="description-col">{f.DescFault}</td>
+                      <td>
+                        <select
+                          value={f.Status}
+                          onChange={async (e) => {
+                            if (isResolved) return;
+                            const updatedFault = {
+                              ...f,
+                              Status: e.target.value,
+                            };
+                            try {
+                              await onEdit(updatedFault);
+                            } catch (err) {
+                              alert("Failed to update status: " + err.message);
+                            }
+                          }}
+                          className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
+                            /\s+/g,
+                            "-"
+                          )}`}
+                          disabled={isResolved}
+                          aria-label={`Change status for fault ${f.id}`}
+                          style={{
+                            backgroundColor:
+                              f.Status === "In Progress"
+                                ? "#fff3cd"
+                                : f.Status === "Pending"
+                                ? "#cff4fc"
+                                : f.Status === "Closed"
+                                ? "#d1e7dd"
+                                : "",
+                            color: "#000",
+                            fontWeight: "500",
+                          }}
+                        >
+                          <option value="In Progress">In Progress</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Closed">Closed</option>
+                        </select>
+                      </td>
+                      <td>{f.AssignTo}</td>
+                      <td
+                        className="d-none d-md-table-cell"
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        {f.DateTime
+                          ? new Date(f.DateTime).toLocaleString()
+                          : ""}
+                      </td>
+                      {!isResolved && (
+                        <td className="text-center">
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            className="me-1 mb-1"
+                            onClick={() => onOpenEditModal(f)}
+                            aria-label={`Edit fault ${f.id}`}
+                          >
+                            Edit
+                          </Button>
+                        </td>
+                      )}
+                      <td>
+                        <Button
+                          variant="outline-info"
+                          size="sm"
+                          onClick={() => onOpenNotesModal(f)}
+                          className="px-2 py-1"
+                          style={{
+                            whiteSpace: "nowrap",
+                            fontSize: "0.85rem",
+                          }}
+                        >
+                          📝 Notes
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </Table>
+          </div>
           <nav
             aria-label="Fault pagination"
             className="mt-3 px-3"
@@ -444,6 +457,10 @@ export default function Dashboard({
   const [selectedFaultForNotes, setSelectedFaultForNotes] = useState(null);
   const notifRef = useRef();
   const [footerInfo, setFooterInfo] = useState(false);
+  const [selectedTechnician, setSelectedTechnician] = useState(null);
+  const [filteredTechnician, setFilteredTechnician] = useState(null);
+  const [filteredStatus, setFilteredStatus] = useState(null);
+  const [detailedView, setDetailedView] = useState(false);
 
   const {
     open,
@@ -525,6 +542,35 @@ export default function Dashboard({
     setSelectedFaultForNotes(fault);
     setNotesModal(true);
   }
+
+  // Function to handle status clicks
+  const handleStatusClick = (technician, status) => {
+    setFilteredTechnician(technician);
+    setFilteredStatus(status);
+    setDetailedView(true);
+    setView("faults"); // Switch to faults view
+
+    // Set search to technician name if provided
+    if (technician) {
+      setSearch(technician);
+    } else {
+      setSearch("");
+    }
+
+    // Filter by status
+    if (status === "Closed") {
+      setView("resolved");
+    }
+  };
+
+  // Function to handle technician card clicks
+  const handleTechnicianClick = (technician) => {
+    setFilteredTechnician(technician);
+    setFilteredStatus(null);
+    setDetailedView(true);
+    setView("faults");
+    setSearch(technician);
+  };
 
   return (
     <>
@@ -680,7 +726,6 @@ export default function Dashboard({
                   📊 Active Chart
                 </button>
               </li>
-
             </ul>
           </Col>
 
@@ -699,193 +744,12 @@ export default function Dashboard({
             {!view ? (
               <div className="p-4">
                 <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
-                <Row>
-                  {assignablePersons.map((technician) => {
-                    const techFaults = [...open, ...resolved].filter(
-                      (f) => f.AssignTo === technician
-                    );
-                    const completedFaults = techFaults.filter(
-                      (f) => f.Status === "Closed"
-                    );
-                    const inProgressFaults = techFaults.filter(
-                      (f) => f.Status === "In Progress"
-                    );
-                    const pendingFaults = techFaults.filter(
-                      (f) => f.Status === "Pending"
-                    );
-
-                    return (
-                      <Col key={technician} md={3} className="mb-4">
-                        <Card className="glass-card h-100 performance-card">
-                          <Card.Body>
-                            <Card.Title className="d-flex align-items-center mb-3">
-                              <span className="tech-avatar">
-                                {technician
-                                  .split(" ")
-                                  .map((word) => word[0])
-                                  .join("")}
-                              </span>
-                              <span className="ms-2">{technician}</span>
-                            </Card.Title>
-                            <div className="donut-chart-container mb-3">
-                              <div className="donut-chart">
-                                <svg
-                                  viewBox="0 0 36 36"
-                                  className="circular-chart"
-                                >
-                                  {/* Background circle */}
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#f3f3f3"
-                                    strokeWidth="1"
-                                  />
-
-                                  {/* Completed */}
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#198754"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (completedFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    className="donut-segment completed"
-                                  />
-
-                                  {/* In Progress */}
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#ffc107"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (inProgressFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    strokeDashoffset={`${
-                                      -(
-                                        (completedFaults.length /
-                                          techFaults.length) *
-                                        100
-                                      ) || 0
-                                    }`}
-                                    className="donut-segment in-progress"
-                                  />
-
-                                  {/* Pending */}
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#0dcaf0"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (pendingFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    strokeDashoffset={`${
-                                      -(
-                                        ((completedFaults.length +
-                                          inProgressFaults.length) /
-                                          techFaults.length) *
-                                        100
-                                      ) || 0
-                                    }`}
-                                    className="donut-segment pending"
-                                  />
-
-                                  {/* Center text */}
-                                  <text
-                                    x="18"
-                                    y="18.5"
-                                    textAnchor="middle"
-                                    dominantBaseline="middle"
-                                    fontSize="8"
-                                    fill="#2d3748"
-                                    //transform="rotate(0)"
-                                    transform="rotate(90, 18, 18.5)"
-                                  >
-                                    {techFaults.length}
-                  
-                                  </text>
-                                </svg>
-                              </div>
-                              <div className="donut-legend">
-                                <div className="legend-item">
-                                  <span className="legend-dot completed"></span>
-                                  <span>Completed</span>
-                                </div>
-                                <div className="legend-item">
-                                  <span className="legend-dot in-progress"></span>
-                                  <span>In Progress</span>
-                                </div>
-                                <div className="legend-item">
-                                  <span className="legend-dot pending"></span>
-                                  <span>Pending</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="performance-stats">
-                              <div className="stat-item">
-                                <span className="stat-label">
-                                  Total Assigned
-                                </span>
-                                <span className="stat-value">
-                                  {techFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item completed">
-                                <span className="stat-label">Completed</span>
-                                <span className="stat-value">
-                                  {completedFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item in-progress">
-                                <span className="stat-label">In Progress</span>
-                                <span className="stat-value">
-                                  {inProgressFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item pending">
-                                <span className="stat-label">Pending</span>
-                                <span className="stat-value">
-                                  {pendingFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item">
-                                <span className="stat-label">
-                                  Completion Rate
-                                </span>
-                                <span className="stat-value">
-                                  {techFaults.length
-                                    ? Math.round(
-                                        (completedFaults.length /
-                                          techFaults.length) *
-                                          100
-                                      )
-                                    : 0}
-                                  %
-                                </span>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
+                <TechnicianCards
+                  technicians={assignablePersons}
+                  faults={[...open, ...resolved]}
+                  onTechnicianClick={handleTechnicianClick}
+                  onStatusClick={handleStatusClick}
+                />
               </div>
             ) : (
               <Tabs activeKey={view} className="custom-tabs" justify>
@@ -967,7 +831,10 @@ export default function Dashboard({
                   title={<span className="tab-title-lg">📊 Active Chart</span>}
                 >
                   {view === "active-chart" && (
-                    <Activecharts faults={[...open, ...resolved]} />
+                    <Activecharts
+                      faults={[...open, ...resolved]}
+                      onStatusClick={handleStatusClick}
+                    />
                   )}
                 </Tab>
               </Tabs>
@@ -1332,6 +1199,10 @@ export default function Dashboard({
           background: rgba(25, 135, 84, 0.1);
         }
         
+        .stat-item.resolved {
+          background: rgba(108, 117, 125, 0.1);
+        }
+        
         .stat-item.in-progress {
           background: rgba(255, 193, 7, 0.1);
         }
@@ -1369,6 +1240,10 @@ export default function Dashboard({
           stroke: #198754;
         }
 
+        .donut-segment.resolved {
+          stroke: #6c757d;
+        }
+
         .donut-segment.in-progress {
           stroke: #ffc107;
         }
@@ -1402,12 +1277,102 @@ export default function Dashboard({
           background-color: #198754;
         }
 
+        .legend-dot.resolved {
+          background-color: #6c757d;
+        }
+
         .legend-dot.in-progress {
           background-color: #ffc107;
         }
 
         .legend-dot.pending {
           background-color: #0dcaf0;
+        }
+
+        .clickable-card {
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .clickable-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 15px 30px rgba(0, 31, 63, 0.15);
+        }
+
+        .clickable-card:active {
+          transform: translateY(-4px);
+          box-shadow: 0 10px 20px rgba(0, 31, 63, 0.1);
+        }
+
+        /* Enhanced responsive table styles */
+        @media (max-width: 992px) {
+          .description-col {
+            max-width: 120px;
+          }
+          
+          .table-fit td, .table-fit th {
+            font-size: 0.9rem;
+            padding: 0.4rem 0.35rem;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .description-col {
+            max-width: 100px;
+          }
+          
+          .table-fit td, .table-fit th {
+            font-size: 0.85rem;
+            padding: 0.35rem 0.3rem;
+          }
+          
+          .form-select-sm {
+            font-size: 0.75rem;
+            padding: 0.15rem 0.5rem;
+          }
+          
+          .btn-sm {
+            padding: 0.25rem 0.4rem;
+            font-size: 0.75rem;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .table-responsive {
+            overflow-x: auto;
+          }
+          
+          .description-col {
+            max-width: 80px;
+          }
+        }
+
+        /* Fix for horizontal scrolling on small devices */
+        .table-responsive {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Add these styles to your existing styles in Dashboard.js */
+        .clickable-status {
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .clickable-status:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.1);
+        }
+
+        .legend-item.clickable-status {
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-radius: 4px;
+          padding: 2px 4px;
+        }
+
+        .legend-item.clickable-status:hover {
+          background-color: rgba(0, 31, 63, 0.1);
         }
       `}</style>
     </>
