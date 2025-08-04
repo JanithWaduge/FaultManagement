@@ -2,15 +2,19 @@ import React from "react";
 import { Pie } from "react-chartjs-2";
 import { Card, Row, Col, Table } from "react-bootstrap";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
+import { useNavigate } from "react-router-dom";
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
-const Activecharts = ({ faults }) => {
+const Activecharts = ({ faults, onStatusClick }) => {
+  const navigate = useNavigate();
+
   // Calculate overall fault statistics
   const overallStats = {
     inProgress: faults.filter((f) => f.Status === "In Progress").length,
     pending: faults.filter((f) => f.Status === "Pending").length,
     closed: faults.filter((f) => f.Status === "Closed").length,
+    resolved: faults.filter((f) => f.Status === "Resolved").length,
   };
 
   // Group faults by technician
@@ -22,6 +26,7 @@ const Activecharts = ({ faults }) => {
         inProgress: 0,
         pending: 0,
         closed: 0,
+        resolved: 0,
       };
     }
 
@@ -32,29 +37,35 @@ const Activecharts = ({ faults }) => {
     } else if (fault.Status === "Closed") {
       acc[fault.AssignTo].closed++;
     }
+    if (fault.Status === "Resolved") {
+      acc[fault.AssignTo].resolved++;
+    }
 
     return acc;
   }, {});
 
   // Chart configuration for overall stats
   const chartData = {
-    labels: ["In Progress", "Pending", "Closed"],
+    labels: ["In Progress", "Pending", "Closed", "Resolved"],
     datasets: [
       {
         data: [
           overallStats.inProgress,
           overallStats.pending,
           overallStats.closed,
+          overallStats.resolved,
         ],
         backgroundColor: [
           "rgba(255, 193, 7, 0.8)", // yellow for in progress
           "rgba(13, 202, 240, 0.8)", // cyan for pending
           "rgba(25, 135, 84, 0.8)", // green for closed
+          "rgba(108, 117, 125, 0.8)",
         ],
         borderColor: [
           "rgba(255, 193, 7, 1)",
           "rgba(13, 202, 240, 1)",
           "rgba(25, 135, 84, 1)",
+          "rgba(108, 117, 125, 1)",
         ],
         borderWidth: 1,
       },
@@ -96,6 +107,44 @@ const Activecharts = ({ faults }) => {
         },
       },
     },
+  };
+
+  // Add state for selected technician and status
+  const [selectedTechnician, setSelectedTechnician] = React.useState(null);
+  const [selectedStatus, setSelectedStatus] = React.useState(null);
+
+  // Handle status click
+  const handleStatusClick = (status) => {
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (selectedTechnician) params.append("technician", selectedTechnician);
+    params.append("status", status);
+
+    // Navigate to details page with query parameters
+    navigate(`/details?${params.toString()}`);
+
+    if (onStatusClick) {
+      onStatusClick(selectedTechnician, status);
+    }
+  };
+
+  // Handle technician click
+  const handleTechnicianClick = (technician) => {
+    setSelectedTechnician(
+      selectedTechnician === technician ? null : technician
+    );
+
+    if (selectedStatus) {
+      // If a status is already selected, navigate to details
+      const params = new URLSearchParams();
+      params.append("technician", technician);
+      params.append("status", selectedStatus);
+      navigate(`/details?${params.toString()}`);
+
+      if (onStatusClick) {
+        onStatusClick(technician, selectedStatus);
+      }
+    }
   };
 
   return (
@@ -160,10 +209,21 @@ const Activecharts = ({ faults }) => {
                   <div className="stats-label">Closed</div>
                 </div>
                 <div className="text-center stats-item">
+                  <h3
+                    className="stats-number"
+                    style={{ color: "rgba(108, 117, 125, 1)" }}
+                  >
+                    {overallStats.resolved}
+                  </h3>
+                  <div className="stats-label">Resolved</div>
+                </div>
+
+                <div className="text-center stats-item">
                   <h3 className="stats-number" style={{ color: "#001f3f" }}>
                     {overallStats.inProgress +
                       overallStats.pending +
-                      overallStats.closed}
+                      overallStats.closed +
+                      overallStats.resolved}
                   </h3>
                   <div className="stats-label">Total</div>
                 </div>
@@ -194,6 +254,7 @@ const Activecharts = ({ faults }) => {
                       <th className="text-center">In Progress</th>
                       <th className="text-center">Pending</th>
                       <th className="text-center">Closed</th>
+                      <th className="text-center">Resolved</th>
                       <th className="text-center">Total</th>
                     </tr>
                   </thead>
@@ -201,7 +262,12 @@ const Activecharts = ({ faults }) => {
                     {Object.entries(technicianStats).map(
                       ([technician, stats]) => (
                         <tr key={technician}>
-                          <td>{technician}</td>
+                          <td
+                            onClick={() => handleTechnicianClick(technician)}
+                            style={{ cursor: "pointer" }}
+                          >
+                            {technician}
+                          </td>
                           <td className="text-center">
                             <span className="badge bg-warning">
                               {stats.inProgress}
@@ -218,8 +284,16 @@ const Activecharts = ({ faults }) => {
                             </span>
                           </td>
                           <td className="text-center">
+                            <span className="badge bg-secondary">
+                              {stats.resolved}
+                            </span>
+                          </td>
+                          <td className="text-center">
                             <strong>
-                              {stats.inProgress + stats.pending + stats.closed}
+                              {stats.inProgress +
+                                stats.pending +
+                                stats.closed +
+                                stats.resolved}
                             </strong>
                           </td>
                         </tr>
