@@ -7,6 +7,7 @@ const TechnicianCards = ({
   faults,
   onTechnicianClick,
   onStatusClick,
+  userInfo, // Add userInfo prop
 }) => {
   const [selectedTechnician, setSelectedTechnician] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -392,6 +393,28 @@ const TechnicianCards = ({
                       </svg>
                     </div>
                     <div className="donut-legend">
+                      <div className="legend-item">
+                        <span className="legend-dot total"></span>
+                        <span>Total: {techFaults.length}</span>
+                      </div>
+                      <div
+                        className="legend-item clickable-status"
+                        onClick={(e) =>
+                          handleStatusClick(technician, "Pending", e)
+                        }
+                      >
+                        <span className="legend-dot pending"></span>
+                        <span>Pending</span>
+                      </div>
+                      <div
+                        className="legend-item clickable-status"
+                        onClick={(e) =>
+                          handleStatusClick(technician, "In Progress", e)
+                        }
+                      >
+                        <span className="legend-dot in-progress"></span>
+                        <span>In Progress</span>
+                      </div>
                       <div
                         className="legend-item clickable-status"
                         onClick={(e) =>
@@ -410,24 +433,6 @@ const TechnicianCards = ({
                         <span className="legend-dot resolved"></span>
                         <span>Resolved</span>
                       </div>
-                      <div
-                        className="legend-item clickable-status"
-                        onClick={(e) =>
-                          handleStatusClick(technician, "In Progress", e)
-                        }
-                      >
-                        <span className="legend-dot in-progress"></span>
-                        <span>In Progress</span>
-                      </div>
-                      <div
-                        className="legend-item clickable-status"
-                        onClick={(e) =>
-                          handleStatusClick(technician, "Pending", e)
-                        }
-                      >
-                        <span className="legend-dot pending"></span>
-                        <span>Pending</span>
-                      </div>
                     </div>
                   </div>
                   <div className="performance-stats">
@@ -435,6 +440,28 @@ const TechnicianCards = ({
                       <div className="stat-item">
                         <span className="stat-label">Total</span>
                         <span className="stat-value">{techFaults.length}</span>
+                      </div>
+                      <div
+                        className="stat-item pending clickable-status"
+                        onClick={(e) =>
+                          handleStatusClick(technician, "Pending", e)
+                        }
+                      >
+                        <span className="stat-label">Pending</span>
+                        <span className="stat-value">
+                          {pendingFaults.length}
+                        </span>
+                      </div>
+                      <div
+                        className="stat-item in-progress clickable-status"
+                        onClick={(e) =>
+                          handleStatusClick(technician, "In Progress", e)
+                        }
+                      >
+                        <span className="stat-label">In Progress</span>
+                        <span className="stat-value">
+                          {inProgressFaults.length}
+                        </span>
                       </div>
                       <div
                         className="stat-item completed clickable-status"
@@ -457,32 +484,6 @@ const TechnicianCards = ({
                         <span className="stat-value">
                           {resolvedFaults.length}
                         </span>
-                      </div>
-                      <div
-                        className="stat-item in-progress clickable-status"
-                        onClick={(e) =>
-                          handleStatusClick(technician, "In Progress", e)
-                        }
-                      >
-                        <span className="stat-label">In Progress</span>
-                        <span className="stat-value">
-                          {inProgressFaults.length}
-                        </span>
-                      </div>
-                      <div
-                        className="stat-item pending clickable-status"
-                        onClick={(e) =>
-                          handleStatusClick(technician, "Pending", e)
-                        }
-                      >
-                        <span className="stat-label">Pending</span>
-                        <span className="stat-value">
-                          {pendingFaults.length}
-                        </span>
-                      </div>
-                      <div className="stat-item">
-                        <span className="stat-label">Active</span>
-                        <span className="stat-value">{activeFaults}</span>
                       </div>
                     </div>
                     <div className="completion-rate">
