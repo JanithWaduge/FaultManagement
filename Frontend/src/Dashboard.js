@@ -746,9 +746,10 @@ export default function Dashboard({
                 <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
                 <TechnicianCards
                   technicians={assignablePersons}
-                  faults={[...open, ...resolved]}
+                  faults={[...open, ...resolved]} // Verify this has data
                   onTechnicianClick={handleTechnicianClick}
                   onStatusClick={handleStatusClick}
+                  userInfo={userInfo}
                 />
               </div>
             ) : (
