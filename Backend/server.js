@@ -9,11 +9,14 @@ const path = require("path");
 
 const faultsRouter = require("./routes/faults");
 const authRouter = require("./routes/auth");
+const photosRouter = require('./routes/photos');
 
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Add this for images
+}));
 
 // CORS configuration - make sure this comes before routes
 app.use(
@@ -25,6 +28,13 @@ app.use(
     optionsSuccessStatus: 200,
   })
 );
+
+// Serve static files from uploads directory - MOVED AFTER CORS
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, path) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -57,6 +67,7 @@ app.get("/api/health", (req, res) => {
 // Mount your routes
 app.use("/api/auth", authRouter);
 app.use("/api/faults", faultsRouter);
+app.use('/api/photos', photosRouter);
 
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === "production") {
