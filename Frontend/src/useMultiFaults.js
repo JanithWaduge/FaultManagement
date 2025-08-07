@@ -4,20 +4,60 @@ export function useMultiFaults() {
   const [open, setOpen] = useState([]);
   const [resolved, setResolved] = useState([]);
   const [err, setErr] = useState("");
-  const token = localStorage.getItem("token");
+
+  const getToken = () => {
+    return localStorage.getItem("token");
+  };
 
   const fetchAllFaults = async () => {
-    if (!token) return setErr("No authentication token.");
+    const token = getToken();
+    if (!token) {
+      setErr("No authentication token found. Please login again.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/faults`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      console.log("Fetching faults from:", `${baseUrl}/api/faults`);
+      console.log("Token present:", !!token);
+
+      const res = await fetch(`${baseUrl}/api/faults`, {
+        method: "GET",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
       });
-      if (!res.ok) throw new Error("Failed to fetch faults");
+
+      console.log("Response status:", res.status);
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setErr("Session expired. Please login again.");
+        // Redirect to login page
+        window.location.href = "/";
+        return;
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to fetch faults: ${res.status} ${errorText}`);
+      }
+
       const data = await res.json();
+      console.log("Fetched faults:", data);
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format: expected array");
+      }
+
       setOpen(data.filter((f) => f.Status?.toLowerCase() !== "closed"));
       setResolved(data.filter((f) => f.Status?.toLowerCase() === "closed"));
       setErr("");
     } catch (e) {
+      console.error("Error fetching faults:", e);
       setErr(e.message);
     }
   };
@@ -27,17 +67,54 @@ export function useMultiFaults() {
   }, []);
 
   const apiCall = async (method, endpoint, data) => {
-    if (!token) throw new Error("Authentication required.");
-    const resp = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/faults${endpoint}`, {
-      method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: data ? JSON.stringify(data.SectionID === "" ? { ...data, SectionID: null } : data) : undefined,
-    });
-    if (!resp.ok) {
-      const error = await resp.json().catch(() => ({}));
-      throw new Error(error.message || `Failed to ${method.toLowerCase()} fault`);
+    const token = getToken();
+    if (!token) {
+      throw new Error("Authentication required. Please login again.");
     }
-    return resp.json();
+
+    const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+    const url = `${baseUrl}/api/faults${endpoint}`;
+    
+    console.log(`${method} request to:`, url);
+    console.log("Data:", data);
+
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: { 
+          "Content-Type": "application/json", 
+          "Authorization": `Bearer ${token}` 
+        },
+        body: data ? JSON.stringify(data.SectionID === "" ? { ...data, SectionID: null } : data) : undefined,
+      });
+
+      console.log("Response status:", resp.status);
+
+      if (resp.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        throw new Error("Session expired. Please login again.");
+      }
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error("Error response:", errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { message: errorText || `Failed to ${method.toLowerCase()} fault` };
+        }
+        throw new Error(error.message || `Failed to ${method.toLowerCase()} fault`);
+      }
+
+      const result = await resp.json();
+      console.log("API response:", result);
+      return result;
+    } catch (error) {
+      console.error(`API call error (${method} ${endpoint}):`, error);
+      throw error;
+    }
   };
 
   const updateState = (fault) => {
@@ -53,36 +130,93 @@ export function useMultiFaults() {
   };
 
   const create = async (data) => {
-    const result = await apiCall("POST", "", data);
-    result.fault.Status.toLowerCase() === "closed"
-      ? setResolved((r) => [...r, result.fault])
-      : setOpen((o) => [...o, result.fault]);
-    return result.fault; // Return the fault object with id
+    try {
+      const result = await apiCall("POST", "", data);
+      console.log("Create result:", result);
+      
+      // Handle different response formats
+      const fault = result.fault || result;
+      
+      if (!fault || !fault.id) {
+        throw new Error("Invalid response: no fault ID returned");
+      }
+
+      // Update state
+      if (fault.Status.toLowerCase() === "closed") {
+        setResolved((r) => [...r, fault]);
+      } else {
+        setOpen((o) => [...o, fault]);
+      }
+      
+      return fault;
+    } catch (error) {
+      console.error("Create error:", error);
+      setErr(error.message);
+      throw error;
+    }
   };
 
   const update = async (data) => {
-    const result = await apiCall("PUT", `/${data.id}`, data);
-    updateState(result.fault);
-    return result.fault; // Return the fault object with id
+    try {
+      const result = await apiCall("PUT", `/${data.id}`, data);
+      console.log("Update result:", result);
+      
+      // Handle different response formats
+      const fault = result.fault || result;
+      
+      if (!fault || !fault.id) {
+        throw new Error("Invalid response: no fault ID returned");
+      }
+
+      updateState(fault);
+      return fault;
+    } catch (error) {
+      console.error("Update error:", error);
+      setErr(error.message);
+      throw error;
+    }
   };
 
   const remove = async (id) => {
-    await apiCall("DELETE", `/${id}`);
-    setOpen((o) => o.filter((f) => f.id !== id));
-    setResolved((r) => r.filter((f) => f.id !== id));
+    try {
+      await apiCall("DELETE", `/${id}`);
+      setOpen((o) => o.filter((f) => f.id !== id));
+      setResolved((r) => r.filter((f) => f.id !== id));
+    } catch (error) {
+      console.error("Remove error:", error);
+      setErr(error.message);
+      throw error;
+    }
   };
 
   const resolve = async (id) => {
     try {
       const fault = open.find((f) => f.id === id);
       if (!fault) throw new Error("Fault not found in open list.");
+      
       const result = await apiCall("PUT", `/${id}`, { ...fault, Status: "Closed" });
+      const updatedFault = result.fault || result;
+      
       setOpen((o) => o.filter((f) => f.id !== id));
-      setResolved((r) => (r.some((f) => f.id === id) ? r : [...r, result.fault]));
+      setResolved((r) => (r.some((f) => f.id === id) ? r : [...r, updatedFault]));
     } catch (error) {
+      console.error("Resolve error:", error);
       setErr(error.message);
+      throw error;
     }
   };
 
-  return { open, resolved, create, update, remove, resolve, err, setErr, fetchAllFaults };
+  return { 
+    open, 
+    resolved, 
+    create, 
+    update, 
+    remove, 
+    resolve, 
+    error: err, 
+    setErr, 
+    fetchAllFaults, 
+    setOpen, 
+    setResolved 
+  };
 }
