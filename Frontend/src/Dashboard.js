@@ -355,7 +355,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       <nav className="navbar navbar-dark fixed-top shadow-sm" style={{ height: 60, backgroundColor: "#001f3f" }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
           <div style={{ width: 120 }} />
-          <span className="navbar-brand mb-0 h1 mx-auto" style={{ cursor: "pointer" }} onClick={() => (window.location.href = "/")} title="Go to Dashboard">⚡ N F M System Version 1.0.1</span>
+
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
               <Button variant="link" className="text-white p-0" onClick={() => setShowNotif(v => !v)} style={{ fontSize: "1.3rem" }}>
@@ -413,55 +413,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
               </div>
             ) : (
               <Tabs activeKey={view} className="custom-tabs" justify>
-                {["faults", "resolved", "active-chart"].map((tabKey) => (
-                  <Tab
-                    key={tabKey}
-                    eventKey={tabKey}
-                    title={
-                      <span className="tab-title-lg">
-                        {tabKey === "faults"
-                          ? "🚧 Faults Review Panel"
-                          : tabKey === "resolved"
-                          ? "✅ Resolved Faults"
-                          : "📊 Active Chart"}
-                      </span>
-                    }
-                  >
-                    {view === tabKey &&
-                      (tabKey === "active-chart" ? (
-                        <Activecharts
-                          faults={[...open, ...resolved]}
-                          onStatusClick={handleStatusClick}
-                        />
-                      ) : (
-                        <>
-                          <Row className="mb-3 px-3">
-                            <Col md={4} className="mb-2">
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder={`Search ${tabKey}...`}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                              />
-                            </Col>
-                          </Row>
-                          <div className="mb-2 px-3">
-                            <strong>
-                              Total {tabKey === "faults" ? "Faults" : "Resolved Faults"}:
-                            </strong>{" "}
-                            {filtered.length}
-                          </div>
-                          <FaultsTable
-                            faults={current}
-                            onEdit={update}
-                            onMarkResolved={resolve}
-                            isResolved={tabKey === "resolved"}
-                            page={page}
-                            setPage={setPage}
-                            max={max}
-                            onOpenEditModal={openEditModal}
-                            onOpenNotesModal={openNotesModal}
+
                           />
                         </>
                       ))}
