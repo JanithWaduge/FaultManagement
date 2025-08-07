@@ -128,9 +128,15 @@ const NotesModal = ({
 
         {/* Add/Edit Note Form */}
         <div className="mb-4">
+          {isClosingNote && (
+            <Alert variant="warning" className="mb-3">
+              <strong>⚠️ Note Required:</strong> You must add a note before this fault can be closed.
+            </Alert>
+          )}
           <Form.Group>
             <Form.Label>
               {editingNote ? "Edit Note" : "Add New Note"}
+              {isClosingNote && <span className="text-danger"> *</span>}
             </Form.Label>
             <Form.Control
               as="textarea"

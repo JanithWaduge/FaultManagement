@@ -13,7 +13,18 @@ import { useMultiFaults } from "./useMultiFaults";
 
 const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
 
-function FaultsTable({ faults, onEdit, onMarkResolved, isResolved, page, setPage, max, onOpenEditModal, onOpenNotesModal }) {
+function FaultsTable({ 
+  faults, 
+  onEdit, 
+  onMarkResolved, 
+  isResolved, 
+  page, 
+  setPage, 
+  max, 
+  onOpenEditModal, 
+  onOpenNotesModal, 
+  handleStatusChange 
+}) {
   const [photosModalOpen, setPhotosModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(null);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
@@ -114,12 +125,16 @@ function FaultsTable({ faults, onEdit, onMarkResolved, isResolved, page, setPage
                           <select
                             value={f.Status}
                             onChange={async (e) => {
-                              if (!isResolved)
+                              if (isResolved) return;
+                              if (handleStatusChange) {
+                                handleStatusChange(f, e.target.value);
+                              } else {
                                 try {
                                   await onEdit({ ...f, Status: e.target.value });
                                 } catch (err) {
                                   alert("Failed to update status: " + err.message);
                                 }
+                              }
                             }}
                             className={`form-select form-select-sm status-${f.Status
                               .toLowerCase()
@@ -241,6 +256,11 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   const [filteredStatus, setFilteredStatus] = useState(null);
   const [detailedView, setDetailedView] = useState(false);
   const [err, setErr] = useState("");
+  // State variables for mandatory note workflow
+  const [faultPendingClose, setFaultPendingClose] = useState(null);
+  const [closeNoteRequired, setCloseNoteRequired] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  const [success, setSuccess] = useState("");
   const notifRef = useRef();
 
   // Get data from useMultiFaults hook
@@ -294,6 +314,68 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
 
   const openEditModal = (fault) => { setEdit(fault); setModal(true); };
   const openNotesModal = (fault) => { setSelectedFaultForNotes(fault); setNotesModal(true); };
+
+  // Status change interceptor function for mandatory closing notes
+  const handleStatusChange = async (fault, newStatus) => {
+    // Check if status is being changed to "Closed"
+    if (newStatus === "Closed" && fault.Status !== "Closed") {
+      console.log("Requiring a closing note for fault:", fault.id);
+
+      // Store the fault and status change for later completion
+      setFaultPendingClose({
+        ...fault,
+        Status: newStatus,
+      });
+      setPendingStatusChange({ fault, newStatus });
+      setCloseNoteRequired(true);
+      setSelectedFaultForNotes(fault);
+      setNotesModal(true);
+
+      // Don't proceed with status change yet
+      return;
+    }
+
+    // For non-closing status changes, proceed normally
+    try {
+      const updatedFault = { ...fault, Status: newStatus };
+      await update(updatedFault);
+    } catch (err) {
+      setErr(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  // Function to handle what happens after a closing note is successfully added
+  const handleClosingNoteComplete = async () => {
+    if (!faultPendingClose || !pendingStatusChange) {
+      console.error("No pending close operation found");
+      return;
+    }
+
+    try {
+      // Now perform the actual status update to "Closed"
+      await update(faultPendingClose);
+
+      // Close the notes modal
+      setNotesModal(false);
+
+      // Clear the pending state
+      setFaultPendingClose(null);
+      setPendingStatusChange(null);
+      setCloseNoteRequired(false);
+      setSelectedFaultForNotes(null);
+
+      // Show success message
+      setSuccess(
+        `Fault #${faultPendingClose.id} has been closed and moved to resolved faults.`
+      );
+
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (error) {
+      console.error("Error completing fault closure:", error);
+      setErr(`Failed to close fault: ${error.message}`);
+    }
+  };
 
   const handleStatusClick = (technician, status) => {
     setFilteredTechnician(technician);
@@ -393,6 +475,17 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
           </div>
         )}
         
+        {success && (
+          <div className="alert alert-success" role="alert">
+            {success}
+            <button
+              type="button"
+              className="btn-close float-end"
+              onClick={() => setSuccess("")}
+            />
+          </div>
+        )}
+        
         <Row>
           <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
             <div className="glass-sidebar-title mb-4 text-center" onClick={() => setView("")} style={{ cursor: "pointer" }} title="Return to Dashboard">
@@ -469,6 +562,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
                             max={max}
                             onOpenEditModal={openEditModal}
                             onOpenNotesModal={openNotesModal}
+                            handleStatusChange={handleStatusChange}
                           />
                         </>
                       ))}
@@ -513,8 +607,23 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       <NotesModal
         show={notesModal}
         onHide={() => {
-          setNotesModal(false);
-          setSelectedFaultForNotes(null);
+          if (closeNoteRequired) {
+            // Show confirmation before closing if this is for closing a fault
+            if (
+              window.confirm(
+                "Closing without adding a note will cancel the status change. Are you sure?"
+              )
+            ) {
+              setNotesModal(false);
+              setCloseNoteRequired(false);
+              setFaultPendingClose(null);
+              setPendingStatusChange(null);
+              setSelectedFaultForNotes(null);
+            }
+          } else {
+            setNotesModal(false);
+            setSelectedFaultForNotes(null);
+          }
         }}
         fault={selectedFaultForNotes}
         notes={notes}
@@ -524,6 +633,8 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
         onEditNote={editNote}
         onDeleteNote={deleteNote}
         onFetchNotes={fetchNotes}
+        isClosingNote={closeNoteRequired}
+        onClosingNoteComplete={handleClosingNoteComplete}
       />
 
       <style>{`
