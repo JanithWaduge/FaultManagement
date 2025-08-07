@@ -651,7 +651,7 @@ export default function Dashboard({
             onClick={() => (window.location.href = "/")}
             title="Go to Dashboard"
           >
-            ⚡ N F M System Version 1.0.1
+              N F M System Version 1.0.1
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
@@ -829,7 +829,7 @@ export default function Dashboard({
                 <Tab
                   eventKey="faults"
                   title={
-                    <span className="tab-title-lg">🚧 Faults Review Panel</span>
+                    <span className="tab-title-lg">📋 Faults Review Panel</span>
                   }
                 >
                   {view === "faults" && (
