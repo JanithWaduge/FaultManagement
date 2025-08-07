@@ -11,19 +11,27 @@ const FaultDetailsView = ({ faults, onBackClick }) => {
   const status = searchParams.get("status");
 
   useEffect(() => {
-    // Filter faults based on URL parameters
-    let filtered = [...faults];
 
-    if (technician) {
-      filtered = filtered.filter(f => f.AssignTo === technician);
-    }
+  let filtered = [...faults];
 
-    if (status) {
-      filtered = filtered.filter(f => f.Status === status);
-    }
+  if (technician) {
+    filtered = filtered.filter(
+      (f) =>
+        f.AssignTo &&
+        f.AssignTo.trim().toLowerCase() === technician.trim().toLowerCase()
+    );
+  }
 
-    setFilteredFaults(filtered);
-  }, [faults, technician, status]);
+  if (status) {
+    filtered = filtered.filter(
+      (f) =>
+        f.Status &&
+        f.Status.trim().toLowerCase() === status.trim().toLowerCase()
+    );
+  }
+
+  setFilteredFaults(filtered);
+}, [faults, technician, status]);
 
   // Handle back button click
   const handleBack = () => {

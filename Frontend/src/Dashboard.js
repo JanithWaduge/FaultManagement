@@ -65,6 +65,7 @@ function FaultsTable({ faults, onEdit, onMarkResolved, isResolved, page, setPage
     handlePhotosClick(faultId); // Refresh photos
   };
 
+
   return (
     <>
       <Row style={{ height: "calc(100vh - 60px - 130px - 80px)", overflowY: "auto" }}>
@@ -83,35 +84,7 @@ function FaultsTable({ faults, onEdit, onMarkResolved, isResolved, page, setPage
                       <th key={i} className={i === 0 || i === 1 || (!isResolved && i === 9) || i === 10 ? "text-center" : i === 3 ? "d-none d-md-table-cell" : i === 4 ? "d-none d-lg-table-cell" : i === 8 ? "d-none d-md-table-cell" : ""}>{h}</th>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {faults.length === 0 ? (
-                    <tr><td colSpan={isResolved ? 11 : 12} className="text-center text-muted py-4">No faults.</td></tr>
-                  ) : (
-                    faults.map(f => (
-                      <tr key={f.id} className={`table-row-hover ${f.Status === "In Progress" ? "status-in-progress-row" : f.Status === "Pending" ? "status-pending-row" : f.Status === "Closed" ? "status-closed-row" : ""}`}>
-                        <td className="text-center">{f.id}</td>
-                        <td className="text-center">{f.SystemID}</td>
-                        <td>{f.ReportedBy}</td>
-                        <td className="d-none d-md-table-cell">{f.Location}</td>
-                        <td className="d-none d-lg-table-cell">{f.LocationOfFault}</td>
-                        <td className="description-col">{f.DescFault}</td>
-                        <td>
-                          <select
-                            value={f.Status}
-                            onChange={async (e) => {
-                              if (!isResolved) try { await onEdit({ ...f, Status: e.target.value }); } catch (err) { alert("Failed to update status: " + err.message); }
-                            }}
-                            className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(/\s+/g, "-")}`}
-                            disabled={isResolved}
-                            style={{ backgroundColor: f.Status === "In Progress" ? "#fff3cd" : f.Status === "Pending" ? "#cff4fc" : f.Status === "Closed" ? "#d1e7dd" : "", color: "#000", fontWeight: "500" }}
-                          >
-                            {["In Progress", "Pending", "Closed"].map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </td>
-                        <td>{f.AssignTo}</td>
-                        <td className="d-none d-md-table-cell" style={{ whiteSpace: "nowrap" }}>{f.DateTime ? new Date(f.DateTime).toLocaleString() : ""}</td>
-                        {!isResolved && <td className="text-center"><Button variant="outline-primary" size="sm" className="me-1 mb-1" onClick={() => onOpenEditModal(f)}>Edit</Button></td>}
+
                         <td className="text-center">
                           <Button
                             variant="outline-secondary"
@@ -179,13 +152,14 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
   const [showNotif, setShowNotif] = useState(false);
   const [notesModal, setNotesModal] = useState(false);
   const [selectedFaultForNotes, setSelectedFaultForNotes] = useState(null);
+
   const [footerInfo, setFooterInfo] = useState(false);
   const [filteredTechnician, setFilteredTechnician] = useState(null);
   const [filteredStatus, setFilteredStatus] = useState(null);
   const [detailedView, setDetailedView] = useState(false);
   const notifRef = useRef();
 
-  const { open, resolved, create, update, remove, resolve, err, setErr } = useMultiFaults();
+
   const token = localStorage.getItem("token");
   const { notes, loading, error: notesError, fetchNotes, addNote, editNote, deleteNote } = useFaultNotes(token);
 
@@ -195,6 +169,68 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
   }, [showNotif, setNotifications]);
+
+  // Step 2: Status change interceptor function
+  const handleStatusChange = async (fault, newStatus) => {
+    // Check if status is being changed to "Closed"
+    if (newStatus === "Closed" && fault.Status !== "Closed") {
+      console.log("Requiring a closing note for fault:", fault.id);
+
+      // Store the fault and status change for later completion
+      setFaultPendingClose({
+        ...fault,
+        Status: newStatus,
+      });
+      setPendingStatusChange({ fault, newStatus });
+      setCloseNoteRequired(true);
+      setSelectedFaultForNotes(fault);
+      setNotesModal(true);
+
+      // Don't proceed with status change yet
+      return;
+    }
+
+    // For non-closing status changes, proceed normally
+    try {
+      const updatedFault = { ...fault, Status: newStatus };
+      await update(updatedFault);
+    } catch (err) {
+      setErr(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  // Step 5: Closing note completion logic
+  const handleClosingNoteComplete = async () => {
+    if (!faultPendingClose || !pendingStatusChange) {
+      console.error("No pending close operation found");
+      return;
+    }
+
+    try {
+      // Now perform the actual status update to "Closed"
+      await update(faultPendingClose);
+
+      // Close the notes modal
+      setNotesModal(false);
+
+      // Clear the pending state
+      setFaultPendingClose(null);
+      setPendingStatusChange(null);
+      setCloseNoteRequired(false);
+      setSelectedFaultForNotes(null);
+
+      // Show success message
+      setSuccess(
+        `Fault #${faultPendingClose.id} has been closed and moved to resolved faults.`
+      );
+
+      // Refresh fault data to ensure UI consistency
+      await fetchAllFaults();
+    } catch (error) {
+      console.error("Error completing fault closure:", error);
+      setErr(`Failed to close fault: ${error.message}`);
+    }
+  };
 
   const currentFaultArr = view === "faults" ? open : resolved;
   const sortedFaults = useMemo(() => [...currentFaultArr].sort((a, b) => b.id - a.id), [currentFaultArr]);
@@ -256,7 +292,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
       </nav>
 
       <Container fluid className="pt-5 mt-4">
-        {err && <div className="alert alert-danger" role="alert">{err} <button type="button" className="btn-close float-end" onClick={() => setErr("")} /></div>}
+
         <Row>
           <Col xs={2} className="bg-dark text-white sidebar p-3 position-fixed vh-100" style={{ top: 60, left: 0, zIndex: 1040 }}>
             <div className="glass-sidebar-title mb-4 text-center" onClick={() => setView("")} style={{ cursor: "pointer" }} title="Return to Dashboard">
@@ -275,27 +311,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
             {!view ? (
               <div className="p-4">
                 <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
-                <TechnicianCards technicians={assignablePersons} faults={[...open, ...resolved]} onTechnicianClick={handleTechnicianClick} onStatusClick={handleStatusClick} />
-              </div>
-            ) : (
-              <Tabs activeKey={view} className="custom-tabs" justify>
-                {["faults", "resolved", "active-chart"].map(tabKey => (
-                  <Tab key={tabKey} eventKey={tabKey} title={<span className="tab-title-lg">{tabKey === "faults" ? "🚧 Faults Review Panel" : tabKey === "resolved" ? "✅ Resolved Faults" : "📊 Active Chart"}</span>}>
-                    {view === tabKey && (tabKey === "active-chart" ? (
-                      <Activecharts faults={[...open, ...resolved]} onStatusClick={handleStatusClick} />
-                    ) : (
-                      <>
-                        <Row className="mb-3 px-3">
-                          <Col md={4} className="mb-2">
-                            <input type="text" className="form-control" placeholder={`Search ${tabKey}...`} value={search} onChange={(e) => setSearch(e.target.value)} />
-                          </Col>
-                        </Row>
-                        <div className="mb-2 px-3"><strong>Total {tabKey === "faults" ? "Faults" : "Resolved Faults"}:</strong> {filtered.length}</div>
-                        <FaultsTable faults={current} onEdit={update} onMarkResolved={resolve} isResolved={tabKey === "resolved"} page={page} setPage={setPage} max={max} onOpenEditModal={openEditModal} onOpenNotesModal={openNotesModal} />
-                      </>
-                    ))}
-                  </Tab>
-                ))}
+
               </Tabs>
             )}
           </Col>
@@ -311,8 +327,7 @@ export default function Dashboard({ userInfo, notifications, setNotifications, o
         </div>
       </footer>
 
-      <NewFaultModal show={modal} handleClose={() => { setModal(false); setEdit(null); }} handleAdd={edit ? update : create} assignablePersons={assignablePersons} initialData={edit} />
-      <NotesModal show={notesModal} onHide={() => { setNotesModal(false); setSelectedFaultForNotes(null); }} fault={selectedFaultForNotes} notes={notes} loading={loading} error={notesError} onAddNote={addNote} onEditNote={editNote} onDeleteNote={deleteNote} onFetchNotes={fetchNotes} />
+
       <style>{`
         .status-in-progress-row, .status-in-progress-row td { background-color: #fff3cd !important; }
         .status-pending-row, .status-pending-row td { background-color: #cff4fc !important; }

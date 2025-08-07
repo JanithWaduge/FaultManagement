@@ -150,7 +150,7 @@ const App = () => {
     return (
       <Layout onLogout={handleLogout}>
         <FaultDetailsView
-          faults={[...open, ...resolved]}
+          faults={faults}
           onBackClick={() => navigate("/")}
         />
       </Layout>
