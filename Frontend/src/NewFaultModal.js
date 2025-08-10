@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Modal, Button, Form, Alert, Spinner, Image } from "react-bootstrap";
 import { PhotoModal } from "./components/PhotoModal";
 
@@ -26,6 +26,19 @@ const faultLocationOptions = [
   "Pier Building",
 ];
 
+const subSystemOptions = [
+  "Sub-System 1",
+  "Sub-System 2",
+  "Sub-System 3",
+  "Sub-System 4",
+  "Sub-System 5",
+  "Hardware",
+  "Software",
+  "Network",
+  "Security",
+  "Maintenance",
+];
+
 export default function NewFaultModal({
   show,
   handleClose,
@@ -42,6 +55,8 @@ export default function NewFaultModal({
     DescFault: "",
     Status: "In Progress",
     AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
+    SubSystem: subSystemOptions[0],
+    isHighPriority: false,
   });
 
   const [photos, setPhotos] = useState([]); // New photos to upload
@@ -53,9 +68,56 @@ export default function NewFaultModal({
   const [validated, setValidated] = useState(false);
   const token = localStorage.getItem("token");
 
+  // Fetch existing photos for the fault
+  const fetchPhotos = useCallback(
+    async (faultId) => {
+      setLoadingPhotos(true);
+      try {
+        const baseUrl =
+          process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+        const url = `${baseUrl}/api/photos/fault/${faultId}`;
+
+        console.log("Fetching photos from:", url);
+        console.log("Token:", token ? "Present" : "Missing");
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        console.log("Response status:", res.status);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Error response:", errorText);
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
+        const photos = await res.json();
+        console.log("Photos fetched successfully:", photos);
+        setExistingPhotos(photos);
+      } catch (error) {
+        console.error("Error fetching photos:", error);
+        setExistingPhotos([]);
+        setError(`Failed to load existing photos: ${error.message}`);
+      } finally {
+        setLoadingPhotos(false);
+      }
+    },
+    [token]
+  );
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user"));
-    const technicianList = ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"];
+    const technicianList = [
+      "John Doe",
+      "Jane Smith",
+      "Alex Johnson",
+      "Emily Davis",
+    ];
     const isTechnician = user && technicianList.includes(user.username);
 
     const emptyForm = {
@@ -67,6 +129,8 @@ export default function NewFaultModal({
       DescFault: "",
       Status: "In Progress",
       AssignTo: isTechnician ? user.username : assignablePersons[0] || "",
+      SubSystem: subSystemOptions[0],
+      isHighPriority: false,
     };
 
     if (initialData) {
@@ -87,6 +151,13 @@ export default function NewFaultModal({
         AssignTo:
           initialData.AssignTo ||
           (assignablePersons.length > 0 ? assignablePersons[0] : ""),
+        SubSystem: subSystemOptions.includes(initialData.SubSystem)
+          ? initialData.SubSystem
+          : subSystemOptions[0],
+        isHighPriority:
+          initialData.isHighPriority ||
+          initialData.Priority === "High" ||
+          false,
       });
 
       // Fetch existing photos if editing a fault
@@ -104,45 +175,7 @@ export default function NewFaultModal({
     setValidated(false);
     setError("");
     setIsSubmitting(false);
-  }, [initialData, assignablePersons, show]);
-
-  // Fetch existing photos for the fault
-  const fetchPhotos = async (faultId) => {
-    setLoadingPhotos(true);
-    try {
-      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
-      const url = `${baseUrl}/api/photos/fault/${faultId}`;
-
-      console.log("Fetching photos from:", url);
-      console.log("Token:", token ? "Present" : "Missing");
-
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("Response status:", res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Error response:", errorText);
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
-      }
-
-      const photos = await res.json();
-      console.log("Photos fetched successfully:", photos);
-      setExistingPhotos(photos);
-    } catch (error) {
-      console.error("Error fetching photos:", error);
-      setExistingPhotos([]);
-      setError(`Failed to load existing photos: ${error.message}`);
-    } finally {
-      setLoadingPhotos(false);
-    }
-  };
+  }, [initialData, assignablePersons, show, fetchPhotos]);
 
   // Handle text/select input changes
   const handleChange = (e) => {
@@ -172,6 +205,8 @@ export default function NewFaultModal({
       DescFault: formData.DescFault,
       AssignTo: formData.AssignTo,
       Status: formData.Status,
+      SubSystem: formData.SubSystem,
+      isHighPriority: formData.isHighPriority,
     };
     if (formData.SectionID && formData.SectionID.trim() !== "") {
       payload.SectionID = formData.SectionID;
@@ -190,7 +225,11 @@ export default function NewFaultModal({
     return photos.map((file, index) => {
       const objectUrl = URL.createObjectURL(file);
       return (
-        <div key={index} className="me-2 mb-2" style={{ display: "inline-block" }}>
+        <div
+          key={index}
+          className="me-2 mb-2"
+          style={{ display: "inline-block" }}
+        >
           <Image
             src={objectUrl}
             rounded
@@ -228,6 +267,8 @@ export default function NewFaultModal({
       // Send fault data
       const payload = buildPayload(formData, initialData);
       console.log("Sending payload to handleAdd:", payload);
+      console.log("Is this an edit?", !!initialData);
+      console.log("FormData isHighPriority:", formData.isHighPriority);
       const savedFault = await handleAdd(payload);
       console.log("Response from handleAdd:", savedFault);
 
@@ -248,7 +289,12 @@ export default function NewFaultModal({
           formDataForPhotos.append("photoOrder", i + 1);
           formDataForPhotos.append("isActive", true);
 
-          console.log("Uploading photo:", photo.name, "for faultId:", savedFault.id);
+          console.log(
+            "Uploading photo:",
+            photo.name,
+            "for faultId:",
+            savedFault.id
+          );
 
           const response = await fetch(uploadUrl, {
             method: "POST",
@@ -292,7 +338,9 @@ export default function NewFaultModal({
       setValidated(false);
     } catch (err) {
       console.error("Submission error:", err);
-      setError(`Failed to submit form or upload photos: ${err.message}. Check console for details.`);
+      setError(
+        `Failed to submit form or upload photos: ${err.message}. Check console for details.`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -324,12 +372,22 @@ export default function NewFaultModal({
 
         <Modal.Body>
           {error && (
-            <Alert variant="danger" dismissible onClose={() => setError("")} className="mb-4">
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4"
+            >
               {error}
             </Alert>
           )}
 
-          <Form noValidate validated={validated} onSubmit={handleSubmit} autoComplete="off">
+          <Form
+            noValidate
+            validated={validated}
+            onSubmit={handleSubmit}
+            autoComplete="off"
+          >
             <div className="row">
               <div className="col-md-6 mb-3">
                 <Form.Group controlId="formSystemID">
@@ -411,7 +469,9 @@ export default function NewFaultModal({
 
               <div className="col-md-6 mb-3">
                 <Form.Group controlId="formLocationOfFault">
-                  <Form.Label className="fw-semibold">Location of Fault</Form.Label>
+                  <Form.Label className="fw-semibold">
+                    Location of Fault
+                  </Form.Label>
                   <Form.Select
                     name="LocationOfFault"
                     value={formData.LocationOfFault}
@@ -422,6 +482,26 @@ export default function NewFaultModal({
                     {faultLocationOptions.map((loc) => (
                       <option key={loc} value={loc}>
                         {loc}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <Form.Group controlId="formSubSystem">
+                  <Form.Label className="fw-semibold">Sub System</Form.Label>
+                  <Form.Select
+                    name="SubSystem"
+                    value={formData.SubSystem}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                  >
+                    {subSystemOptions.map((subSystem) => (
+                      <option key={subSystem} value={subSystem}>
+                        {subSystem}
                       </option>
                     ))}
                   </Form.Select>
@@ -487,7 +567,11 @@ export default function NewFaultModal({
             {photos.length > 0 && (
               <div
                 className="mb-4"
-                style={{ maxHeight: "150px", overflowX: "auto", whiteSpace: "nowrap" }}
+                style={{
+                  maxHeight: "150px",
+                  overflowX: "auto",
+                  whiteSpace: "nowrap",
+                }}
               >
                 {renderPhotoPreviews()}
               </div>
@@ -532,7 +616,12 @@ export default function NewFaultModal({
                     disabled={
                       assignablePersons.length === 0 ||
                       isSubmitting ||
-                      ["John Doe", "Jane Smith", "Alex Johnson", "Emily Davis"].includes(
+                      [
+                        "John Doe",
+                        "Jane Smith",
+                        "Alex Johnson",
+                        "Emily Davis",
+                      ].includes(
                         JSON.parse(localStorage.getItem("user"))?.username
                       )
                     }
@@ -557,6 +646,42 @@ export default function NewFaultModal({
               </div>
             </div>
 
+            {/* High Priority Checkbox */}
+            <div className="mb-4 p-3 border rounded bg-light">
+              <Form.Check
+                type="checkbox"
+                id="high-priority-checkbox"
+                checked={formData.isHighPriority}
+                onChange={(e) =>
+                  setFormData({ ...formData, isHighPriority: e.target.checked })
+                }
+                disabled={isSubmitting}
+                label={
+                  <span
+                    className={`fs-6 ${
+                      formData.isHighPriority
+                        ? "text-danger fw-bold"
+                        : "text-dark"
+                    }`}
+                  >
+                    🚩 High Priority
+                  </span>
+                }
+              />
+              <Form.Text className="text-muted d-block mt-1">
+                Check this box for critical issues requiring immediate attention
+              </Form.Text>
+
+              {formData.isHighPriority && (
+                <div className="alert alert-warning mt-2 mb-0 py-2">
+                  <small>
+                    <strong>⚠️ High Priority Selected:</strong> This fault will
+                    be flagged with a red flag for immediate attention.
+                  </small>
+                </div>
+              )}
+            </div>
+
             <Modal.Footer className="px-0 pt-0 border-0">
               <Button
                 variant="outline-secondary"
@@ -567,7 +692,7 @@ export default function NewFaultModal({
                 Cancel
               </Button>
               <Button
-                variant="primary"
+                variant={formData.isHighPriority ? "danger" : "primary"}
                 type="submit"
                 disabled={isSubmitting || assignablePersons.length === 0}
                 className="d-flex align-items-center justify-content-center"

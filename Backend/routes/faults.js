@@ -43,6 +43,7 @@ const ALLOWED_UPDATE_FIELDS = [
   "Status",
   "SectionID",
   "FaultForwardID",
+  "Priority",
 ];
 
 // Allowed values for SystemID
@@ -125,9 +126,14 @@ router.post(
         Status = "Open",
         SectionID = null,
         FaultForwardID = null,
+        isHighPriority = false,
       } = req.body;
 
+      // Convert boolean to database value
+      const Priority = isHighPriority ? "High" : null;
+
       console.log("Received data:", req.body);
+      console.log("isHighPriority:", isHighPriority, "Priority:", Priority);
 
       const queryParams = {
         SystemID,
@@ -141,6 +147,7 @@ router.post(
         Status,
         SectionID,
         FaultForwardID,
+        Priority,
       };
 
       const result = await db.query(
@@ -148,11 +155,11 @@ router.post(
             INSERT INTO dbo.tblFaults (
                 SystemID, Location, LocationOfFault, LocFaultID, DescFault,
                 ReportedBy, ExtNo, DateTime, AssignTo,
-                Status, SectionID, FaultForwardID
+                Status, SectionID, FaultForwardID, Priority
             ) VALUES (
                 @SystemID, @Location, @LocationOfFault, @LocFaultID, @DescFault,
                 @ReportedBy, @ExtNo, GETDATE(), @AssignTo,
-                @Status, @SectionID, @FaultForwardID
+                @Status, @SectionID, @FaultForwardID, @Priority
             );
             SELECT SCOPE_IDENTITY() AS id;
         `,
@@ -297,6 +304,17 @@ router.put(
           updates[field] = req.body[field];
         }
       });
+
+      // Handle isHighPriority conversion for updates
+      if (req.body.isHighPriority !== undefined) {
+        updates.Priority = req.body.isHighPriority ? "High" : null;
+        console.log(
+          "UPDATE - isHighPriority:",
+          req.body.isHighPriority,
+          "Priority:",
+          updates.Priority
+        );
+      }
 
       if (Object.keys(updates).length === 0) {
         return res

@@ -7,6 +7,7 @@ import {
   FaClipboardList,
   FaCheckCircle,
 } from "react-icons/fa";
+import PriorityFlag from "./PriorityFlag";
 
 const TechnicianDetails = () => {
   const [userInfo, setUserInfo] = useState(null);
@@ -43,11 +44,11 @@ const TechnicianDetails = () => {
         }
 
         console.log("Fetching faults for technician:", decodedName);
-        
+
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/faults/technician/${encodeURIComponent(
-            decodedName
-          )}`,
+          `${
+            process.env.REACT_APP_API_URL || "http://localhost:5000"
+          }/api/faults/technician/${encodeURIComponent(decodedName)}`,
           {
             method: "GET",
             headers: {
@@ -70,7 +71,7 @@ const TechnicianDetails = () => {
 
         const data = await response.json();
         console.log("Fetched fault data:", data);
-        
+
         if (!Array.isArray(data)) {
           console.warn("Invalid data format received:", data);
           setFaults([]);
@@ -114,19 +115,6 @@ const TechnicianDetails = () => {
     return <Badge bg={statusColors[status] || "secondary"}>{status}</Badge>;
   };
 
-  const getPriorityBadge = (priority) => {
-    const priorityColors = {
-      High: "danger",
-      Medium: "warning",
-      Low: "success",
-    };
-    return (
-      <Badge bg={priorityColors[priority] || "secondary"}>
-        {priority || "Low"}
-      </Badge>
-    );
-  };
-
   if (loading) {
     return (
       <Container className="mt-4">
@@ -146,8 +134,8 @@ const TechnicianDetails = () => {
         <div className="alert alert-danger text-center">
           <h5>Error</h5>
           <p>{error}</p>
-          <button 
-            className="btn btn-primary" 
+          <button
+            className="btn btn-primary"
             onClick={() => navigate("/dashboard")}
           >
             Back to Dashboard
@@ -164,7 +152,8 @@ const TechnicianDetails = () => {
     resolved: faults.filter((f) => f.Status === "Closed").length,
   };
 
-  const resolutionRate = stats.total > 0 ? (stats.resolved / stats.total) * 100 : 0;
+  const resolutionRate =
+    stats.total > 0 ? (stats.resolved / stats.total) * 100 : 0;
 
   return (
     <Container
@@ -254,6 +243,7 @@ const TechnicianDetails = () => {
                 <Table striped bordered hover className="align-middle">
                   <thead className="table-dark">
                     <tr>
+                      <th>Priority</th>
                       <th>Fault ID</th>
                       <th>System</th>
                       <th>Location</th>
@@ -261,41 +251,60 @@ const TechnicianDetails = () => {
                       <th>Status</th>
                       <th>Reported By</th>
                       <th>Reported At</th>
-                      <th>Priority</th>
                     </tr>
                   </thead>
                   <tbody>
                     {faults.length > 0 ? (
                       faults.map((fault, index) => (
                         <tr key={fault.id || fault.FaultID || index}>
+                          <td className="text-center">
+                            <PriorityFlag priority={fault.Priority} />
+                          </td>
                           <td>
-                            <strong>{fault.id || fault.FaultID || "N/A"}</strong>
+                            <strong>
+                              {fault.id || fault.FaultID || "N/A"}
+                            </strong>
                           </td>
                           <td>{fault.SystemID || fault.System || "N/A"}</td>
                           <td>
                             {fault.Location || "N/A"}
                             {fault.LocationOfFault && (
-                              <><br /><small className="text-muted">{fault.LocationOfFault}</small></>
+                              <>
+                                <br />
+                                <small className="text-muted">
+                                  {fault.LocationOfFault}
+                                </small>
+                              </>
                             )}
                           </td>
-                          <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>
-                            {fault.DescFault || fault.Description || "No description"}
+                          <td
+                            style={{
+                              maxWidth: "200px",
+                              wordWrap: "break-word",
+                            }}
+                          >
+                            {fault.DescFault ||
+                              fault.Description ||
+                              "No description"}
                           </td>
                           <td>{getStatusBadge(fault.Status || "Unknown")}</td>
                           <td>{fault.ReportedBy || "N/A"}</td>
                           <td>
                             {fault.created_at || fault.ReportedAt
-                              ? new Date(fault.created_at || fault.ReportedAt).toLocaleString()
+                              ? new Date(
+                                  fault.created_at || fault.ReportedAt
+                                ).toLocaleString()
                               : "N/A"}
                           </td>
-                          <td>{getPriorityBadge(fault.Priority)}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td colSpan="8" className="text-center text-muted py-4">
                           <FaClipboardList size={24} className="mb-2" />
-                          <p className="mb-0">No faults found for this technician</p>
+                          <p className="mb-0">
+                            No faults found for this technician
+                          </p>
                         </td>
                       </tr>
                     )}
@@ -307,25 +316,28 @@ const TechnicianDetails = () => {
             <div className="text-center mt-5">
               <h4>Performance Summary</h4>
               <p className="text-muted">
-                {stats.total > 0 
+                {stats.total > 0
                   ? "Click 'View Detailed History' to see complete fault records"
-                  : "No faults assigned to this technician yet"
-                }
+                  : "No faults assigned to this technician yet"}
               </p>
-              
+
               {stats.total > 0 && (
                 <div className="mt-4">
                   <h5>Resolution Rate</h5>
                   <div
                     className="progress bg-light border mx-auto"
-                    style={{ height: "25px", borderRadius: "12px", maxWidth: "400px" }}
+                    style={{
+                      height: "25px",
+                      borderRadius: "12px",
+                      maxWidth: "400px",
+                    }}
                   >
                     <div
                       className="progress-bar bg-success d-flex align-items-center justify-content-center"
                       style={{
                         width: `${resolutionRate}%`,
                         fontWeight: "bold",
-                        fontSize: "14px"
+                        fontSize: "14px",
                       }}
                     >
                       {Math.round(resolutionRate)}% Resolved
@@ -348,7 +360,9 @@ const TechnicianDetails = () => {
                       </div>
                       <div className="d-flex justify-content-between">
                         <span>Completion Rate:</span>
-                        <strong className="text-success">{Math.round(resolutionRate)}%</strong>
+                        <strong className="text-success">
+                          {Math.round(resolutionRate)}%
+                        </strong>
                       </div>
                     </Col>
                   </Row>

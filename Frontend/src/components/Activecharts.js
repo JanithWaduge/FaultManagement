@@ -3,6 +3,7 @@ import { Pie } from "react-chartjs-2";
 import { Card, Row, Col, Table } from "react-bootstrap";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
 import { useNavigate } from "react-router-dom";
+import PendingFaultsGrid from "./PendingFaultsGrid";
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
@@ -16,6 +17,12 @@ const Activecharts = ({ faults, onStatusClick }) => {
     closed: faults.filter((f) => f.Status === "Closed").length,
     resolved: faults.filter((f) => f.Status === "Resolved").length,
   };
+
+  // Filter pending faults for the grid
+  const pendingFaults = faults.filter((f) => f.Status === "Pending");
+
+  console.log("Total faults:", faults.length);
+  console.log("Pending faults:", pendingFaults.length);
 
   // Group faults by technician
   const technicianStats = faults.reduce((acc, fault) => {
@@ -163,7 +170,7 @@ const Activecharts = ({ faults, onStatusClick }) => {
             <Card.Body className="d-flex flex-column">
               <div
                 className="chart-container"
-                style={{ minHeight: "300px", height: "calc(100vh - 500px)" }}
+                style={{ minHeight: "300px", height: "350px" }}
               >
                 <Pie
                   data={chartData}
@@ -307,8 +314,14 @@ const Activecharts = ({ faults, onStatusClick }) => {
         </Col>
       </Row>
 
+      {/* All Pending Faults Grid */}
+      <Row className="g-4 mt-4">
+        <Col xs={12}>
+          <PendingFaultsGrid pendingFaults={pendingFaults} />
+        </Col>
+      </Row>
+
       <style>{`
-        .table-fixed-header thead th {
           position: sticky;
           top: 0;
           background-color: #f8f9fa;
@@ -384,7 +397,7 @@ const Activecharts = ({ faults, onStatusClick }) => {
         /* Media Queries */
         @media (max-width: 992px) {
           .chart-container {
-            height: 400px !important;
+            height: 350px !important;
           }
 
           .stats-container {
