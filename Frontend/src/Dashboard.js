@@ -151,7 +151,6 @@ function FaultsTable({
                       "Description",
                       "Status",
                       "Assigned To",
-                      "Group",
                       "Reported At",
                       !isResolved && "Actions",
                       "Photos",
@@ -165,14 +164,14 @@ function FaultsTable({
                             i === 0 ||
                             i === 1 ||
                             i === 2 ||
-                            (!isResolved && i === 10) ||
-                            i === 11
+                            (!isResolved && i === 9) ||
+                            i === 10
                               ? "text-center"
                               : i === 4
                               ? "d-none d-md-table-cell"
                               : i === 5
                               ? "d-none d-lg-table-cell"
-                              : i === 9
+                              : i === 8
                               ? "d-none d-md-table-cell"
                               : ""
                           }
@@ -186,7 +185,7 @@ function FaultsTable({
                   {faults.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isResolved ? 13 : 14}
+                        colSpan={isResolved ? 12 : 13}
                         className="text-center text-muted py-4"
                       >
                         No faults.
@@ -263,11 +262,6 @@ function FaultsTable({
                           </select>
                         </td>
                         <td>{f.AssignTo}</td>
-                        <td>
-                          {f.isGrouped && f.groupSize > 1
-                            ? `Group (${f.groupSize})`
-                            : "-"}
-                        </td>
                         <td
                           className="d-none d-md-table-cell"
                           style={{ whiteSpace: "nowrap" }}
