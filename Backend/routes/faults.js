@@ -225,7 +225,12 @@ router.get("/", authenticateToken, async (req, res) => {
     baseQuery += " ORDER BY DateTime DESC";
 
     const result = await db.query(baseQuery, queryParams);
-    res.status(200).json(result.recordset);
+    const faults = result.recordset;
+
+    // Add group detection logic
+    const faultsWithGroups = detectGroupsInFaults(faults);
+
+    res.status(200).json(faultsWithGroups);
   } catch (error) {
     console.error("Database error:", error);
     res.status(500).json({
@@ -394,6 +399,123 @@ router.delete(
     }
   }
 );
+
+// Group assignment endpoint - Update AssignTo field with comma-separated assignees
+router.post(
+  "/:id/assign-group",
+  [
+    authenticateToken,
+    param("id").isInt().withMessage("Fault ID must be an integer"),
+    body("assignees")
+      .isArray({ min: 1 })
+      .withMessage("Assignees must be a non-empty array"),
+    body("assignees.*")
+      .isString()
+      .trim()
+      .notEmpty()
+      .withMessage("Each assignee must be a non-empty string"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: errors.array(),
+      });
+    }
+
+    try {
+      const faultId = parseInt(req.params.id);
+      const { assignees } = req.body;
+
+      // Get original fault data
+      const originalFaultQuery = "SELECT * FROM dbo.tblFaults WHERE id = @id";
+      const originalFaultResult = await db.query(originalFaultQuery, {
+        id: faultId,
+      });
+
+      if (originalFaultResult.recordset.length === 0) {
+        return res.status(404).json({ message: "Fault not found" });
+      }
+
+      const originalFault = originalFaultResult.recordset[0];
+
+      // Get current assignees (might already be a comma-separated list)
+      const currentAssignees = originalFault.AssignTo
+        ? originalFault.AssignTo.split(",").map((name) => name.trim())
+        : [];
+
+      // Use the new assignees (replace, don't append)
+      const newAssignees = [...new Set(assignees)]; // Remove duplicates
+
+      if (newAssignees.length < 2) {
+        return res.status(400).json({
+          message: "Group assignment requires at least 2 assignees",
+        });
+      }
+
+      console.log("Group assignment - Current assignees:", currentAssignees);
+      console.log("Group assignment - New assignees:", newAssignees);
+
+      // Update the fault record with comma-separated assignees
+      const updateQuery = `
+        UPDATE dbo.tblFaults 
+        SET AssignTo = @assignTo
+        WHERE id = @id
+      `;
+
+      const updateParams = {
+        id: faultId,
+        assignTo: newAssignees.join(", "),
+      };
+
+      await db.query(updateQuery, updateParams);
+
+      res.status(200).json({
+        success: true,
+        message: "Group assignment updated successfully",
+        faultId: faultId,
+        assignees: newAssignees,
+        totalAssignees: newAssignees.length,
+      });
+    } catch (error) {
+      console.error("Error updating group assignment:", error);
+      res.status(500).json({
+        message: "Failed to update group assignment",
+        error: process.env.NODE_ENV === "development" ? error.message : null,
+      });
+    }
+  }
+);
+
+// Function to detect groups in faults array - now based on comma-separated AssignTo field
+function detectGroupsInFaults(faults) {
+  if (!faults || faults.length === 0) return faults;
+
+  // Add group metadata to each fault based on AssignTo field
+  return faults.map((fault) => {
+    // Check if AssignTo contains multiple assignees (comma-separated)
+    const assignees = fault.AssignTo
+      ? fault.AssignTo.split(",")
+          .map((name) => name.trim())
+          .filter((name) => name.length > 0)
+      : [];
+
+    const isGrouped = assignees.length > 1;
+
+    return {
+      ...fault,
+      // Group metadata (computed, not stored in DB)
+      isGrouped: isGrouped,
+      groupSize: assignees.length,
+      allAssignees: fault.AssignTo || "",
+      groupMembers: assignees.map((assignee, index) => ({
+        id: fault.id, // Same ID for all members since it's one record
+        assignee: assignee,
+      })),
+    };
+  });
+}
 
 // Notes routes - nested under faults
 const notesRouter = require("./notes");

@@ -59,6 +59,9 @@ export default function NewFaultModal({
     isHighPriority: false,
   });
 
+  const [isGroupAssignment, setIsGroupAssignment] = useState(false);
+  const [selectedTechnicians, setSelectedTechnicians] = useState([]);
+
   const [photos, setPhotos] = useState([]); // New photos to upload
   const [existingPhotos, setExistingPhotos] = useState([]); // Existing photos from backend
   const [photosModalOpen, setPhotosModalOpen] = useState(false); // For PhotoModal
@@ -249,6 +252,25 @@ export default function NewFaultModal({
     e.preventDefault();
     e.stopPropagation();
 
+    // Validate group assignment early
+    if (isGroupAssignment && selectedTechnicians.length < 2) {
+      setError("Please select at least 2 technicians for group assignment.");
+      setValidated(true);
+      return;
+    }
+
+    // For group assignment, ensure AssignTo is set for form validation
+    if (
+      isGroupAssignment &&
+      selectedTechnicians.length > 0 &&
+      !formData.AssignTo
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        AssignTo: selectedTechnicians[0],
+      }));
+    }
+
     const form = e.currentTarget;
     if (form.checkValidity() === false) {
       setValidated(true);
@@ -264,11 +286,26 @@ export default function NewFaultModal({
     setError("");
 
     try {
-      // Send fault data
-      const payload = buildPayload(formData, initialData);
+      // For group assignment, set AssignTo to comma-separated list of all selected technicians
+      let payload;
+      if (isGroupAssignment && selectedTechnicians.length > 0) {
+        payload = buildPayload(
+          {
+            ...formData,
+            AssignTo: selectedTechnicians.join(", "), // Join all technicians with comma-space
+          },
+          initialData
+        );
+      } else {
+        payload = buildPayload(formData, initialData);
+      }
+
       console.log("Sending payload to handleAdd:", payload);
       console.log("Is this an edit?", !!initialData);
       console.log("FormData isHighPriority:", formData.isHighPriority);
+      console.log("Is group assignment?", isGroupAssignment);
+      console.log("Selected technicians:", selectedTechnicians);
+
       const savedFault = await handleAdd(payload);
       console.log("Response from handleAdd:", savedFault);
 
@@ -608,37 +645,145 @@ export default function NewFaultModal({
                   <Form.Label className="fw-semibold">
                     Assigned To <span className="text-danger">*</span>
                   </Form.Label>
-                  <Form.Select
-                    name="AssignTo"
-                    value={formData.AssignTo}
-                    onChange={handleChange}
-                    required
-                    disabled={
-                      assignablePersons.length === 0 ||
-                      isSubmitting ||
-                      [
-                        "John Doe",
-                        "Jane Smith",
-                        "Alex Johnson",
-                        "Emily Davis",
-                      ].includes(
-                        JSON.parse(localStorage.getItem("user"))?.username
-                      )
-                    }
-                    aria-required="true"
-                  >
-                    {assignablePersons.length === 0 ? (
-                      <option value="" disabled>
-                        No persons available
-                      </option>
-                    ) : (
-                      assignablePersons.map((person) => (
-                        <option key={person} value={person}>
-                          {person}
-                        </option>
-                      ))
+
+                  {/* Group Assignment Toggle */}
+                  <div className="mb-2">
+                    <Form.Check
+                      type="checkbox"
+                      id="groupAssignmentToggle"
+                      label="Assign to multiple technicians (Group Assignment)"
+                      checked={isGroupAssignment}
+                      onChange={(e) => {
+                        console.log(
+                          "Group assignment toggle changed:",
+                          e.target.checked
+                        );
+                        setIsGroupAssignment(e.target.checked);
+                        if (!e.target.checked) {
+                          setSelectedTechnicians([]);
+                          setFormData((prev) => ({
+                            ...prev,
+                            AssignTo:
+                              assignablePersons.length > 0
+                                ? assignablePersons[0]
+                                : "",
+                          }));
+                        } else {
+                          setSelectedTechnicians(
+                            [formData.AssignTo].filter(Boolean)
+                          );
+                        }
+                      }}
+                      disabled={isSubmitting || assignablePersons.length < 2}
+                    />
+                    {assignablePersons.length < 2 && (
+                      <small className="text-muted d-block">
+                        Group assignment requires at least 2 available
+                        technicians. Currently available:{" "}
+                        {assignablePersons.length}
+                      </small>
                     )}
-                  </Form.Select>
+                  </div>
+
+                  {/* Single Assignment */}
+                  {!isGroupAssignment && (
+                    <Form.Select
+                      name="AssignTo"
+                      value={formData.AssignTo}
+                      onChange={handleChange}
+                      required={!isGroupAssignment}
+                      disabled={
+                        assignablePersons.length === 0 ||
+                        isSubmitting ||
+                        [
+                          "John Doe",
+                          "Jane Smith",
+                          "Alex Johnson",
+                          "Emily Davis",
+                        ].includes(
+                          JSON.parse(localStorage.getItem("user"))?.username
+                        )
+                      }
+                      aria-required="true"
+                    >
+                      {assignablePersons.length === 0 ? (
+                        <option value="" disabled>
+                          No persons available
+                        </option>
+                      ) : (
+                        assignablePersons.map((person) => (
+                          <option key={person} value={person}>
+                            {person}
+                          </option>
+                        ))
+                      )}
+                    </Form.Select>
+                  )}
+
+                  {/* Group Assignment */}
+                  {isGroupAssignment && (
+                    <div>
+                      <div
+                        className="border rounded p-2"
+                        style={{ maxHeight: "200px", overflowY: "auto" }}
+                      >
+                        {assignablePersons.length === 0 && (
+                          <p className="text-muted">
+                            No technicians available for selection.
+                          </p>
+                        )}
+                        {assignablePersons.map((person) => (
+                          <Form.Check
+                            key={person}
+                            type="checkbox"
+                            id={`tech-${person}`}
+                            label={person}
+                            checked={selectedTechnicians.includes(person)}
+                            onChange={(e) => {
+                              console.log(
+                                `Technician ${person} ${
+                                  e.target.checked ? "selected" : "deselected"
+                                }`
+                              );
+                              if (e.target.checked) {
+                                setSelectedTechnicians((prev) => {
+                                  const newSelection = [...prev, person];
+                                  console.log("New selection:", newSelection);
+                                  return newSelection;
+                                });
+                              } else {
+                                setSelectedTechnicians((prev) => {
+                                  const newSelection = prev.filter(
+                                    (tech) => tech !== person
+                                  );
+                                  console.log("New selection:", newSelection);
+                                  return newSelection;
+                                });
+                              }
+                            }}
+                            disabled={isSubmitting}
+                          />
+                        ))}
+                      </div>
+                      {selectedTechnicians.length > 0 && (
+                        <div className="mt-2">
+                          <small className="text-muted">
+                            Selected: {selectedTechnicians.join(", ")} (
+                            {selectedTechnicians.length} technicians)
+                          </small>
+                        </div>
+                      )}
+                      {selectedTechnicians.length < 2 && isGroupAssignment && (
+                        <div className="mt-1">
+                          <small className="text-danger">
+                            Please select at least 2 technicians for group
+                            assignment
+                          </small>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <Form.Control.Feedback type="invalid">
                     Please select an assignee.
                   </Form.Control.Feedback>
@@ -740,3 +885,4 @@ export default function NewFaultModal({
     </>
   );
 }
+//test comment
