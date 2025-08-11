@@ -151,6 +151,7 @@ function FaultsTable({
                       "Description",
                       "Status",
                       "Assigned To",
+                      "Group",
                       "Reported At",
                       !isResolved && "Actions",
                       "Photos",
@@ -185,7 +186,7 @@ function FaultsTable({
                   {faults.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isResolved ? 12 : 13}
+                        colSpan={isResolved ? 13 : 14}
                         className="text-center text-muted py-4"
                       >
                         No faults.
@@ -262,6 +263,11 @@ function FaultsTable({
                           </select>
                         </td>
                         <td>{f.AssignTo}</td>
+                        <td>
+                          {f.isGrouped && f.groupSize > 1
+                            ? `Group (${f.groupSize})`
+                            : "-"}
+                        </td>
                         <td
                           className="d-none d-md-table-cell"
                           style={{ whiteSpace: "nowrap" }}
@@ -277,8 +283,9 @@ function FaultsTable({
                               size="sm"
                               className="me-1 mb-1"
                               onClick={() => onOpenEditModal(f)}
+                              title="Edit Fault"
                             >
-                              Edit
+                              ✏️
                             </Button>
                           </td>
                         )}
@@ -308,12 +315,9 @@ function FaultsTable({
                             size="sm"
                             onClick={() => onOpenNotesModal(f)}
                             className="px-2 py-1"
-                            style={{
-                              whiteSpace: "nowrap",
-                              fontSize: "0.85rem",
-                            }}
+                            title="View/Add Notes"
                           >
-                            📝 Notes
+                            📝
                           </Button>
                         </td>
                       </tr>
@@ -580,12 +584,12 @@ export default function Dashboard({
       },
     },
     {
-      label: "📋 Fault Review Panel",
+      label: "🖥️ Fault Review Panel",
       onClick: () => setView("faults"),
       active: view === "faults",
     },
     {
-      label: "✅ Resolved Faults",
+      label: "🛠️ Resolved Faults",
       onClick: () => setView("resolved"),
       active: view === "resolved",
     },
@@ -645,7 +649,7 @@ export default function Dashboard({
             onClick={() => (window.location.href = "/")}
             title="Go to Dashboard"
           >
-            ⚡ N F M System Version 1.0.1
+            N F M System Version 1.0.1
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
@@ -779,7 +783,10 @@ export default function Dashboard({
           >
             {!view ? (
               <div className="p-4">
-                <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
+                <h2 className="mb-4 text-center">
+                  {" "}
+                  🌐𝖶𝖾𝗅𝖼𝗈𝗆𝖾 𝗍𝗈 𝖭𝖾𝗍𝗐𝗈𝗋𝗄 𝖥𝖺𝗎𝗅𝗍 𝖬𝖺𝗇𝖺𝗀𝖾𝗆𝖾𝗇𝗍 𝖲𝗒𝗌𝗍𝖾𝗆
+                </h2>
                 <TechnicianCards
                   technicians={assignablePersons}
                   faults={[...open, ...resolved]}
@@ -796,10 +803,10 @@ export default function Dashboard({
                     title={
                       <span className="tab-title-lg">
                         {tabKey === "faults"
-                          ? "🚧 Faults Review Panel"
+                          ? " Faults Review Panel"
                           : tabKey === "resolved"
-                          ? "✅ Resolved Faults"
-                          : "📊 Active Chart"}
+                          ? " Resolved Faults"
+                          : " Active Chart"}
                       </span>
                     }
                   >
