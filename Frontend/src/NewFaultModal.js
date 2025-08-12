@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Modal, Button, Form, Alert, Spinner, Image } from "react-bootstrap";
+import {
+  Modal,
+  Button,
+  Form,
+  Alert,
+  Spinner,
+  Image,
+  Card,
+  Row,
+  Col,
+} from "react-bootstrap";
 import { PhotoModal } from "./components/PhotoModal";
 
 // Options arrays
@@ -401,175 +411,302 @@ export default function NewFaultModal({
         size="lg"
         aria-labelledby="new-fault-modal"
       >
-        <Modal.Header closeButton={!isSubmitting} className="border-bottom-0">
-          <Modal.Title id="new-fault-modal" className="fw-bold fs-5">
-            {initialData ? "Edit Fault Report" : "New Fault Report"}
+        <Modal.Header
+          closeButton={!isSubmitting}
+          className="enhanced-modal-header"
+        >
+          <Modal.Title
+            id="new-fault-modal"
+            className="fw-bold fs-4 d-flex align-items-center"
+          >
+            <span className="me-2 fs-3">{initialData ? "✏️" : ""}</span>
+            {initialData ? "Edit Fault Report" : "Create New Fault Report"}
           </Modal.Title>
         </Modal.Header>
 
-        <Modal.Body>
+        <Modal.Body className="p-4" style={{ backgroundColor: "#f8f9fa" }}>
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-              className="mb-4"
+              className="mb-4 border-0 shadow-sm"
+              style={{
+                background: "linear-gradient(135deg, #ff6b6b, #ee5a24)",
+                color: "white",
+              }}
             >
-              {error}
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
             </Alert>
           )}
 
           <Form
+            id="fault-form"
             noValidate
             validated={validated}
             onSubmit={handleSubmit}
             autoComplete="off"
           >
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formSystemID">
-                  <Form.Label className="fw-semibold">
-                    System <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="SystemID"
-                    value={formData.SystemID}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    aria-required="true"
-                    aria-describedby="systemHelp"
-                  >
-                    {systemOptions.map((system) => (
-                      <option key={system} value={system}>
-                        {system}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a system.
-                  </Form.Control.Feedback>
-                  <Form.Text id="systemHelp" muted>
-                    Select the system related to the fault.
-                  </Form.Text>
-                </Form.Group>
-              </div>
+            {/* System Information Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-primary d-flex align-items-center">
+                  <span className="me-2">🔧</span>
+                  System Information
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formSystemID">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        System <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <Form.Select
+                        name="SystemID"
+                        value={formData.SystemID}
+                        onChange={handleChange}
+                        required
+                        disabled={isSubmitting}
+                        aria-required="true"
+                        aria-describedby="systemHelp"
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#e3f2fd",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      >
+                        {systemOptions.map((system) => (
+                          <option key={system} value={system}>
+                            {system}
+                          </option>
+                        ))}
+                      </Form.Select>
+                      <Form.Control.Feedback type="invalid">
+                        Please select a system.
+                      </Form.Control.Feedback>
+                      <Form.Text id="systemHelp" className="text-muted">
+                        <small>Select the system related to the fault.</small>
+                      </Form.Text>
+                    </Form.Group>
+                  </Col>
 
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formReportedBy">
-                  <Form.Label className="fw-semibold">
-                    Reported By <span className="text-danger">*</span>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formReportedBy">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Reported By <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="ReportedBy"
+                        value={formData.ReportedBy}
+                        onChange={handleChange}
+                        placeholder="Enter reporter name"
+                        required
+                        maxLength="100"
+                        disabled={isSubmitting}
+                        aria-required="true"
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#e3f2fd",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      />
+                      <Form.Control.Feedback type="invalid">
+                        Please provide the reporter's name.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Location Information Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #fff3e0, #ffe0b2)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-warning d-flex align-items-center">
+                  <span className="me-2">📍</span>
+                  Location Details
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formLocation">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Location <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <Form.Select
+                        name="Location"
+                        value={formData.Location}
+                        onChange={handleChange}
+                        required
+                        disabled={isSubmitting}
+                        aria-required="true"
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#fff3e0",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      >
+                        {locationOptions.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </Form.Select>
+                      <Form.Control.Feedback type="invalid">
+                        Please select the location.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formLocationOfFault">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Location of Fault
+                      </Form.Label>
+                      <Form.Select
+                        name="LocationOfFault"
+                        value={formData.LocationOfFault}
+                        onChange={handleChange}
+                        disabled={isSubmitting}
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#fff3e0",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      >
+                        <option value="">Select location of fault</option>
+                        {faultLocationOptions.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Additional Details Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e8f5e8, #c8e6c9)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-success d-flex align-items-center">
+                  <span className="me-2">⚙️</span>
+                  Additional Details
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formSubSystem">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Sub System
+                      </Form.Label>
+                      <Form.Select
+                        name="SubSystem"
+                        value={formData.SubSystem}
+                        onChange={handleChange}
+                        disabled={isSubmitting}
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#e8f5e8",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      >
+                        {subSystemOptions.map((subSystem) => (
+                          <option key={subSystem} value={subSystem}>
+                            {subSystem}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Fault Description Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #fce4ec, #f8bbd9)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-danger d-flex align-items-center">
+                  <span className="me-2">📝</span>
+                  Fault Description
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Form.Group className="mb-4" controlId="formDescFault">
+                  <Form.Label className="fw-semibold d-flex align-items-center">
+                    <span className="me-2"></span>
+                    Description <span className="text-danger ms-1">*</span>
                   </Form.Label>
                   <Form.Control
-                    type="text"
-                    name="ReportedBy"
-                    value={formData.ReportedBy}
+                    name="DescFault"
+                    as="textarea"
+                    rows={4}
+                    value={formData.DescFault}
                     onChange={handleChange}
-                    placeholder="Enter reporter name"
+                    placeholder="Describe the fault in detail..."
                     required
-                    maxLength="100"
+                    maxLength="500"
                     disabled={isSubmitting}
                     aria-required="true"
+                    aria-describedby="descHelp"
+                    className="border-2 shadow-sm"
+                    style={{
+                      borderColor: "#fce4ec",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      resize: "vertical",
+                    }}
                   />
                   <Form.Control.Feedback type="invalid">
-                    Please provide the reporter's name.
+                    Please provide a description of the fault.
                   </Form.Control.Feedback>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formLocation">
-                  <Form.Label className="fw-semibold">
-                    Location <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="Location"
-                    value={formData.Location}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    aria-required="true"
+                  <Form.Text
+                    id="descHelp"
+                    className="text-muted d-block text-end"
                   >
-                    {locationOptions.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select the location.
-                  </Form.Control.Feedback>
+                    <small>{formData.DescFault.length}/500 characters</small>
+                  </Form.Text>
                 </Form.Group>
-              </div>
-
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formLocationOfFault">
-                  <Form.Label className="fw-semibold">
-                    Location of Fault
-                  </Form.Label>
-                  <Form.Select
-                    name="LocationOfFault"
-                    value={formData.LocationOfFault}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                  >
-                    <option value="">Select location of fault</option>
-                    {faultLocationOptions.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formSubSystem">
-                  <Form.Label className="fw-semibold">Sub System</Form.Label>
-                  <Form.Select
-                    name="SubSystem"
-                    value={formData.SubSystem}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                  >
-                    {subSystemOptions.map((subSystem) => (
-                      <option key={subSystem} value={subSystem}>
-                        {subSystem}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-
-            <Form.Group className="mb-4" controlId="formDescFault">
-              <Form.Label className="fw-semibold">
-                Description <span className="text-danger">*</span>
-              </Form.Label>
-              <Form.Control
-                name="DescFault"
-                as="textarea"
-                rows={4}
-                value={formData.DescFault}
-                onChange={handleChange}
-                placeholder="Describe the fault in detail"
-                required
-                maxLength="500"
-                disabled={isSubmitting}
-                aria-required="true"
-                aria-describedby="descHelp"
-              />
-              <Form.Control.Feedback type="invalid">
-                Please provide a description of the fault.
-              </Form.Control.Feedback>
-              <Form.Text id="descHelp" muted className="d-block text-end">
-                {formData.DescFault.length}/500 characters
-              </Form.Text>
-            </Form.Group>
+              </Card.Body>
+            </Card>
 
             {/* Photos Section */}
             <Form.Group controlId="formAddPhotos" className="mb-4">
@@ -826,43 +963,44 @@ export default function NewFaultModal({
                 </div>
               )}
             </div>
-
-            <Modal.Footer className="px-0 pt-0 border-0">
-              <Button
-                variant="outline-secondary"
-                onClick={handleModalClose}
-                disabled={isSubmitting}
-                className="me-2"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={formData.isHighPriority ? "danger" : "primary"}
-                type="submit"
-                disabled={isSubmitting || assignablePersons.length === 0}
-                className="d-flex align-items-center justify-content-center"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Spinner
-                      as="span"
-                      animation="border"
-                      size="sm"
-                      className="me-2"
-                      role="status"
-                      aria-hidden="true"
-                    />
-                    {initialData ? "Updating..." : "Creating..."}
-                  </>
-                ) : initialData ? (
-                  "Update Fault"
-                ) : (
-                  "Create Fault"
-                )}
-              </Button>
-            </Modal.Footer>
           </Form>
         </Modal.Body>
+
+        <Modal.Footer className="px-0 pt-0 border-0">
+          <Button
+            variant="outline-secondary"
+            onClick={handleModalClose}
+            disabled={isSubmitting}
+            className="me-2"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant={formData.isHighPriority ? "danger" : "primary"}
+            type="submit"
+            form="fault-form"
+            disabled={isSubmitting || assignablePersons.length === 0}
+            className="d-flex align-items-center justify-content-center"
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  className="me-2"
+                  role="status"
+                  aria-hidden="true"
+                />
+                {initialData ? "Updating..." : "Creating..."}
+              </>
+            ) : initialData ? (
+              "Update Fault"
+            ) : (
+              "Create Fault"
+            )}
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <PhotoModal
@@ -876,10 +1014,175 @@ export default function NewFaultModal({
         .fw-semibold {
           font-weight: 600 !important;
         }
+        
+        /* Enhanced Modal Styles */
+        .modal-content {
+          border: none;
+          border-radius: 15px;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          overflow: hidden;
+        }
+        
+        .modal-header {
+          background: #001f3f;
+          border: none;
+          color: white;
+          padding: 1.5rem;
+        }
+        
+        .modal-header .btn-close {
+          filter: brightness(0) invert(1);
+          opacity: 0.8;
+        }
+        
+        .modal-header .btn-close:hover {
+          opacity: 1;
+        }
+        
         .modal-body {
-          max-height: 70vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          padding: 2rem;
+          max-height: 75vh;
           overflow-y: auto;
-          padding-right: 1.25rem;
+        }
+        
+        /* Enhanced Form Controls */
+        .form-control, .form-select {
+          border: 2px solid #e3f2fd;
+          border-radius: 10px;
+          padding: 12px 16px;
+          transition: all 0.3s ease;
+          background: rgba(255,255,255,0.9);
+          backdrop-filter: blur(10px);
+        }
+        
+        .form-control:focus, .form-select:focus {
+          border-color: #667eea;
+          box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+          background: white;
+        }
+        
+        .form-label {
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+        }
+        
+        /* Section Cards */
+        .section-card {
+          background: rgba(255,255,255,0.95);
+          border: none;
+          border-radius: 15px;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+          margin-bottom: 1.5rem;
+          overflow: hidden;
+          backdrop-filter: blur(10px);
+        }
+        
+        .section-header {
+          background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+          border: none;
+          padding: 1rem 1.5rem;
+        }
+        
+        .section-header h6 {
+          margin: 0;
+          font-weight: 700;
+          color: #2c3e50;
+        }
+        
+        /* Priority Section */
+        .priority-section {
+          background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+          border-radius: 10px;
+          padding: 1rem;
+          border: 2px solid #ff9800;
+        }
+        
+        /* Button Enhancements */
+        .btn-primary {
+          background: #001f3f;
+          border: none;
+          border-radius: 10px;
+          padding: 12px 24px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0, 31, 63, 0.3);
+          background: #003366;
+        }
+        
+        .btn-danger {
+          background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+          border: none;
+          border-radius: 10px;
+          padding: 12px 24px;
+          font-weight: 600;
+        }
+        
+        .btn-outline-secondary {
+          border: 2px solid #6c757d;
+          border-radius: 10px;
+          padding: 12px 24px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        
+        /* Photo Upload Section */
+        .photo-upload-section {
+          background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+          border-radius: 10px;
+          padding: 1rem;
+          border: 2px dashed #4caf50;
+        }
+        
+        /* Alert Enhancements */
+        .alert {
+          border: none;
+          border-radius: 10px;
+          backdrop-filter: blur(10px);
+        }
+        
+        /* Text Area Enhancements */
+        textarea.form-control {
+          resize: vertical;
+          min-height: 120px;
+        }
+        
+        /* Icon Enhancements */
+        .form-label span {
+          font-size: 1.2em;
+          margin-right: 8px;
+        }
+        
+        /* Animated Loading */
+        .loading-spinner {
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+          .modal-body {
+            padding: 1rem;
+          }
+          
+          .section-header {
+            padding: 0.75rem 1rem;
+          }
+          
+          .form-control, .form-select {
+            padding: 10px 12px;
+          }
         }
       `}</style>
     </>
