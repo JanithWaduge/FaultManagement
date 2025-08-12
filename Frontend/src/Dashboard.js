@@ -192,21 +192,39 @@ function FaultsTable({
                       </td>
                     </tr>
                   ) : (
-                    faults.map((f) => (
-                      <tr
-                        key={f.id}
-                        className={`table-row-hover ${
-                          f.Status === "In Progress"
-                            ? "status-in-progress-row"
-                            : f.Status === "Pending"
-                            ? "status-pending-row"
-                            : f.Status === "Closed"
-                            ? "status-closed-row"
-                            : ""
-                        }`}
+                    faults.map((f) => {
+                      // Check if fault is overdue (more than a week old)
+                      const isOverdue = () => {
+                        if (!f.DateTime || f.Status === "Closed") return false;
+                        const faultDate = new Date(f.DateTime);
+                        const currentDate = new Date();
+                        const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+                        return (currentDate - faultDate) > weekInMs;
+                      };
+
+                      const getRowClassName = () => {
+                        if (isOverdue()) {
+                          return "overdue-row";
+                        }
+                        if (f.Status === "In Progress") {
+                          return "status-in-progress-row";
+                        }
+                        if (f.Status === "Pending") {
+                          return "status-pending-row";
+                        }
+                        if (f.Status === "Closed") {
+                          return "status-closed-row";
+                        }
+                        return "";
+                      };
+
+                      return (
+                        <tr
+                          key={f.id}
+                          className={`table-row-hover ${getRowClassName()}`}
                       >
                         <td className="text-center">
-                          <PriorityFlag priority={f.Priority} />
+                          <PriorityFlag priority={f.Priority} fault={f} />
                         </td>
                         <td className="text-center">{f.id}</td>
                         <td className="text-center">{f.SystemID}</td>
@@ -315,7 +333,8 @@ function FaultsTable({
                           </Button>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </Table>
@@ -427,6 +446,17 @@ export default function Dashboard({
     setOpen,
     setResolved,
   } = useMultiFaults();
+
+  // Calculate overdue faults
+  const overdueFaults = useMemo(() => {
+    return open.filter(fault => {
+      if (!fault.DateTime || fault.Status === "Closed") return false;
+      const faultDate = new Date(fault.DateTime);
+      const currentDate = new Date();
+      const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+      return (currentDate - faultDate) > weekInMs;
+    });
+  }, [open]);
 
   const token = localStorage.getItem("token");
   const {
@@ -832,6 +862,16 @@ export default function Dashboard({
                               :
                             </strong>{" "}
                             {filtered.length}
+                            {tabKey === "faults" && overdueFaults.length > 0 && (
+                              <span style={{ color: "#dc3545", fontWeight: "bold", marginLeft: "10px" }}>
+                                | Overdue: {overdueFaults.filter(f => 
+                                  [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID]
+                                    .join(" ")
+                                    .toLowerCase()
+                                    .includes(search.toLowerCase())
+                                ).length}
+                              </span>
+                            )}
                           </div>
                           <FaultsTable
                             faults={current}
@@ -869,8 +909,13 @@ export default function Dashboard({
           </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Open: {open.length} | Resolved: {resolved.length} | Unread
-          Notifications: {notifications.filter((n) => !n.isRead).length}
+          Total Open: {open.length} | Resolved: {resolved.length} | 
+          {overdueFaults.length > 0 && (
+            <span style={{ color: "#dc3545", fontWeight: "bold" }}>
+              {" "}Overdue: {overdueFaults.length} |
+            </span>
+          )}
+          {" "}Unread Notifications: {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
           <Button
@@ -936,6 +981,25 @@ export default function Dashboard({
         .status-in-progress-row, .status-in-progress-row td { background-color: #fff3cd !important; }
         .status-pending-row, .status-pending-row td { background-color: #cff4fc !important; }
         .status-closed-row, .status-closed-row td { background-color: #d1e7dd !important; }
+        .overdue-row, .overdue-row td { 
+          background: linear-gradient(145deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.3)) !important; 
+          border-left: 4px solid #dc3545 !important;
+          color: #721c24 !important;
+          font-weight: 500 !important;
+        }
+        .overdue-row:hover, .overdue-row:hover td {
+          background: linear-gradient(145deg, rgba(220, 53, 69, 0.3), rgba(220, 53, 69, 0.4)) !important;
+          box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2) !important;
+        }
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .overdue-flag {
+          display: inline-block;
+          animation: pulse 2s infinite;
+        }
         .form-select.status-in-progress { border-color: #ffc107; background-color: #fff3cd; }
         .form-select.status-pending { border-color: #0dcaf0; background-color: #cff4fc; }
         .form-select.status-closed { border-color: #198754; background-color: #d1e7dd; }

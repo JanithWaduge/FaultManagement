@@ -2,48 +2,68 @@
 
 ## 📋 **Implementation Summary**
 
-- ✅ **Mandatory Note Feature**: Fully implemented and functional
-- ✅ **Overdue Fault Highlighting**: Implemented with visual row highlighting only
-- 🎨 **Simple & Clean**: No extra database columns needed - uses existing DateTime field
-- 🗄️ **Zero Database Changes**: Uses only existing fault table structure
+- ✅ **Photo Upload Date/Time Display**: Fully implemented and functional
+- ✅ **Overdue Fault Highlighting**: Fully implemented with comprehensive visual indicators
+- 🎨 **Enhanced User Experience**: Real-time overdue detection with animated warnings
+- 🗄️ **Zero Database Changes**: Uses existing DateTime field for calculations
 
 ---
 
-## 🚀 **New Feature: Overdue Fault Highlighting**
+## 🚀 **New Feature: Enhanced Overdue Fault System**
 
 ### ✅ **What's Implemented**
 
-1. **Visual Row Highlighting**: Overdue faults (7+ days since reported and still "In Progress") are highlighted with:
+1. **Visual Row Highlighting**: Overdue faults (7+ days old and not closed) are highlighted with:
+   - Red gradient background with transparency
+   - 4px solid red left border
+   - Dark red text for better visibility
+   - Enhanced hover effects with shadows
 
-   - Light red background (`#fee2e2`)
-   - Red left border (`#dc2626`)
-   - Subtle pulse animation for attention
-   - Enhanced hover effects
+2. **Animated Priority Indicators**: 
+   - Pulsing warning emoji (⚠️) for overdue faults
+   - Combined display with existing priority flags
+   - Responsive tooltips with descriptive messages
 
-2. **Smart Detection**: Uses existing `DateTime` field to calculate how long faults have been in the system
-3. **Clean UI**: No additional columns or database changes needed
-4. **Status-Based Logic**: Only highlights faults that are currently "In Progress" and older than 7 days
+3. **Real-time Counters**:
+   - Overdue count in main footer status bar
+   - Filtered overdue count in search results
+   - Live updating without page refresh
 
-### 🎨 **Visual Indicators**
+4. **Smart Detection Logic**: 
+   - Uses existing `DateTime` field for calculation
+   - Excludes closed faults from overdue status
+   - Overdue styling takes precedence over status-based colors
 
-- **🔴 Overdue Faults**: Red highlighting with pulse animation (In Progress + 7+ days old)
-- **🟡 In Progress**: Yellow background (In Progress + <7 days old)
-- **🔵 Pending**: Blue background
-- **🟢 Closed**: Green background (muted)
+### 🎨 **Visual Hierarchy**
+
+- **🔴 Overdue Faults**: Red gradient background + animated warning (Any status + 7+ days old + not closed)
+- **🟡 In Progress**: Yellow background (In Progress + not overdue)
+- **🔵 Pending**: Blue background (Pending + not overdue)
+- **🟢 Closed**: Green background (always excluded from overdue)
 
 ---
 
-## 📁 **Files Modified for Overdue Feature**
+## 📁 **Files Modified**
 
 ### Frontend Changes:
 
 1. **`Frontend/src/Dashboard.js`**:
+   - Enhanced overdue detection with comprehensive logic
+   - Updated table row rendering with priority-based styling
+   - Added overdue counter calculations and display
+   - Integrated real-time overdue metrics in footer and search results
 
-   - Added `isOverdueFault` import
-   - Enhanced table row rendering with overdue detection
-   - Maintained existing status-based styling
+2. **`Frontend/src/components/PriorityFlag.js`**:
+   - Enhanced to accept fault object as prop
+   - Added animated overdue warning indicators
+   - Combined overdue warnings with priority flags
+   - Implemented pulsing animation for attention
 
-2. **`Frontend/src/App.css`**:
+3. **Enhanced CSS Styling**:
+   - Comprehensive overdue row styling with gradients
+   - Pulse animation keyframes for warning indicators
+   - Enhanced hover effects for overdue rows
+   - Responsive design maintaining mobile compatibility
 
    - Added `.overdue-fault-row` styling
    - Created pulse animation for overdue alerts
