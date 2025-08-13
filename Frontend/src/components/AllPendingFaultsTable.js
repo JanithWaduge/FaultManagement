@@ -101,7 +101,7 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     )}
                   </span>
                 </th>
-                <th className="text-center" style={{ width: "10%" }}>
+                <th className="text-center" style={{ width: "8%" }}>
                   <span
                     className="sortable-header"
                     onClick={() => handleSort("id")}
@@ -116,7 +116,7 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     )}
                   </span>
                 </th>
-                <th style={{ width: "40%" }}>
+                <th style={{ width: "22%" }}>
                   <span
                     className="sortable-header"
                     onClick={() => handleSort("DescFault")}
@@ -131,7 +131,7 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     )}
                   </span>
                 </th>
-                <th style={{ width: "15%" }}>
+                <th style={{ width: "10%" }}>
                   <span
                     className="sortable-header"
                     onClick={() => handleSort("SystemID")}
@@ -146,7 +146,22 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     )}
                   </span>
                 </th>
-                <th style={{ width: "15%" }}>
+                <th style={{ width: "10%" }}>
+                  <span
+                    className="sortable-header"
+                    onClick={() => handleSort("LocationOfFault")}
+                  >
+                    Location of Fault
+                    {sortField === "LocationOfFault" && (
+                      <i
+                        className={`bi bi-arrow-${
+                          sortDirection === "asc" ? "up" : "down"
+                        } ms-1`}
+                      ></i>
+                    )}
+                  </span>
+                </th>
+                <th style={{ width: "10%" }}>
                   <span
                     className="sortable-header"
                     onClick={() => handleSort("Status")}
@@ -161,12 +176,42 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     )}
                   </span>
                 </th>
+                <th style={{ width: "15%" }}>
+                  <span
+                    className="sortable-header"
+                    onClick={() => handleSort("AssignTo")}
+                  >
+                    Assigned To
+                    {sortField === "AssignTo" && (
+                      <i
+                        className={`bi bi-arrow-${
+                          sortDirection === "asc" ? "up" : "down"
+                        } ms-1`}
+                      ></i>
+                    )}
+                  </span>
+                </th>
+                <th style={{ width: "15%" }}>
+                  <span
+                    className="sortable-header"
+                    onClick={() => handleSort("DateTime")}
+                  >
+                    Reported At
+                    {sortField === "DateTime" && (
+                      <i
+                        className={`bi bi-arrow-${
+                          sortDirection === "asc" ? "up" : "down"
+                        } ms-1`}
+                      ></i>
+                    )}
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {sortedFaults.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-4 text-muted">
+                  <td colSpan="8" className="text-center py-4 text-muted">
                     No pending faults found.
                   </td>
                 </tr>
@@ -213,6 +258,9 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                         </div>
                       )}
                     </td>
+                    <td className="small">
+                      {fault.LocationOfFault || fault.Location || "—"}
+                    </td>
                     <td>
                       <Badge bg={getStatusBadge(fault.Status)} pill>
                         {fault.Status}
@@ -223,6 +271,19 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                           Overdue
                         </Badge>
                       )}
+                    </td>
+                    <td className="small text-nowrap">
+                      {fault.AssignTo || "Unassigned"}
+                    </td>
+                    <td className="small text-nowrap">
+                      {fault.DateTime
+                        ? new Date(fault.DateTime).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
                     </td>
                   </tr>
                 ))

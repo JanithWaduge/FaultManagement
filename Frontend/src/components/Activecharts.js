@@ -114,6 +114,32 @@ const Activecharts = ({ faults, onStatusClick }) => {
         },
       },
     },
+    onClick: (event, elements) => {
+      if (elements.length > 0) {
+        const clickedElement = elements[0];
+        const label = chartData.labels[clickedElement.index];
+        console.log(`Clicked on ${label} segment`);
+
+        // Map chart label to status for onStatusClick
+        let status = "";
+        if (label === "In Progress") status = "In Progress";
+        else if (label === "Pending") status = "Pending";
+        else if (label === "Closed") status = "Closed";
+        else if (label === "Resolved") status = "Resolved";
+
+        if (status && onStatusClick) {
+          onStatusClick(null, status); // null for technician means all technicians
+        }
+      }
+    },
+    elements: {
+      arc: {
+        borderWidth: 2,
+        hoverBorderWidth: 3,
+        hoverBorderColor: "#000",
+        cursor: "pointer",
+      },
+    },
   };
 
   // Add state for selected technician and status
@@ -141,16 +167,16 @@ const Activecharts = ({ faults, onStatusClick }) => {
       selectedTechnician === technician ? null : technician
     );
 
-    if (selectedStatus) {
-      // If a status is already selected, navigate to details
-      const params = new URLSearchParams();
-      params.append("technician", technician);
-      params.append("status", selectedStatus);
-      navigate(`/details?${params.toString()}`);
+    // Call onStatusClick to show all faults for this technician
+    if (onStatusClick) {
+      onStatusClick(technician, null); // null status means show all statuses for this technician
+    }
+  };
 
-      if (onStatusClick) {
-        onStatusClick(technician, selectedStatus);
-      }
+  // Handle technician status cell click
+  const handleTechnicianStatusClick = (technician, status) => {
+    if (onStatusClick) {
+      onStatusClick(technician, status);
     }
   };
 
@@ -276,26 +302,66 @@ const Activecharts = ({ faults, onStatusClick }) => {
                             {technician}
                           </td>
                           <td className="text-center">
-                            <span className="badge bg-warning">
+                            <span
+                              className="badge bg-warning"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                handleTechnicianStatusClick(
+                                  technician,
+                                  "In Progress"
+                                )
+                              }
+                            >
                               {stats.inProgress}
                             </span>
                           </td>
                           <td className="text-center">
-                            <span className="badge bg-info">
+                            <span
+                              className="badge bg-info"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                handleTechnicianStatusClick(
+                                  technician,
+                                  "Pending"
+                                )
+                              }
+                            >
                               {stats.pending}
                             </span>
                           </td>
                           <td className="text-center">
-                            <span className="badge bg-success">
+                            <span
+                              className="badge bg-success"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                handleTechnicianStatusClick(
+                                  technician,
+                                  "Closed"
+                                )
+                              }
+                            >
                               {stats.closed}
                             </span>
                           </td>
                           <td className="text-center">
-                            <span className="badge bg-secondary">
+                            <span
+                              className="badge bg-secondary"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                handleTechnicianStatusClick(
+                                  technician,
+                                  "Resolved"
+                                )
+                              }
+                            >
                               {stats.resolved}
                             </span>
                           </td>
-                          <td className="text-center">
+                          <td
+                            className="text-center"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => handleTechnicianClick(technician)}
+                          >
                             <strong>
                               {stats.inProgress +
                                 stats.pending +
@@ -317,7 +383,13 @@ const Activecharts = ({ faults, onStatusClick }) => {
       {/* All Pending Faults Grid */}
       <Row className="g-4 mt-4">
         <Col xs={12}>
-          <PendingFaultsGrid pendingFaults={pendingFaults} />
+          <PendingFaultsGrid
+            pendingFaults={pendingFaults}
+            onTechnicianClick={(technician) =>
+              onStatusClick(technician, "Pending")
+            }
+            onFaultClick={(fault) => console.log("Fault clicked:", fault.id)}
+          />
         </Col>
       </Row>
 
@@ -331,11 +403,25 @@ const Activecharts = ({ faults, onStatusClick }) => {
         .badge {
           font-size: 0.9rem;
           padding: 0.5em 0.8em;
+          transition: all 0.2s ease;
+        }
+        
+        .badge:hover {
+          transform: scale(1.05);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .table-responsive {
           scrollbar-width: thin;
           scrollbar-color: rgba(0, 31, 63, 0.2) transparent;
+        }
+        
+        .table tr:hover {
+          background-color: rgba(0, 123, 255, 0.05);
+        }
+        
+        .table td[style*="cursor: pointer"]:hover {
+          background-color: rgba(0, 123, 255, 0.1);
         }
 
         .table-responsive::-webkit-scrollbar {

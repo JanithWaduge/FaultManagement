@@ -1,10 +1,16 @@
 import React, { useState, useMemo } from "react";
 import { Card, Table, Form, Row, Col } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 
-const PendingFaultsGrid = ({ pendingFaults }) => {
+const PendingFaultsGrid = ({
+  pendingFaults,
+  onTechnicianClick,
+  onFaultClick,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("DateTime");
   const [sortDirection, setSortDirection] = useState("desc");
+  const navigate = useNavigate();
 
   // Filter and sort pending faults
   const filteredAndSortedFaults = useMemo(() => {
@@ -43,6 +49,23 @@ const PendingFaultsGrid = ({ pendingFaults }) => {
     } else {
       setSortField(field);
       setSortDirection("asc");
+    }
+  };
+
+  // Handle row click to navigate to fault details
+  const handleRowClick = (fault) => {
+    if (onFaultClick) {
+      onFaultClick(fault);
+    } else {
+      navigate(`/faults/${fault.id}`);
+    }
+  };
+
+  // Handle technician click to filter by technician
+  const handleTechnicianClick = (technician, event) => {
+    event.stopPropagation(); // Prevent row click
+    if (onTechnicianClick) {
+      onTechnicianClick(technician);
     }
   };
 
@@ -339,7 +362,9 @@ const PendingFaultsGrid = ({ pendingFaults }) => {
                     key={fault.id}
                     className={`table-row ${
                       index % 2 === 0 ? "row-even" : "row-odd"
-                    }`}
+                    } hover-effect`}
+                    onClick={() => handleRowClick(fault)}
+                    style={{ cursor: "pointer" }}
                   >
                     <td style={{ padding: "16px 12px" }} className="fw-bold">
                       <span className="id-badge">#{fault.id}</span>
@@ -381,7 +406,19 @@ const PendingFaultsGrid = ({ pendingFaults }) => {
                       <span className="reporter-text">{fault.ReportedBy}</span>
                     </td>
                     <td style={{ padding: "16px 12px" }}>
-                      <span className="assignee-text">{fault.AssignTo}</span>
+                      <span
+                        className="assignee-text"
+                        onClick={(e) =>
+                          handleTechnicianClick(fault.AssignTo, e)
+                        }
+                        style={{
+                          cursor: "pointer",
+                          textDecoration: "underline",
+                          color: "#0d6efd",
+                        }}
+                      >
+                        {fault.AssignTo || "Unassigned"}
+                      </span>
                     </td>
                     <td
                       style={{ padding: "16px 12px" }}
@@ -407,6 +444,16 @@ const PendingFaultsGrid = ({ pendingFaults }) => {
         .sortable-header {
           transition: all 0.2s ease;
           user-select: none;
+        }
+        
+        .hover-effect:hover {
+          background-color: rgba(13, 110, 253, 0.1) !important;
+          box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .table-row {
+          transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
         }
         
         .sortable-header:hover {
