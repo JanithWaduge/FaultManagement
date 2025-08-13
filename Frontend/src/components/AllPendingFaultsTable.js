@@ -277,11 +277,10 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                     </td>
                     <td className="small text-nowrap">
                       {fault.DateTime
-                        ? new Date(fault.DateTime).toLocaleString("en-US", {
+                        ? new Date(fault.DateTime).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
+                            year: "numeric",
                           })
                         : "—"}
                     </td>

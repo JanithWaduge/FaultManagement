@@ -48,6 +48,7 @@ function FaultsTable({
   const [uploadModalOpen, setUploadModalOpen] = useState(null);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [faultsWithPhotos, setFaultsWithPhotos] = useState(new Set());
   const token = localStorage.getItem("token");
 
   const handlePhotosClick = async (faultId) => {
@@ -92,8 +93,54 @@ function FaultsTable({
 
   const handleUploadSuccess = (faultId) => {
     setUploadModalOpen(null);
+    setFaultsWithPhotos(prev => new Set([...prev, faultId]));
     handlePhotosClick(faultId);
   };
+
+  // Function to check if a fault has photos
+  const checkFaultPhotos = async (faultId) => {
+    try {
+      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const url = `${baseUrl}/api/photos/fault/${faultId}`;
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (res.ok) {
+        const photos = await res.json();
+        return photos && photos.length > 0;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking photos for fault", faultId, error);
+      return false;
+    }
+  };
+
+  // Use effect to check photos for all faults when faults change
+  React.useEffect(() => {
+    const checkAllFaultPhotos = async () => {
+      const faultsWithPhotosSet = new Set();
+      
+      for (const fault of faults) {
+        const hasPhotos = await checkFaultPhotos(fault.id);
+        if (hasPhotos) {
+          faultsWithPhotosSet.add(fault.id);
+        }
+      }
+      
+      setFaultsWithPhotos(faultsWithPhotosSet);
+    };
+
+    if (faults && faults.length > 0) {
+      checkAllFaultPhotos();
+    }
+  }, [faults, token]);
 
   return (
     <>
@@ -153,7 +200,7 @@ function FaultsTable({
                       "Description",
                       "Status",
                       "Assigned To",
-                      "Reported At",
+                      "Date",
                       !isResolved && "Actions",
                       "Photos",
                       "Notes",
@@ -214,6 +261,9 @@ function FaultsTable({
                         if (f.Status === "Pending") {
                           return "status-pending-row";
                         }
+                        if (f.Status === "Hold") {
+                          return "status-hold-row";
+                        }
                         if (f.Status === "Closed") {
                           return "status-closed-row";
                         }
@@ -269,6 +319,8 @@ function FaultsTable({
                                     ? "#fff3cd"
                                     : f.Status === "Pending"
                                     ? "#cff4fc"
+                                    : f.Status === "Hold"
+                                    ? "#fce4ec"
                                     : f.Status === "Closed"
                                     ? "#d1e7dd"
                                     : "",
@@ -291,7 +343,7 @@ function FaultsTable({
                             style={{ whiteSpace: "nowrap" }}
                           >
                             {f.DateTime
-                              ? new Date(f.DateTime).toLocaleString()
+                              ? new Date(f.DateTime).toLocaleDateString()
                               : ""}
                           </td>
                           {!isResolved && (
@@ -308,16 +360,18 @@ function FaultsTable({
                             </td>
                           )}
                           <td className="text-center">
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              onClick={() => handlePhotosClick(f.id)}
-                              title="View Photos"
-                              disabled={loadingPhotos}
-                              className="me-1"
-                            >
-                              📷
-                            </Button>
+                            {faultsWithPhotos.has(f.id) && (
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => handlePhotosClick(f.id)}
+                                title="View Photos"
+                                disabled={loadingPhotos}
+                                className="me-1"
+                              >
+                                📷
+                              </Button>
+                            )}
                             <Button
                               variant="outline-success"
                               size="sm"
@@ -1157,6 +1211,7 @@ export default function Dashboard({
       <style>{`
         .status-in-progress-row, .status-in-progress-row td { background-color: #fff3cd !important; }
         .status-pending-row, .status-pending-row td { background-color: #cff4fc !important; }
+        .status-hold-row, .status-hold-row td { background-color: #fce4ec !important; }
         .status-closed-row, .status-closed-row td { background-color: #d1e7dd !important; }
         .overdue-row, .overdue-row td { 
           background: linear-gradient(145deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.3)) !important; 
@@ -1179,9 +1234,11 @@ export default function Dashboard({
         }
         .form-select.status-in-progress { border-color: #ffc107; background-color: #fff3cd; }
         .form-select.status-pending { border-color: #0dcaf0; background-color: #cff4fc; }
+        .form-select.status-hold { border-color: #e91e63; background-color: #fce4ec; }
         .form-select.status-closed { border-color: #198754; background-color: #d1e7dd; }
         .form-select.status-in-progress:focus { border-color: #ffc107; box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25); }
         .form-select.status-pending:focus { border-color: #0dcaf0; box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25); }
+        .form-select.status-hold:focus { border-color: #e91e63; box-shadow: 0 0 0 0.25rem rgba(233, 30, 99, 0.25); }
         .form-select.status-closed:focus { border-color: #198754; box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25); }
         .glass-button { background: rgba(255, 255, 255, 0.1); border: 1.5px solid rgba(255, 255, 255, 0.4); border-radius: 12px; backdrop-filter: blur(10px); color: white; font-weight: 600; padding: 0.4rem 0.9rem; transition: all 0.3s ease-in-out; cursor: pointer; }
         .glass-button:hover { background: rgba(255, 255, 255, 0.35); color: #001f3f; transform: scale(1.07); box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
@@ -1203,6 +1260,7 @@ export default function Dashboard({
         .glass-table tbody td { padding: 1rem 0.5rem; }
         .status-in-progress-row { background: linear-gradient(145deg, rgba(255, 243, 205, 0.7), rgba(255, 243, 205, 0.9)) !important; backdrop-filter: blur(5px); }
         .status-pending-row { background: linear-gradient(145deg, rgba(207, 244, 252, 0.7), rgba(207, 244, 252, 0.9)) !important; backdrop-filter: blur(5px); }
+        .status-hold-row { background: linear-gradient(145deg, rgba(252, 228, 236, 0.7), rgba(252, 228, 236, 0.9)) !important; backdrop-filter: blur(5px); }
         .status-closed-row { background: linear-gradient(145deg, rgba(209, 231, 221, 0.7), rgba(209, 231, 221, 0.9)) !important; backdrop-filter: blur(5px); }
         .table-row-hover:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); cursor: pointer; }
         .form-control, .form-select { font-size: 1rem; border-radius: 8px; }

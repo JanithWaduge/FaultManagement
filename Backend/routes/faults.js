@@ -284,7 +284,7 @@ router.put(
       }),
     body("Status")
       .optional()
-      .isIn(["Open", "In Progress", "Pending", "Closed"])
+      .isIn(["Open", "In Progress", "Pending", "Hold", "Closed"])
       .withMessage("Invalid status value"),
   ],
   async (req, res) => {
@@ -335,8 +335,7 @@ router.put(
       UPDATE dbo.tblFaults
       SET ${Object.keys(updates)
         .map((field) => `${field} = @${field}`)
-        .join(", ")},
-          DateTime = GETDATE()
+        .join(", ")}
       WHERE id = @id;
       SELECT * FROM dbo.tblFaults WHERE id = @id;
     `;
