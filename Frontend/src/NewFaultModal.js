@@ -79,7 +79,16 @@ export default function NewFaultModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [validated, setValidated] = useState(false);
+  const [success, setSuccess] = useState("");
   const token = localStorage.getItem("token");
+
+  // States for "Add" modals
+  const [showAddSystemModal, setShowAddSystemModal] = useState(false);
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false);
+  const [showAddSubSystemModal, setShowAddSubSystemModal] = useState(false);
+  const [newSystemName, setNewSystemName] = useState("");
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newSubSystemName, setNewSubSystemName] = useState("");
 
   // Fetch existing photos for the fault
   const fetchPhotos = useCallback(
@@ -189,6 +198,66 @@ export default function NewFaultModal({
     setError("");
     setIsSubmitting(false);
   }, [initialData, assignablePersons, show, fetchPhotos]);
+
+  // Handler for adding a new system
+  const handleAddSystem = () => {
+    if (newSystemName.trim() === "") {
+      setError("System name cannot be empty");
+      return;
+    }
+
+    // Add the new system to the options list if it doesn't already exist
+    if (!systemOptions.includes(newSystemName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      systemOptions.push(newSystemName.trim());
+      setFormData({ ...formData, SystemID: newSystemName.trim() });
+      setNewSystemName("");
+      setShowAddSystemModal(false);
+      setSuccess("New system added successfully!");
+    } else {
+      setError("This system already exists!");
+    }
+  };
+
+  // Handler for adding a new location
+  const handleAddLocation = () => {
+    if (newLocationName.trim() === "") {
+      setError("Location name cannot be empty");
+      return;
+    }
+
+    // Add the new location to the options list if it doesn't already exist
+    if (!locationOptions.includes(newLocationName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      locationOptions.push(newLocationName.trim());
+      setFormData({ ...formData, Location: newLocationName.trim() });
+      setNewLocationName("");
+      setShowAddLocationModal(false);
+      setSuccess("New location added successfully!");
+    } else {
+      setError("This location already exists!");
+    }
+  };
+
+  // Handler for adding a new subsystem
+  const handleAddSubSystem = () => {
+    if (newSubSystemName.trim() === "") {
+      setError("Subsystem name cannot be empty");
+      return;
+    }
+
+    // Add the new subsystem to the options list if it doesn't already exist
+    if (!subSystemOptions.includes(newSubSystemName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      subSystemOptions.push(newSubSystemName.trim());
+      setFormData({ ...formData, SubSystem: newSubSystemName.trim() });
+      setNewSubSystemName("");
+      setShowAddSubSystemModal(false);
+      setSuccess("New subsystem added successfully!");
+    } else {
+      setError("This subsystem already exists!");
+    }
+  };
 
   // Handle text/select input changes
   const handleChange = (e) => {
@@ -459,7 +528,7 @@ export default function NewFaultModal({
                 }}
               >
                 <h6 className="mb-0 fw-bold text-primary d-flex align-items-center">
-                  <span className="me-2">🔧</span>
+                  <span className="me-2"></span>
                   System Information
                 </h6>
               </Card.Header>
@@ -471,27 +540,37 @@ export default function NewFaultModal({
                         <span className="me-2"></span>
                         System <span className="text-danger ms-1">*</span>
                       </Form.Label>
-                      <Form.Select
-                        name="SystemID"
-                        value={formData.SystemID}
-                        onChange={handleChange}
-                        required
-                        disabled={isSubmitting}
-                        aria-required="true"
-                        aria-describedby="systemHelp"
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#e3f2fd",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
-                      >
-                        {systemOptions.map((system) => (
-                          <option key={system} value={system}>
-                            {system}
-                          </option>
-                        ))}
-                      </Form.Select>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="SystemID"
+                          value={formData.SystemID}
+                          onChange={handleChange}
+                          required
+                          disabled={isSubmitting}
+                          aria-required="true"
+                          aria-describedby="systemHelp"
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#e3f2fd",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {systemOptions.map((system) => (
+                            <option key={system} value={system}>
+                              {system}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-primary"
+                          className="add-button"
+                          onClick={() => setShowAddSystemModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
                       <Form.Control.Feedback type="invalid">
                         Please select a system.
                       </Form.Control.Feedback>
@@ -538,11 +617,11 @@ export default function NewFaultModal({
               <Card.Header
                 className="bg-light border-bottom-0 py-3"
                 style={{
-                  background: "linear-gradient(135deg, #fff3e0, #ffe0b2)",
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-warning d-flex align-items-center">
-                  <span className="me-2">📍</span>
+                  <span className="me-2"></span>
                   Location Details
                 </h6>
               </Card.Header>
@@ -554,26 +633,36 @@ export default function NewFaultModal({
                         <span className="me-2"></span>
                         Location <span className="text-danger ms-1">*</span>
                       </Form.Label>
-                      <Form.Select
-                        name="Location"
-                        value={formData.Location}
-                        onChange={handleChange}
-                        required
-                        disabled={isSubmitting}
-                        aria-required="true"
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#fff3e0",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
-                      >
-                        {locationOptions.map((loc) => (
-                          <option key={loc} value={loc}>
-                            {loc}
-                          </option>
-                        ))}
-                      </Form.Select>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="Location"
+                          value={formData.Location}
+                          onChange={handleChange}
+                          required
+                          disabled={isSubmitting}
+                          aria-required="true"
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#fff3e0",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {locationOptions.map((loc) => (
+                            <option key={loc} value={loc}>
+                              {loc}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-warning"
+                          className="add-button"
+                          onClick={() => setShowAddLocationModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
                       <Form.Control.Feedback type="invalid">
                         Please select the location.
                       </Form.Control.Feedback>
@@ -616,11 +705,11 @@ export default function NewFaultModal({
               <Card.Header
                 className="bg-light border-bottom-0 py-3"
                 style={{
-                  background: "linear-gradient(135deg, #e8f5e8, #c8e6c9)",
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-success d-flex align-items-center">
-                  <span className="me-2">⚙️</span>
+                  <span className="me-2"></span>
                   Additional Details
                 </h6>
               </Card.Header>
@@ -632,24 +721,34 @@ export default function NewFaultModal({
                         <span className="me-2"></span>
                         Sub System
                       </Form.Label>
-                      <Form.Select
-                        name="SubSystem"
-                        value={formData.SubSystem}
-                        onChange={handleChange}
-                        disabled={isSubmitting}
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#e8f5e8",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
-                      >
-                        {subSystemOptions.map((subSystem) => (
-                          <option key={subSystem} value={subSystem}>
-                            {subSystem}
-                          </option>
-                        ))}
-                      </Form.Select>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="SubSystem"
+                          value={formData.SubSystem}
+                          onChange={handleChange}
+                          disabled={isSubmitting}
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#e8f5e8",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {subSystemOptions.map((subSystem) => (
+                            <option key={subSystem} value={subSystem}>
+                              {subSystem}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-success"
+                          className="add-button"
+                          onClick={() => setShowAddSubSystemModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
                     </Form.Group>
                   </Col>
                 </Row>
@@ -661,11 +760,11 @@ export default function NewFaultModal({
               <Card.Header
                 className="bg-light border-bottom-0 py-3"
                 style={{
-                  background: "linear-gradient(135deg, #fce4ec, #f8bbd9)",
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-danger d-flex align-items-center">
-                  <span className="me-2">📝</span>
+                  <span className="me-2"></span>
                   Fault Description
                 </h6>
               </Card.Header>
@@ -752,32 +851,31 @@ export default function NewFaultModal({
             )}
 
             <div className="row mb-4">
-              {initialData && (
-                <div className="col-md-6 mb-3 mb-md-0">
-                  <Form.Group controlId="formStatus">
-                    <Form.Label className="fw-semibold">
-                      Status <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Select
-                      name="Status"
-                      value={formData.Status}
-                      onChange={handleChange}
-                      required
-                      disabled={isSubmitting}
-                      aria-required="true"
-                    >
-                      <option value="In Progress">In Progress</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Closed">Closed</option>
-                    </Form.Select>
-                    <Form.Control.Feedback type="invalid">
-                      Please select a status.
-                    </Form.Control.Feedback>
-                  </Form.Group>
-                </div>
-              )}
+              <div className="col-md-6 mb-3 mb-md-0">
+                <Form.Group controlId="formStatus">
+                  <Form.Label className="fw-semibold">
+                    Status <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="Status"
+                    value={formData.Status}
+                    onChange={handleChange}
+                    required
+                    disabled={isSubmitting}
+                    aria-required="true"
+                  >
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Hold">Hold</option>
+                    <option value="Closed">Closed</option>
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    Please select a status.
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </div>
 
-              <div className={`col-md-${initialData ? "6" : "12"}`}>
+              <div className="col-md-6">
                 <Form.Group controlId="formAssignTo">
                   <Form.Label className="fw-semibold">
                     Assigned To <span className="text-danger">*</span>
@@ -999,6 +1097,228 @@ export default function NewFaultModal({
             ) : (
               "Create Fault"
             )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new system */}
+      <Modal
+        show={showAddSystemModal}
+        onHide={() => setShowAddSystemModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New System</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddSystemModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddSystemModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddSystem">
+            <Form.Label className="fw-semibold">System Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newSystemName}
+              onChange={(e) => setNewSystemName(e.target.value)}
+              placeholder="Enter new system name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#e3f2fd",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The system name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddSystemModal(false);
+              setNewSystemName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleAddSystem}>
+            Add System
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new location */}
+      <Modal
+        show={showAddLocationModal}
+        onHide={() => setShowAddLocationModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New Location</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddLocationModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddLocationModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddLocation">
+            <Form.Label className="fw-semibold">Location Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newLocationName}
+              onChange={(e) => setNewLocationName(e.target.value)}
+              placeholder="Enter new location name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#fff3e0",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The location name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddLocationModal(false);
+              setNewLocationName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="warning" onClick={handleAddLocation}>
+            Add Location
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new subsystem */}
+      <Modal
+        show={showAddSubSystemModal}
+        onHide={() => setShowAddSubSystemModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New Subsystem</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddSubSystemModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddSubSystemModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddSubSystem">
+            <Form.Label className="fw-semibold">Subsystem Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newSubSystemName}
+              onChange={(e) => setNewSubSystemName(e.target.value)}
+              placeholder="Enter new subsystem name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#e8f5e8",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The subsystem name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddSubSystemModal(false);
+              setNewSubSystemName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="success" onClick={handleAddSubSystem}>
+            Add Subsystem
           </Button>
         </Modal.Footer>
       </Modal>

@@ -22,6 +22,8 @@ import { useFaultNotes } from "./useFaultNotes";
 import PhotoUploadForm from "./PhotoUploadForm";
 import { PhotoModal } from "./components/PhotoModal";
 import { useMultiFaults } from "./useMultiFaults";
+import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
+import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
 
 const assignablePersons = [
   "John Doe",
@@ -274,11 +276,13 @@ function FaultsTable({
                                 fontWeight: "500",
                               }}
                             >
-                              {["In Progress", "Pending", "Closed"].map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
+                              {["In Progress", "Pending", "Hold", "Closed"].map(
+                                (s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                )
+                              )}
                             </select>
                           </td>
                           <td>{f.AssignTo}</td>
@@ -813,12 +817,21 @@ export default function Dashboard({
                   {" "}
                   🌐𝖶𝖾𝗅𝖼𝗈𝗆𝖾 𝗍𝗈 𝖭𝖾𝗍𝗐𝗈𝗋𝗄 𝖥𝖺𝗎𝗅𝗍 𝖬𝖺𝗇𝖺𝗀𝖾𝗆𝖾𝗇𝗍 𝖲𝗒𝗌𝗍𝖾𝗆
                 </h2>
-                <TechnicianCards
-                  technicians={assignablePersons}
-                  faults={[...open, ...resolved]}
-                  onTechnicianClick={handleTechnicianClick}
-                  onStatusClick={handleStatusClick}
-                />
+                <Row>
+                  <Col md={9}>
+                    <AllPendingFaultsTable
+                      faults={open}
+                      onViewDetails={(fault) => openEditModal(fault)}
+                    />
+                  </Col>
+                  <Col md={3}>
+                    <SimplifiedTechnicianCards
+                      technicians={assignablePersons}
+                      faults={[...open, ...resolved]}
+                      onTechnicianClick={handleTechnicianClick}
+                    />
+                  </Col>
+                </Row>
               </div>
             ) : (
               <Tabs activeKey={view} className="custom-tabs" justify>
@@ -844,15 +857,32 @@ export default function Dashboard({
                         />
                       ) : (
                         <>
-                          <Row className="mb-3 px-3">
-                            <Col md={4} className="mb-2">
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder={`Search ${tabKey}...`}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                              />
+                          <Row className="mb-3 px-3 justify-content-center">
+                            <Col md={6} className="mb-2">
+                              <div className="search-container position-relative">
+                                <i
+                                  className="bi bi-search position-absolute"
+                                  style={{
+                                    left: "15px",
+                                    top: "10px",
+                                    color: "#6c757d",
+                                  }}
+                                ></i>
+                                <input
+                                  type="text"
+                                  className="form-control search-input pl-4"
+                                  placeholder={`Search ${tabKey}...`}
+                                  value={search}
+                                  onChange={(e) => setSearch(e.target.value)}
+                                  style={{
+                                    paddingLeft: "40px",
+                                    borderRadius: "20px",
+                                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                                    border: "1px solid #dee2e6",
+                                    height: "45px",
+                                  }}
+                                />
+                              </div>
                             </Col>
                           </Row>
                           <div className="mb-2 px-3">
