@@ -49,6 +49,14 @@ const subSystemOptions = [
   "Maintenance",
 ];
 
+const statusOptions = [
+  "Pending",
+  "In Progress",
+  "On Hold",
+  "Closed",
+  "Resolved",
+];
+
 export default function NewFaultModal({
   show,
   handleClose,
@@ -58,7 +66,6 @@ export default function NewFaultModal({
 }) {
   const [formData, setFormData] = useState({
     SystemID: systemOptions[0],
-    SectionID: "",
     ReportedBy: "",
     Location: locationOptions[0],
     LocationOfFault: "",
@@ -86,9 +93,12 @@ export default function NewFaultModal({
   const [showAddSystemModal, setShowAddSystemModal] = useState(false);
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
   const [showAddSubSystemModal, setShowAddSubSystemModal] = useState(false);
+  const [showAddFaultLocationModal, setShowAddFaultLocationModal] =
+    useState(false);
   const [newSystemName, setNewSystemName] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
   const [newSubSystemName, setNewSubSystemName] = useState("");
+  const [newFaultLocationName, setNewFaultLocationName] = useState("");
 
   // Fetch existing photos for the fault
   const fetchPhotos = useCallback(
@@ -144,7 +154,6 @@ export default function NewFaultModal({
 
     const emptyForm = {
       SystemID: systemOptions[0],
-      SectionID: "",
       ReportedBy: "",
       Location: locationOptions[0],
       LocationOfFault: "",
@@ -162,7 +171,6 @@ export default function NewFaultModal({
         SystemID: systemOptions.includes(initialData.SystemID)
           ? initialData.SystemID
           : systemOptions[0],
-        SectionID: initialData.SectionID || "",
         ReportedBy: initialData.ReportedBy || "",
         Location: locationOptions.includes(initialData.Location)
           ? initialData.Location
@@ -259,6 +267,29 @@ export default function NewFaultModal({
     }
   };
 
+  // Handler for adding a new fault location
+  const handleAddFaultLocation = () => {
+    if (newFaultLocationName.trim() === "") {
+      setError("Fault location name cannot be empty");
+      return;
+    }
+
+    // Add the new fault location to the options list if it doesn't already exist
+    if (!faultLocationOptions.includes(newFaultLocationName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      faultLocationOptions.push(newFaultLocationName.trim());
+      setFormData({
+        ...formData,
+        LocationOfFault: newFaultLocationName.trim(),
+      });
+      setNewFaultLocationName("");
+      setShowAddFaultLocationModal(false);
+      setSuccess("New fault location added successfully!");
+    } else {
+      setError("This fault location already exists!");
+    }
+  };
+
   // Handle text/select input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -290,9 +321,7 @@ export default function NewFaultModal({
       SubSystem: formData.SubSystem,
       isHighPriority: formData.isHighPriority,
     };
-    if (formData.SectionID && formData.SectionID.trim() !== "") {
-      payload.SectionID = formData.SectionID;
-    }
+
     if (formData.LocationOfFault && formData.LocationOfFault.trim() !== "") {
       payload.LocationOfFault = formData.LocationOfFault;
     }
@@ -479,36 +508,24 @@ export default function NewFaultModal({
         backdrop={isSubmitting ? "static" : true}
         size="lg"
         aria-labelledby="new-fault-modal"
-        className="professional-modal"
+        className="fixed-modal"
       >
-        <Modal.Header closeButton className="professional-modal-header">
-          <Modal.Title id="new-fault-modal" className="professional-modal-title d-flex align-items-center">
-            <div className="modal-icon me-3">
-              <span>🔧</span>
-            </div>
-            <div>
-              <h4 className="mb-0 fw-bold">
-                {initialData ? "Edit Fault" : "New Fault Report"}
-              </h4>
-              <small className="opacity-75">
-                {initialData 
-                  ? "Update fault information and assignment" 
-                  : "Report a new system fault or issue"}
-              </small>
-            </div>
+        <Modal.Header closeButton className="bg-primary text-white border-0">
+          <Modal.Title className="fw-bold">
+            {initialData ? "Edit Fault" : "Add New Fault"}
           </Modal.Title>
         </Modal.Header>
 
-        <Modal.Body className="px-4 py-4">
+        <Modal.Body className="px-3 py-3">
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
+              className="mb-3 border-0 shadow-sm"
             >
               <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
+                <span className="me-2">⚠️</span>
                 {error}
               </div>
             </Alert>
@@ -523,27 +540,25 @@ export default function NewFaultModal({
             className="professional-form"
           >
             {/* System Information Section */}
-            <Card className="mb-4 border-0 shadow-sm">
+            <Card className="mb-3 border-0 shadow-sm">
               <Card.Header
-                className="bg-light border-bottom-0 py-3"
+                className="bg-light border-bottom-0 py-2"
                 style={{
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-primary d-flex align-items-center">
-                  <span className="me-2">🖥️</span>
                   System Information
                 </h6>
               </Card.Header>
-              <Card.Body className="p-4">
+              <Card.Body className="p-3">
                 <Row>
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formSystemID">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">⚙️</span>
+                      <Form.Label className="fw-semibold">
                         System <span className="text-danger ms-1">*</span>
                       </Form.Label>
-                      <div className="d-flex">
+                      <div className="d-flex gap-2">
                         <Form.Select
                           name="SystemID"
                           value={formData.SystemID}
@@ -551,12 +566,8 @@ export default function NewFaultModal({
                           required
                           disabled={isSubmitting}
                           aria-required="true"
-                          className="border-2 shadow-sm me-2"
-                          style={{
-                            borderColor: "#e3f2fd",
-                            borderRadius: "8px",
-                            padding: "12px",
-                          }}
+                          className="form-control-modern"
+                          style={{ flex: 1 }}
                         >
                           {systemOptions.map((system) => (
                             <option key={system} value={system}>
@@ -566,11 +577,11 @@ export default function NewFaultModal({
                         </Form.Select>
                         <Button
                           variant="outline-primary"
-                          className="add-button"
+                          className="btn-modern-outline"
                           onClick={() => setShowAddSystemModal(true)}
                           disabled={isSubmitting}
                         >
-                          <i className="bi bi-plus-lg"></i> Add
+                          +
                         </Button>
                       </div>
                       <Form.Control.Feedback type="invalid">
@@ -580,33 +591,8 @@ export default function NewFaultModal({
                   </Col>
 
                   <Col md={6} className="mb-3">
-                    <Form.Group controlId="formSectionID">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">📋</span>
-                        Section ID
-                      </Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="SectionID"
-                        value={formData.SectionID}
-                        onChange={handleChange}
-                        placeholder="Enter section identifier"
-                        maxLength="50"
-                        disabled={isSubmitting}
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#e3f2fd",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  <Col md={6} className="mb-3">
                     <Form.Group controlId="formReportedBy">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">👤</span>
+                      <Form.Label className="fw-semibold">
                         Reported By <span className="text-danger ms-1">*</span>
                       </Form.Label>
                       <Form.Control
@@ -619,12 +605,7 @@ export default function NewFaultModal({
                         maxLength="100"
                         disabled={isSubmitting}
                         aria-required="true"
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#e3f2fd",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
+                        className="form-control-modern"
                       />
                       <Form.Control.Feedback type="invalid">
                         Please provide the reporter's name.
@@ -636,27 +617,25 @@ export default function NewFaultModal({
             </Card>
 
             {/* Location Information Section */}
-            <Card className="mb-4 border-0 shadow-sm">
+            <Card className="mb-3 border-0 shadow-sm">
               <Card.Header
-                className="bg-light border-bottom-0 py-3"
+                className="bg-light border-bottom-0 py-2"
                 style={{
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-warning d-flex align-items-center">
-                  <span className="me-2">📍</span>
                   Location Details
                 </h6>
               </Card.Header>
-              <Card.Body className="p-4">
+              <Card.Body className="p-3">
                 <Row>
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formLocation">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">🏢</span>
+                      <Form.Label className="fw-semibold">
                         Location <span className="text-danger ms-1">*</span>
                       </Form.Label>
-                      <div className="d-flex">
+                      <div className="d-flex gap-2">
                         <Form.Select
                           name="Location"
                           value={formData.Location}
@@ -664,12 +643,8 @@ export default function NewFaultModal({
                           required
                           disabled={isSubmitting}
                           aria-required="true"
-                          className="border-2 shadow-sm me-2"
-                          style={{
-                            borderColor: "#fff3e0",
-                            borderRadius: "8px",
-                            padding: "12px",
-                          }}
+                          className="form-control-modern"
+                          style={{ flex: 1 }}
                         >
                           {locationOptions.map((loc) => (
                             <option key={loc} value={loc}>
@@ -679,11 +654,11 @@ export default function NewFaultModal({
                         </Form.Select>
                         <Button
                           variant="outline-warning"
-                          className="add-button"
+                          className="btn-modern-outline"
                           onClick={() => setShowAddLocationModal(true)}
                           disabled={isSubmitting}
                         >
-                          <i className="bi bi-plus-lg"></i> Add
+                          +
                         </Button>
                       </div>
                       <Form.Control.Feedback type="invalid">
@@ -694,29 +669,34 @@ export default function NewFaultModal({
 
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formLocationOfFault">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">🎯</span>
+                      <Form.Label className="fw-semibold">
                         Location of Fault
                       </Form.Label>
-                      <Form.Select
-                        name="LocationOfFault"
-                        value={formData.LocationOfFault}
-                        onChange={handleChange}
-                        disabled={isSubmitting}
-                        className="border-2 shadow-sm"
-                        style={{
-                          borderColor: "#fff3e0",
-                          borderRadius: "8px",
-                          padding: "12px",
-                        }}
-                      >
-                        <option value="">Select location of fault</option>
-                        {faultLocationOptions.map((loc) => (
-                          <option key={loc} value={loc}>
-                            {loc}
-                          </option>
-                        ))}
-                      </Form.Select>
+                      <div className="d-flex gap-2">
+                        <Form.Select
+                          name="LocationOfFault"
+                          value={formData.LocationOfFault}
+                          onChange={handleChange}
+                          disabled={isSubmitting}
+                          className="form-control-modern"
+                          style={{ flex: 1 }}
+                        >
+                          <option value="">Select location of fault</option>
+                          {faultLocationOptions.map((loc) => (
+                            <option key={loc} value={loc}>
+                              {loc}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-info"
+                          className="btn-modern-outline"
+                          onClick={() => setShowAddFaultLocationModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          +
+                        </Button>
+                      </div>
                     </Form.Group>
                   </Col>
                 </Row>
@@ -724,38 +704,32 @@ export default function NewFaultModal({
             </Card>
 
             {/* Additional Details Section */}
-            <Card className="mb-4 border-0 shadow-sm">
+            <Card className="mb-3 border-0 shadow-sm">
               <Card.Header
-                className="bg-light border-bottom-0 py-3"
+                className="bg-light border-bottom-0 py-2"
                 style={{
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-success d-flex align-items-center">
-                  <span className="me-2">⚙️</span>
                   Additional Details
                 </h6>
               </Card.Header>
-              <Card.Body className="p-4">
+              <Card.Body className="p-3">
                 <Row>
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formSubSystem">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2">🔧</span>
+                      <Form.Label className="fw-semibold">
                         Sub System
                       </Form.Label>
-                      <div className="d-flex">
+                      <div className="d-flex gap-2">
                         <Form.Select
                           name="SubSystem"
                           value={formData.SubSystem}
                           onChange={handleChange}
                           disabled={isSubmitting}
-                          className="border-2 shadow-sm me-2"
-                          style={{
-                            borderColor: "#e8f5e8",
-                            borderRadius: "8px",
-                            padding: "12px",
-                          }}
+                          className="form-control-modern"
+                          style={{ flex: 1 }}
                         >
                           {subSystemOptions.map((subSystem) => (
                             <option key={subSystem} value={subSystem}>
@@ -765,11 +739,11 @@ export default function NewFaultModal({
                         </Form.Select>
                         <Button
                           variant="outline-success"
-                          className="add-button"
+                          className="btn-modern-outline"
                           onClick={() => setShowAddSubSystemModal(true)}
                           disabled={isSubmitting}
                         >
-                          <i className="bi bi-plus-lg"></i> Add
+                          +
                         </Button>
                       </div>
                     </Form.Group>
@@ -779,23 +753,22 @@ export default function NewFaultModal({
             </Card>
 
             {/* Fault Description Section */}
-            <Card className="mb-4 border-0 shadow-sm">
+            <Card className="mb-3 border-0 shadow-sm">
               <Card.Header
-                className="bg-light border-bottom-0 py-3"
+                className="bg-light border-bottom-0 py-2"
                 style={{
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
                 <h6 className="mb-0 fw-bold text-danger d-flex align-items-center">
-                  <span className="me-2">📝</span>
                   Fault Description
                 </h6>
               </Card.Header>
-              <Card.Body className="p-4">
-                <Form.Group className="mb-4" controlId="formDescFault">
-                  <Form.Label className="fw-semibold d-flex align-items-center">
-                    <span className="me-2">📄</span>
-                    Description <span className="text-danger ms-1">*</span>
+              <Card.Body className="p-3">
+                <Form.Group className="mb-3" controlId="formDescFault">
+                  <Form.Label className="fw-semibold">
+                    Fault Description{" "}
+                    <span className="text-danger ms-1">*</span>
                   </Form.Label>
                   <Form.Control
                     name="DescFault"
@@ -803,18 +776,16 @@ export default function NewFaultModal({
                     rows={4}
                     value={formData.DescFault}
                     onChange={handleChange}
-                    placeholder="Describe the fault in detail..."
+                    // placeholder="Provide a detailed description of the fault, including symptoms, error messages, and any relevant information..."
                     required
                     maxLength="500"
                     disabled={isSubmitting}
                     aria-required="true"
                     aria-describedby="descHelp"
-                    className="border-2 shadow-sm"
+                    className="form-control-modern"
                     style={{
-                      borderColor: "#fce4ec",
-                      borderRadius: "8px",
-                      padding: "12px",
                       resize: "vertical",
+                      minHeight: "120px",
                     }}
                   />
                   <Form.Control.Feedback type="invalid">
@@ -822,28 +793,31 @@ export default function NewFaultModal({
                   </Form.Control.Feedback>
                   <Form.Text
                     id="descHelp"
-                    className="text-muted d-block text-end"
+                    className="text-muted d-flex justify-content-between align-items-center mt-2"
                   >
-                    <small>{formData.DescFault.length}/500 characters</small>
+                    <small>
+                      Be as specific as possible to help technicians understand
+                      the issue
+                    </small>
+                    <small className="fw-medium">
+                      {formData.DescFault.length}/500 characters
+                    </small>
                   </Form.Text>
                 </Form.Group>
               </Card.Body>
             </Card>
 
             {/* Photos Section */}
-            <Card className="mb-4 border-0 shadow-sm">
+            <Card className="mb-3 border-0 shadow-sm">
               <Card.Header
-                className="bg-light border-bottom-0 py-3"
+                className="bg-light border-bottom-0 py-2"
                 style={{
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
-                <h6 className="mb-0 fw-bold text-info d-flex align-items-center">
-                  <span className="me-2">📷</span>
-                  Photo Attachments
-                </h6>
+                <h6 className="mb-0 fw-bold text-info">Photo Attachments</h6>
               </Card.Header>
-              <Card.Body className="p-4">
+              <Card.Body className="p-3">
                 <Form.Group controlId="formAddPhotos" className="mb-3">
                   <div className="d-flex align-items-center mb-3">
                     <Button
@@ -852,9 +826,9 @@ export default function NewFaultModal({
                       onClick={() => setPhotosModalOpen(true)}
                       disabled={loadingPhotos || !initialData?.id}
                       title="View Existing Photos"
-                      className="me-3"
+                      className="btn-modern-outline me-3"
                     >
-                      📷 View Existing Photos
+                      View Existing Photos
                     </Button>
                     <Form.Control
                       type="file"
@@ -864,10 +838,12 @@ export default function NewFaultModal({
                       disabled={isSubmitting}
                       style={{ flex: 1 }}
                       aria-describedby="photosHelp"
+                      className="form-control-modern"
                     />
                   </div>
                   <Form.Text id="photosHelp" className="text-muted">
-                    You can upload multiple photos (JPG, PNG, GIF) to showcase the fault. Maximum 10MB per file.
+                    You can upload multiple photos (JPG, PNG, GIF) to showcase
+                    the fault. Maximum 10MB per file.
                   </Form.Text>
 
                   {/* Photo previews */}
@@ -887,6 +863,49 @@ export default function NewFaultModal({
               </Card.Body>
             </Card>
 
+            {/* Status Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-primary">
+                  Status Information
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formStatus">
+                      <Form.Label className="fw-semibold">
+                        Status <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <Form.Select
+                        name="Status"
+                        value={formData.Status}
+                        onChange={handleChange}
+                        required
+                        disabled={isSubmitting}
+                        aria-required="true"
+                        className="form-control-modern"
+                      >
+                        {statusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </Form.Select>
+                      <Form.Control.Feedback type="invalid">
+                        Please select the status.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
             {/* Assignment Section */}
             <Card className="mb-4 border-0 shadow-sm">
               <Card.Header
@@ -895,8 +914,7 @@ export default function NewFaultModal({
                   background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
                 }}
               >
-                <h6 className="mb-0 fw-bold text-secondary d-flex align-items-center">
-                  <span className="me-2">👥</span>
+                <h6 className="mb-0 fw-bold text-secondary">
                   Assignment & Priority
                 </h6>
               </Card.Header>
@@ -936,7 +954,9 @@ export default function NewFaultModal({
                               );
                             }
                           }}
-                          disabled={isSubmitting || assignablePersons.length < 2}
+                          disabled={
+                            isSubmitting || assignablePersons.length < 2
+                          }
                         />
                         {assignablePersons.length < 2 && (
                           <small className="text-muted d-block">
@@ -1004,13 +1024,18 @@ export default function NewFaultModal({
                                 onChange={(e) => {
                                   console.log(
                                     `Technician ${person} ${
-                                      e.target.checked ? "selected" : "deselected"
+                                      e.target.checked
+                                        ? "selected"
+                                        : "deselected"
                                     }`
                                   );
                                   if (e.target.checked) {
                                     setSelectedTechnicians((prev) => {
                                       const newSelection = [...prev, person];
-                                      console.log("New selection:", newSelection);
+                                      console.log(
+                                        "New selection:",
+                                        newSelection
+                                      );
                                       return newSelection;
                                     });
                                   } else {
@@ -1018,7 +1043,10 @@ export default function NewFaultModal({
                                       const newSelection = prev.filter(
                                         (tech) => tech !== person
                                       );
-                                      console.log("New selection:", newSelection);
+                                      console.log(
+                                        "New selection:",
+                                        newSelection
+                                      );
                                       return newSelection;
                                     });
                                   }
@@ -1035,14 +1063,15 @@ export default function NewFaultModal({
                               </small>
                             </div>
                           )}
-                          {selectedTechnicians.length < 2 && isGroupAssignment && (
-                            <div className="mt-1">
-                              <small className="text-danger">
-                                Please select at least 2 technicians for group
-                                assignment
-                              </small>
-                            </div>
-                          )}
+                          {selectedTechnicians.length < 2 &&
+                            isGroupAssignment && (
+                              <div className="mt-1">
+                                <small className="text-danger">
+                                  Please select at least 2 technicians for group
+                                  assignment
+                                </small>
+                              </div>
+                            )}
                         </div>
                       )}
 
@@ -1063,7 +1092,10 @@ export default function NewFaultModal({
                   id="high-priority-checkbox"
                   checked={formData.isHighPriority}
                   onChange={(e) =>
-                    setFormData({ ...formData, isHighPriority: e.target.checked })
+                    setFormData({
+                      ...formData,
+                      isHighPriority: e.target.checked,
+                    })
                   }
                   disabled={isSubmitting}
                   label={
@@ -1079,14 +1111,15 @@ export default function NewFaultModal({
                   }
                 />
                 <Form.Text className="text-muted d-block mt-1">
-                  Check this box for critical issues requiring immediate attention
+                  Check this box for critical issues requiring immediate
+                  attention
                 </Form.Text>
 
                 {formData.isHighPriority && (
                   <div className="alert alert-warning mt-2 mb-0 py-2">
                     <small>
-                      <strong>⚠️ High Priority Selected:</strong> This fault will
-                      be flagged with a red flag for immediate attention.
+                      <strong>⚠️ High Priority Selected:</strong> This fault
+                      will be flagged with a red flag for immediate attention.
                     </small>
                   </div>
                 )}
@@ -1095,21 +1128,31 @@ export default function NewFaultModal({
           </Form>
         </Modal.Body>
 
-        <Modal.Footer className="px-4 pt-0 border-0">
+        <Modal.Footer className="px-4 pt-0 border-0 d-flex justify-content-end gap-3">
           <Button
-            variant="outline-secondary"
+            variant="secondary"
             onClick={handleModalClose}
             disabled={isSubmitting}
-            className="me-2"
+            className="btn-modern-secondary"
           >
             Cancel
           </Button>
           <Button
-            variant={formData.isHighPriority ? "danger" : "primary"}
+            variant="primary"
             type="submit"
             form="fault-form"
             disabled={isSubmitting || assignablePersons.length === 0}
-            className="d-flex align-items-center justify-content-center"
+            className={`btn-modern-primary d-flex align-items-center justify-content-center ${
+              formData.isHighPriority ? "btn-priority" : ""
+            }`}
+            style={
+              formData.isHighPriority
+                ? {
+                    background:
+                      "linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)",
+                  }
+                : {}
+            }
           >
             {isSubmitting ? (
               <>
@@ -1184,23 +1227,25 @@ export default function NewFaultModal({
                 padding: "12px",
               }}
             />
-            <Form.Text className="text-muted">
-              The system name should be unique and descriptive.
-            </Form.Text>
           </Form.Group>
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="d-flex justify-content-end gap-3">
           <Button
-            variant="outline-secondary"
+            variant="secondary"
             onClick={() => {
               setShowAddSystemModal(false);
               setNewSystemName("");
               setError("");
             }}
+            className="btn-modern-secondary"
           >
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleAddSystem}>
+          <Button
+            variant="primary"
+            onClick={handleAddSystem}
+            className="btn-modern-primary"
+          >
             Add System
           </Button>
         </Modal.Footer>
@@ -1258,23 +1303,25 @@ export default function NewFaultModal({
                 padding: "12px",
               }}
             />
-            <Form.Text className="text-muted">
-              The location name should be unique and descriptive.
-            </Form.Text>
           </Form.Group>
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="d-flex justify-content-end gap-3">
           <Button
-            variant="outline-secondary"
+            variant="secondary"
             onClick={() => {
               setShowAddLocationModal(false);
               setNewLocationName("");
               setError("");
             }}
+            className="btn-modern-secondary"
           >
             Cancel
           </Button>
-          <Button variant="warning" onClick={handleAddLocation}>
+          <Button
+            variant="warning"
+            onClick={handleAddLocation}
+            className="btn-modern-success"
+          >
             Add Location
           </Button>
         </Modal.Footer>
@@ -1332,24 +1379,107 @@ export default function NewFaultModal({
                 padding: "12px",
               }}
             />
-            <Form.Text className="text-muted">
-              The subsystem name should be unique and descriptive.
-            </Form.Text>
           </Form.Group>
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="d-flex justify-content-end gap-3">
           <Button
-            variant="outline-secondary"
+            variant="secondary"
             onClick={() => {
               setShowAddSubSystemModal(false);
               setNewSubSystemName("");
               setError("");
             }}
+            className="btn-modern-secondary"
           >
             Cancel
           </Button>
-          <Button variant="success" onClick={handleAddSubSystem}>
+          <Button
+            variant="success"
+            onClick={handleAddSubSystem}
+            className="btn-modern-success"
+          >
             Add Subsystem
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new fault location */}
+      <Modal
+        show={showAddFaultLocationModal}
+        onHide={() => setShowAddFaultLocationModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">
+            Add New Fault Location
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddFaultLocationModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddFaultLocationModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddFaultLocation">
+            <Form.Label className="fw-semibold">Fault Location Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newFaultLocationName}
+              onChange={(e) => setNewFaultLocationName(e.target.value)}
+              placeholder="Enter new fault location name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#e8f5e8",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The fault location name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-end gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowAddFaultLocationModal(false);
+              setNewFaultLocationName("");
+              setError("");
+            }}
+            className="btn-modern-secondary"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="info"
+            onClick={handleAddFaultLocation}
+            className="btn-modern-success"
+          >
+            Add Fault Location
           </Button>
         </Modal.Footer>
       </Modal>
@@ -1428,4 +1558,80 @@ export default function NewFaultModal({
       `}</style>
     </>
   );
+}
+
+// Add modern styling
+const styles = `
+  .form-control-modern {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+  }
+  
+  .form-control-modern:focus {
+    border-color: #4c84ff;
+    box-shadow: 0 0 0 0.2rem rgba(76, 132, 255, 0.15);
+    background-color: #ffffff;
+  }
+  
+  .btn-modern-outline {
+    border: 2px solid;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .btn-modern-outline:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .btn-modern-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 14px 28px;
+    font-weight: 600;
+    color: white;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-modern-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  }
+  
+  .btn-modern-secondary {
+    background: #6c757d;
+    border: 2px solid #6c757d;
+    border-radius: 12px;
+    padding: 14px 28px;
+    font-weight: 600;
+    color: white;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-modern-secondary:hover {
+    background: #5a6268;
+    border-color: #5a6268;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+  }
+`;
+
+// Inject styles
+if (typeof document !== "undefined") {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
 }
