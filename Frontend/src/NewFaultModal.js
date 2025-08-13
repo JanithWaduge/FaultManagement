@@ -400,22 +400,48 @@ export default function NewFaultModal({
         backdrop={isSubmitting ? "static" : true}
         size="lg"
         aria-labelledby="new-fault-modal"
+        className="professional-modal"
       >
-        <Modal.Header closeButton={!isSubmitting} className="border-bottom-0">
-          <Modal.Title id="new-fault-modal" className="fw-bold fs-5">
-            {initialData ? "Edit Fault Report" : "New Fault Report"}
+        <Modal.Header closeButton={!isSubmitting} className="professional-modal-header">
+          <Modal.Title id="new-fault-modal" className="professional-modal-title">
+            <div className="d-flex align-items-center">
+              <div className="modal-icon me-3">
+                {initialData ? (
+                  <span className="edit-icon">✏️</span>
+                ) : (
+                  <span className="new-icon">🆕</span>
+                )}
+              </div>
+              <div>
+                <h4 className="mb-1 title-text">
+                  {initialData ? "Edit Fault Report" : "Create New Fault Report"}
+                </h4>
+                <small className="subtitle-text">
+                  {initialData 
+                    ? `Modifying Fault ID: #${initialData.id}` 
+                    : "Complete the form below to submit a new fault report"
+                  }
+                </small>
+              </div>
+            </div>
           </Modal.Title>
         </Modal.Header>
 
-        <Modal.Body>
+        <Modal.Body className="professional-modal-body">
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-              className="mb-4"
+              className="professional-alert mb-4"
             >
-              {error}
+              <div className="d-flex align-items-center">
+                <span className="alert-icon me-2">⚠️</span>
+                <div>
+                  <strong>Validation Error:</strong>
+                  <div className="mt-1">{error}</div>
+                </div>
+              </div>
             </Alert>
           )}
 
@@ -424,8 +450,19 @@ export default function NewFaultModal({
             validated={validated}
             onSubmit={handleSubmit}
             autoComplete="off"
+            className="professional-form"
           >
-            <div className="row">
+            {/* System Information Section */}
+            <div className="form-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">🖥️</span>
+                  System Information
+                </h5>
+                <p className="section-subtitle">Basic system and location details</p>
+              </div>
+
+              <div className="row g-3">
               <div className="col-md-6 mb-3">
                 <Form.Group controlId="formSystemID">
                   <Form.Label className="fw-semibold">
@@ -545,76 +582,113 @@ export default function NewFaultModal({
                 </Form.Group>
               </div>
             </div>
+            </div>
 
-            <Form.Group className="mb-4" controlId="formDescFault">
-              <Form.Label className="fw-semibold">
-                Description <span className="text-danger">*</span>
-              </Form.Label>
-              <Form.Control
-                name="DescFault"
-                as="textarea"
-                rows={4}
-                value={formData.DescFault}
-                onChange={handleChange}
-                placeholder="Describe the fault in detail"
-                required
-                maxLength="500"
-                disabled={isSubmitting}
-                aria-required="true"
-                aria-describedby="descHelp"
-              />
-              <Form.Control.Feedback type="invalid">
-                Please provide a description of the fault.
-              </Form.Control.Feedback>
-              <Form.Text id="descHelp" muted className="d-block text-end">
-                {formData.DescFault.length}/500 characters
-              </Form.Text>
-            </Form.Group>
+            {/* Fault Details Section */}
+            <div className="form-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">📝</span>
+                  Fault Description
+                </h5>
+                <p className="section-subtitle">Provide detailed information about the issue</p>
+              </div>
+
+              <Form.Group className="professional-form-group" controlId="formDescFault">
+                <Form.Label className="professional-label">
+                  <span className="label-icon">📄</span>
+                  Detailed Description <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Control
+                  name="DescFault"
+                  as="textarea"
+                  rows={5}
+                  value={formData.DescFault}
+                  onChange={handleChange}
+                  placeholder="Please describe the fault in detail including when it occurred, what happened, and any error messages..."
+                  required
+                  maxLength="500"
+                  disabled={isSubmitting}
+                  aria-required="true"
+                  aria-describedby="descHelp"
+                  className="professional-textarea"
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a detailed description of the fault.
+                </Form.Control.Feedback>
+                <div className="character-counter">
+                  {formData.DescFault.length}/500 characters
+                </div>
+                <Form.Text id="descHelp" className="professional-help-text">
+                  Include as much detail as possible to help technicians understand and resolve the issue quickly
+                </Form.Text>
+              </Form.Group>
+            </div>
 
             {/* Photos Section */}
-            <Form.Group controlId="formAddPhotos" className="mb-4">
-              <Form.Label className="fw-semibold">Photos</Form.Label>
-              <div className="d-flex align-items-center mb-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => setPhotosModalOpen(true)}
-                  disabled={loadingPhotos || !initialData?.id}
-                  title="View Existing Photos"
-                  className="me-2"
-                >
-                  📷 View Photos
-                </Button>
-                <Form.Control
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  disabled={isSubmitting}
-                  style={{ flex: 1 }}
-                  aria-describedby="photosHelp"
-                />
+            <div className="form-section photo-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">📷</span>
+                  Photo Attachments
+                </h5>
+                <p className="section-subtitle">Upload photos to help illustrate the problem</p>
               </div>
-              <Form.Text id="photosHelp" muted>
-                You can upload one or more photos showcasing the fault.
-              </Form.Text>
-            </Form.Group>
 
-            {/* Photo previews */}
-            {photos.length > 0 && (
-              <div
-                className="mb-4"
-                style={{
-                  maxHeight: "150px",
-                  overflowX: "auto",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {renderPhotoPreviews()}
+              <Form.Group controlId="formAddPhotos" className="professional-form-group">
+                <div className="d-flex align-items-center mb-3">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setPhotosModalOpen(true)}
+                    disabled={loadingPhotos || !initialData?.id}
+                    title="View Existing Photos"
+                    className="professional-btn professional-btn-secondary me-3"
+                  >
+                    📷 View Existing Photos
+                  </Button>
+                  <Form.Control
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    disabled={isSubmitting}
+                    style={{ flex: 1 }}
+                    aria-describedby="photosHelp"
+                    className="professional-input"
+                  />
+                </div>
+                <Form.Text id="photosHelp" className="professional-help-text">
+                  You can upload multiple photos (JPG, PNG, GIF) to showcase the fault. Maximum 10MB per file.
+                </Form.Text>
+
+                {/* Photo previews */}
+                {photos.length > 0 && (
+                  <div
+                    className="mt-3 p-3 bg-light rounded"
+                    style={{
+                      maxHeight: "150px",
+                      overflowX: "auto",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {renderPhotoPreviews()}
+                  </div>
+                )}
+              </Form.Group>
+            </div>
+
+            {/* Assignment Section */}
+            <div className="form-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">👥</span>
+                  Assignment & Priority
+                </h5>
+                <p className="section-subtitle">Assign technicians and set priority level</p>
               </div>
-            )}
 
-            <div className="row mb-4">
+              <div className="row g-3">
               {initialData && (
                 <div className="col-md-6 mb-3 mb-md-0">
                   <Form.Group controlId="formStatus">
@@ -826,21 +900,28 @@ export default function NewFaultModal({
                 </div>
               )}
             </div>
+          </div>
 
-            <Modal.Footer className="px-0 pt-0 border-0">
+          <Modal.Footer className="professional-modal-footer px-0 pt-0 border-0">
+            <div className="d-flex justify-content-between w-100">
               <Button
                 variant="outline-secondary"
                 onClick={handleModalClose}
                 disabled={isSubmitting}
-                className="me-2"
+                className="professional-btn professional-btn-secondary"
               >
+                <span className="me-2">✖️</span>
                 Cancel
               </Button>
               <Button
                 variant={formData.isHighPriority ? "danger" : "primary"}
                 type="submit"
                 disabled={isSubmitting || assignablePersons.length === 0}
-                className="d-flex align-items-center justify-content-center"
+                className={`professional-btn ${
+                  formData.isHighPriority 
+                    ? "professional-btn-danger" 
+                    : "professional-btn-primary"
+                } d-flex align-items-center justify-content-center`}
               >
                 {isSubmitting ? (
                   <>
@@ -854,13 +935,17 @@ export default function NewFaultModal({
                     />
                     {initialData ? "Updating..." : "Creating..."}
                   </>
-                ) : initialData ? (
-                  "Update Fault"
                 ) : (
-                  "Create Fault"
+                  <>
+                    <span className="me-2">
+                      {initialData ? "💾" : "✅"}
+                    </span>
+                    {initialData ? "Update Fault" : "Create Fault"}
+                  </>
                 )}
               </Button>
-            </Modal.Footer>
+            </div>
+          </Modal.Footer>
           </Form>
         </Modal.Body>
       </Modal>
@@ -873,13 +958,380 @@ export default function NewFaultModal({
       />
 
       <style>{`
-        .fw-semibold {
-          font-weight: 600 !important;
+        /* Professional Modal Styling */
+        .professional-modal .modal-content {
+          border: none;
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+          overflow: hidden;
         }
-        .modal-body {
+
+        .professional-modal-header {
+          background: linear-gradient(135deg, #001f3f 0%, #0072ff 100%);
+          color: white;
+          border: none;
+          padding: 2rem 2rem 1.5rem 2rem;
+          position: relative;
+        }
+
+        .professional-modal-header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" patternUnits="userSpaceOnUse" width="100" height="100"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+          opacity: 0.3;
+        }
+
+        .professional-modal-title {
+          position: relative;
+          z-index: 1;
+        }
+
+        .modal-icon {
+          width: 60px;
+          height: 60px;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.8rem;
+          backdrop-filter: blur(10px);
+          border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .title-text {
+          color: white;
+          font-weight: 700;
+          font-size: 1.5rem;
+          margin: 0;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle-text {
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 0.9rem;
+          font-weight: 400;
+        }
+
+        .professional-modal-body {
+          padding: 2rem;
           max-height: 70vh;
           overflow-y: auto;
-          padding-right: 1.25rem;
+          background: #ffffff;
+        }
+
+        /* Form Section Styling */
+        .form-section {
+          margin-bottom: 2.5rem;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+          border-radius: 16px;
+          border: 1px solid rgba(0, 31, 63, 0.08);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .form-section::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 4px;
+          height: 100%;
+          background: linear-gradient(135deg, #0072ff, #00c6ff);
+        }
+
+        .section-header {
+          margin-bottom: 1.5rem;
+          padding-left: 1rem;
+        }
+
+        .section-title {
+          color: #001f3f;
+          font-weight: 700;
+          font-size: 1.2rem;
+          margin-bottom: 0.5rem;
+          display: flex;
+          align-items: center;
+        }
+
+        .section-icon {
+          margin-right: 0.75rem;
+          font-size: 1.3rem;
+          width: 35px;
+          height: 35px;
+          background: linear-gradient(135deg, #0072ff, #00c6ff);
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          box-shadow: 0 4px 12px rgba(0, 114, 255, 0.3);
+        }
+
+        .section-subtitle {
+          color: #6c757d;
+          font-size: 0.9rem;
+          margin: 0;
+          font-weight: 500;
+        }
+
+        /* Professional Form Controls */
+        .professional-form-group {
+          margin-bottom: 1.5rem;
+        }
+
+        .professional-label {
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 0.75rem;
+          font-size: 0.95rem;
+          display: flex;
+          align-items: center;
+        }
+
+        .label-icon {
+          margin-right: 0.5rem;
+          font-size: 1rem;
+          opacity: 0.8;
+        }
+
+        .professional-input,
+        .professional-select {
+          border: 2px solid #e9ecef;
+          border-radius: 12px;
+          padding: 0.75rem 1rem;
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          background: white;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .professional-input:focus,
+        .professional-select:focus {
+          border-color: #0072ff;
+          box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.1), 0 4px 16px rgba(0, 114, 255, 0.08);
+          outline: none;
+        }
+
+        .professional-help-text {
+          color: #6c757d;
+          font-size: 0.8rem;
+          margin-top: 0.5rem;
+          font-style: italic;
+        }
+
+        /* Professional Alert */
+        .professional-alert {
+          border: none;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+          border-left: 4px solid #dc3545;
+          box-shadow: 0 4px 16px rgba(220, 53, 69, 0.15);
+        }
+
+        .alert-icon {
+          font-size: 1.2rem;
+        }
+
+        /* Textarea Specific */
+        .professional-textarea {
+          border: 2px solid #e9ecef;
+          border-radius: 12px;
+          padding: 1rem;
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          background: white;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          resize: vertical;
+          min-height: 120px;
+        }
+
+        .professional-textarea:focus {
+          border-color: #0072ff;
+          box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.1), 0 4px 16px rgba(0, 114, 255, 0.08);
+          outline: none;
+        }
+
+        /* Character Counter */
+        .character-counter {
+          font-size: 0.8rem;
+          color: #6c757d;
+          text-align: right;
+          margin-top: 0.5rem;
+          font-weight: 500;
+        }
+
+        /* Photo Section */
+        .photo-section {
+          background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 100%);
+          border-radius: 12px;
+          padding: 1.5rem;
+          border: 2px dashed #0072ff;
+          margin: 1rem 0;
+          transition: all 0.3s ease;
+        }
+
+        .photo-section:hover {
+          border-color: #0056b3;
+          background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+        }
+
+        /* Priority Section */
+        .priority-section {
+          background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+          border-radius: 12px;
+          padding: 1.5rem;
+          border: 2px solid #ffc107;
+          margin: 1rem 0;
+        }
+
+        .priority-section.high-priority {
+          background: linear-gradient(135deg, #f8d7da 0%, #ffffff 100%);
+          border-color: #dc3545;
+        }
+
+        /* Professional Buttons */
+        .professional-btn {
+          border-radius: 10px;
+          padding: 0.75rem 2rem;
+          font-weight: 600;
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          border: none;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .professional-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .professional-btn:active {
+          transform: translateY(0);
+        }
+
+        .professional-btn-primary {
+          background: linear-gradient(135deg, #0072ff, #00c6ff);
+          color: white;
+        }
+
+        .professional-btn-secondary {
+          background: linear-gradient(135deg, #6c757d, #495057);
+          color: white;
+        }
+
+        .professional-btn-danger {
+          background: linear-gradient(135deg, #dc3545, #c82333);
+          color: white;
+        }
+
+        /* Modal Footer */
+        .professional-modal .modal-footer,
+        .professional-modal-footer {
+          border: none;
+          padding: 1.5rem 2rem 2rem 2rem;
+          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+          border-top: 1px solid rgba(0, 31, 63, 0.1);
+        }
+
+        /* Group Assignment Styling */
+        .group-assignment-container {
+          background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+          border-radius: 12px;
+          padding: 1rem;
+          border: 2px solid #2196f3;
+          margin-top: 1rem;
+        }
+
+        .technician-checkbox {
+          padding: 0.5rem;
+          border-radius: 8px;
+          margin-bottom: 0.5rem;
+          transition: all 0.2s ease;
+        }
+
+        .technician-checkbox:hover {
+          background: rgba(33, 150, 243, 0.1);
+        }
+
+        /* Animation */
+        .professional-modal .modal-dialog {
+          animation: modalSlideIn 0.4s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-50px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .professional-modal-header {
+            padding: 1.5rem 1rem 1rem 1rem;
+          }
+
+          .professional-modal-body {
+            padding: 1rem;
+          }
+
+          .form-section {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+          }
+
+          .modal-icon {
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+          }
+
+          .title-text {
+            font-size: 1.3rem;
+          }
+        }
+
+        /* Loading State */
+        .professional-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .spinner-border-sm {
+          width: 1rem;
+          height: 1rem;
+        }
+
+        /* Custom Scrollbar */
+        .professional-modal-body::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .professional-modal-body::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        .professional-modal-body::-webkit-scrollbar-thumb {
+          background: linear-gradient(135deg, #0072ff, #00c6ff);
+          border-radius: 4px;
+        }
+
+        .professional-modal-body::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(135deg, #0056b3, #0099cc);
         }
       `}</style>
     </>
