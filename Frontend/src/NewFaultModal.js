@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Modal, Button, Form, Alert, Spinner, Image } from "react-bootstrap";
+import {
+  Modal,
+  Button,
+  Form,
+  Alert,
+  Spinner,
+  Image,
+  Card,
+  Row,
+  Col,
+} from "react-bootstrap";
 import { PhotoModal } from "./components/PhotoModal";
 
 // Options arrays
@@ -69,7 +79,16 @@ export default function NewFaultModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [validated, setValidated] = useState(false);
+  const [success, setSuccess] = useState("");
   const token = localStorage.getItem("token");
+
+  // States for "Add" modals
+  const [showAddSystemModal, setShowAddSystemModal] = useState(false);
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false);
+  const [showAddSubSystemModal, setShowAddSubSystemModal] = useState(false);
+  const [newSystemName, setNewSystemName] = useState("");
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newSubSystemName, setNewSubSystemName] = useState("");
 
   // Fetch existing photos for the fault
   const fetchPhotos = useCallback(
@@ -179,6 +198,66 @@ export default function NewFaultModal({
     setError("");
     setIsSubmitting(false);
   }, [initialData, assignablePersons, show, fetchPhotos]);
+
+  // Handler for adding a new system
+  const handleAddSystem = () => {
+    if (newSystemName.trim() === "") {
+      setError("System name cannot be empty");
+      return;
+    }
+
+    // Add the new system to the options list if it doesn't already exist
+    if (!systemOptions.includes(newSystemName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      systemOptions.push(newSystemName.trim());
+      setFormData({ ...formData, SystemID: newSystemName.trim() });
+      setNewSystemName("");
+      setShowAddSystemModal(false);
+      setSuccess("New system added successfully!");
+    } else {
+      setError("This system already exists!");
+    }
+  };
+
+  // Handler for adding a new location
+  const handleAddLocation = () => {
+    if (newLocationName.trim() === "") {
+      setError("Location name cannot be empty");
+      return;
+    }
+
+    // Add the new location to the options list if it doesn't already exist
+    if (!locationOptions.includes(newLocationName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      locationOptions.push(newLocationName.trim());
+      setFormData({ ...formData, Location: newLocationName.trim() });
+      setNewLocationName("");
+      setShowAddLocationModal(false);
+      setSuccess("New location added successfully!");
+    } else {
+      setError("This location already exists!");
+    }
+  };
+
+  // Handler for adding a new subsystem
+  const handleAddSubSystem = () => {
+    if (newSubSystemName.trim() === "") {
+      setError("Subsystem name cannot be empty");
+      return;
+    }
+
+    // Add the new subsystem to the options list if it doesn't already exist
+    if (!subSystemOptions.includes(newSubSystemName.trim())) {
+      // In a real application, you would make an API call to save this to the database
+      subSystemOptions.push(newSubSystemName.trim());
+      setFormData({ ...formData, SubSystem: newSubSystemName.trim() });
+      setNewSubSystemName("");
+      setShowAddSubSystemModal(false);
+      setSuccess("New subsystem added successfully!");
+    } else {
+      setError("This subsystem already exists!");
+    }
+  };
 
   // Handle text/select input changes
   const handleChange = (e) => {
@@ -402,50 +481,19 @@ export default function NewFaultModal({
         aria-labelledby="new-fault-modal"
         className="professional-modal"
       >
-        <Modal.Header closeButton={!isSubmitting} className="professional-modal-header">
-          <Modal.Title id="new-fault-modal" className="professional-modal-title">
-            <div className="d-flex align-items-center">
-              <div className="modal-icon me-3">
-                {initialData ? (
-                  <span className="edit-icon">✏️</span>
-                ) : (
-                  <span className="new-icon">🆕</span>
-                )}
-              </div>
-              <div>
-                <h4 className="mb-1 title-text">
-                  {initialData ? "Edit Fault Report" : "Create New Fault Report"}
-                </h4>
-                <small className="subtitle-text">
-                  {initialData 
-                    ? `Modifying Fault ID: #${initialData.id}` 
-                    : "Complete the form below to submit a new fault report"
-                  }
-                </small>
-              </div>
-            </div>
-          </Modal.Title>
-        </Modal.Header>
 
-        <Modal.Body className="professional-modal-body">
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-              className="professional-alert mb-4"
-            >
-              <div className="d-flex align-items-center">
-                <span className="alert-icon me-2">⚠️</span>
-                <div>
-                  <strong>Validation Error:</strong>
-                  <div className="mt-1">{error}</div>
-                </div>
+
               </div>
             </Alert>
           )}
 
           <Form
+            id="fault-form"
             noValidate
             validated={validated}
             onSubmit={handleSubmit}
@@ -453,146 +501,233 @@ export default function NewFaultModal({
             className="professional-form"
           >
             {/* System Information Section */}
-            <div className="form-section">
-              <div className="section-header">
-                <h5 className="section-title">
-                  <span className="section-icon">🖥️</span>
-                  System Information
-                </h5>
-                <p className="section-subtitle">Basic system and location details</p>
-              </div>
 
-              <div className="row g-3">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formSystemID">
-                  <Form.Label className="fw-semibold">
-                    System <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="SystemID"
-                    value={formData.SystemID}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    aria-required="true"
-                    aria-describedby="systemHelp"
-                  >
-                    {systemOptions.map((system) => (
-                      <option key={system} value={system}>
-                        {system}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a system.
-                  </Form.Control.Feedback>
-                  <Form.Text id="systemHelp" muted>
-                    Select the system related to the fault.
-                  </Form.Text>
-                </Form.Group>
-              </div>
 
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formReportedBy">
-                  <Form.Label className="fw-semibold">
-                    Reported By <span className="text-danger">*</span>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formReportedBy">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Reported By <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="ReportedBy"
+                        value={formData.ReportedBy}
+                        onChange={handleChange}
+                        placeholder="Enter reporter name"
+                        required
+                        maxLength="100"
+                        disabled={isSubmitting}
+                        aria-required="true"
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#e3f2fd",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      />
+                      <Form.Control.Feedback type="invalid">
+                        Please provide the reporter's name.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Location Information Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-warning d-flex align-items-center">
+                  <span className="me-2"></span>
+                  Location Details
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formLocation">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Location <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="Location"
+                          value={formData.Location}
+                          onChange={handleChange}
+                          required
+                          disabled={isSubmitting}
+                          aria-required="true"
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#fff3e0",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {locationOptions.map((loc) => (
+                            <option key={loc} value={loc}>
+                              {loc}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-warning"
+                          className="add-button"
+                          onClick={() => setShowAddLocationModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
+                      <Form.Control.Feedback type="invalid">
+                        Please select the location.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formLocationOfFault">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Location of Fault
+                      </Form.Label>
+                      <Form.Select
+                        name="LocationOfFault"
+                        value={formData.LocationOfFault}
+                        onChange={handleChange}
+                        disabled={isSubmitting}
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#fff3e0",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      >
+                        <option value="">Select location of fault</option>
+                        {faultLocationOptions.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Additional Details Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-success d-flex align-items-center">
+                  <span className="me-2"></span>
+                  Additional Details
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formSubSystem">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2"></span>
+                        Sub System
+                      </Form.Label>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="SubSystem"
+                          value={formData.SubSystem}
+                          onChange={handleChange}
+                          disabled={isSubmitting}
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#e8f5e8",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {subSystemOptions.map((subSystem) => (
+                            <option key={subSystem} value={subSystem}>
+                              {subSystem}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-success"
+                          className="add-button"
+                          onClick={() => setShowAddSubSystemModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Fault Description Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-danger d-flex align-items-center">
+                  <span className="me-2"></span>
+                  Fault Description
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Form.Group className="mb-4" controlId="formDescFault">
+                  <Form.Label className="fw-semibold d-flex align-items-center">
+                    <span className="me-2"></span>
+                    Description <span className="text-danger ms-1">*</span>
                   </Form.Label>
                   <Form.Control
-                    type="text"
-                    name="ReportedBy"
-                    value={formData.ReportedBy}
+                    name="DescFault"
+                    as="textarea"
+                    rows={4}
+                    value={formData.DescFault}
                     onChange={handleChange}
-                    placeholder="Enter reporter name"
+                    placeholder="Describe the fault in detail..."
                     required
-                    maxLength="100"
+                    maxLength="500"
                     disabled={isSubmitting}
                     aria-required="true"
+                    aria-describedby="descHelp"
+                    className="border-2 shadow-sm"
+                    style={{
+                      borderColor: "#fce4ec",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      resize: "vertical",
+                    }}
                   />
                   <Form.Control.Feedback type="invalid">
-                    Please provide the reporter's name.
+                    Please provide a description of the fault.
                   </Form.Control.Feedback>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formLocation">
-                  <Form.Label className="fw-semibold">
-                    Location <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="Location"
-                    value={formData.Location}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    aria-required="true"
+                  <Form.Text
+                    id="descHelp"
+                    className="text-muted d-block text-end"
                   >
-                    {locationOptions.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select the location.
-                  </Form.Control.Feedback>
+                    <small>{formData.DescFault.length}/500 characters</small>
+                  </Form.Text>
                 </Form.Group>
-              </div>
 
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formLocationOfFault">
-                  <Form.Label className="fw-semibold">
-                    Location of Fault
-                  </Form.Label>
-                  <Form.Select
-                    name="LocationOfFault"
-                    value={formData.LocationOfFault}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                  >
-                    <option value="">Select location of fault</option>
-                    {faultLocationOptions.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group controlId="formSubSystem">
-                  <Form.Label className="fw-semibold">Sub System</Form.Label>
-                  <Form.Select
-                    name="SubSystem"
-                    value={formData.SubSystem}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                  >
-                    {subSystemOptions.map((subSystem) => (
-                      <option key={subSystem} value={subSystem}>
-                        {subSystem}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-            </div>
-
-            {/* Fault Details Section */}
-            <div className="form-section">
-              <div className="section-header">
-                <h5 className="section-title">
-                  <span className="section-icon">📝</span>
-                  Fault Description
-                </h5>
-                <p className="section-subtitle">Provide detailed information about the issue</p>
-              </div>
 
               <Form.Group className="professional-form-group" controlId="formDescFault">
                 <Form.Label className="professional-label">
@@ -688,33 +823,9 @@ export default function NewFaultModal({
                 <p className="section-subtitle">Assign technicians and set priority level</p>
               </div>
 
-              <div className="row g-3">
-              {initialData && (
-                <div className="col-md-6 mb-3 mb-md-0">
-                  <Form.Group controlId="formStatus">
-                    <Form.Label className="fw-semibold">
-                      Status <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Select
-                      name="Status"
-                      value={formData.Status}
-                      onChange={handleChange}
-                      required
-                      disabled={isSubmitting}
-                      aria-required="true"
-                    >
-                      <option value="In Progress">In Progress</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Closed">Closed</option>
-                    </Form.Select>
-                    <Form.Control.Feedback type="invalid">
-                      Please select a status.
-                    </Form.Control.Feedback>
-                  </Form.Group>
-                </div>
-              )}
 
-              <div className={`col-md-${initialData ? "6" : "12"}`}>
+
+              <div className="col-md-6">
                 <Form.Group controlId="formAssignTo">
                   <Form.Label className="fw-semibold">
                     Assigned To <span className="text-danger">*</span>
@@ -900,54 +1011,267 @@ export default function NewFaultModal({
                 </div>
               )}
             </div>
-          </div>
 
-          <Modal.Footer className="professional-modal-footer px-0 pt-0 border-0">
-            <div className="d-flex justify-content-between w-100">
-              <Button
-                variant="outline-secondary"
-                onClick={handleModalClose}
-                disabled={isSubmitting}
-                className="professional-btn professional-btn-secondary"
-              >
-                <span className="me-2">✖️</span>
-                Cancel
-              </Button>
-              <Button
-                variant={formData.isHighPriority ? "danger" : "primary"}
-                type="submit"
-                disabled={isSubmitting || assignablePersons.length === 0}
-                className={`professional-btn ${
-                  formData.isHighPriority 
-                    ? "professional-btn-danger" 
-                    : "professional-btn-primary"
-                } d-flex align-items-center justify-content-center`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Spinner
-                      as="span"
-                      animation="border"
-                      size="sm"
-                      className="me-2"
-                      role="status"
-                      aria-hidden="true"
-                    />
-                    {initialData ? "Updating..." : "Creating..."}
-                  </>
-                ) : (
-                  <>
-                    <span className="me-2">
-                      {initialData ? "💾" : "✅"}
-                    </span>
-                    {initialData ? "Update Fault" : "Create Fault"}
-                  </>
-                )}
-              </Button>
-            </div>
-          </Modal.Footer>
           </Form>
         </Modal.Body>
+
+        <Modal.Footer className="px-0 pt-0 border-0">
+          <Button
+            variant="outline-secondary"
+            onClick={handleModalClose}
+            disabled={isSubmitting}
+            className="me-2"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant={formData.isHighPriority ? "danger" : "primary"}
+            type="submit"
+            form="fault-form"
+            disabled={isSubmitting || assignablePersons.length === 0}
+            className="d-flex align-items-center justify-content-center"
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  className="me-2"
+                  role="status"
+                  aria-hidden="true"
+                />
+                {initialData ? "Updating..." : "Creating..."}
+              </>
+            ) : initialData ? (
+              "Update Fault"
+            ) : (
+              "Create Fault"
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new system */}
+      <Modal
+        show={showAddSystemModal}
+        onHide={() => setShowAddSystemModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New System</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddSystemModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddSystemModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddSystem">
+            <Form.Label className="fw-semibold">System Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newSystemName}
+              onChange={(e) => setNewSystemName(e.target.value)}
+              placeholder="Enter new system name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#e3f2fd",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The system name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddSystemModal(false);
+              setNewSystemName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleAddSystem}>
+            Add System
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new location */}
+      <Modal
+        show={showAddLocationModal}
+        onHide={() => setShowAddLocationModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New Location</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddLocationModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddLocationModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddLocation">
+            <Form.Label className="fw-semibold">Location Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newLocationName}
+              onChange={(e) => setNewLocationName(e.target.value)}
+              placeholder="Enter new location name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#fff3e0",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The location name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddLocationModal(false);
+              setNewLocationName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="warning" onClick={handleAddLocation}>
+            Add Location
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal for adding a new subsystem */}
+      <Modal
+        show={showAddSubSystemModal}
+        onHide={() => setShowAddSubSystemModal(false)}
+        centered
+        backdrop="static"
+        size="md"
+      >
+        <Modal.Header closeButton className="enhanced-modal-header">
+          <Modal.Title className="fw-bold fs-5">Add New Subsystem</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && showAddSubSystemModal && (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setError("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
+              </div>
+            </Alert>
+          )}
+          {success && showAddSubSystemModal && (
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => setSuccess("")}
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">✅</span>
+                {success}
+              </div>
+            </Alert>
+          )}
+          <Form.Group controlId="formAddSubSystem">
+            <Form.Label className="fw-semibold">Subsystem Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={newSubSystemName}
+              onChange={(e) => setNewSubSystemName(e.target.value)}
+              placeholder="Enter new subsystem name"
+              className="border-2 shadow-sm"
+              style={{
+                borderColor: "#e8f5e8",
+                borderRadius: "8px",
+                padding: "12px",
+              }}
+            />
+            <Form.Text className="text-muted">
+              The subsystem name should be unique and descriptive.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddSubSystemModal(false);
+              setNewSubSystemName("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="success" onClick={handleAddSubSystem}>
+            Add Subsystem
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <PhotoModal
@@ -1004,334 +1328,6 @@ export default function NewFaultModal({
           border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
-        .title-text {
-          color: white;
-          font-weight: 700;
-          font-size: 1.5rem;
-          margin: 0;
-          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .subtitle-text {
-          color: rgba(255, 255, 255, 0.9);
-          font-size: 0.9rem;
-          font-weight: 400;
-        }
-
-        .professional-modal-body {
-          padding: 2rem;
-          max-height: 70vh;
-          overflow-y: auto;
-          background: #ffffff;
-        }
-
-        /* Form Section Styling */
-        .form-section {
-          margin-bottom: 2.5rem;
-          padding: 1.5rem;
-          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-          border-radius: 16px;
-          border: 1px solid rgba(0, 31, 63, 0.08);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-          position: relative;
-          overflow: hidden;
-        }
-
-        .form-section::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 4px;
-          height: 100%;
-          background: linear-gradient(135deg, #0072ff, #00c6ff);
-        }
-
-        .section-header {
-          margin-bottom: 1.5rem;
-          padding-left: 1rem;
-        }
-
-        .section-title {
-          color: #001f3f;
-          font-weight: 700;
-          font-size: 1.2rem;
-          margin-bottom: 0.5rem;
-          display: flex;
-          align-items: center;
-        }
-
-        .section-icon {
-          margin-right: 0.75rem;
-          font-size: 1.3rem;
-          width: 35px;
-          height: 35px;
-          background: linear-gradient(135deg, #0072ff, #00c6ff);
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          box-shadow: 0 4px 12px rgba(0, 114, 255, 0.3);
-        }
-
-        .section-subtitle {
-          color: #6c757d;
-          font-size: 0.9rem;
-          margin: 0;
-          font-weight: 500;
-        }
-
-        /* Professional Form Controls */
-        .professional-form-group {
-          margin-bottom: 1.5rem;
-        }
-
-        .professional-label {
-          font-weight: 600;
-          color: #2c3e50;
-          margin-bottom: 0.75rem;
-          font-size: 0.95rem;
-          display: flex;
-          align-items: center;
-        }
-
-        .label-icon {
-          margin-right: 0.5rem;
-          font-size: 1rem;
-          opacity: 0.8;
-        }
-
-        .professional-input,
-        .professional-select {
-          border: 2px solid #e9ecef;
-          border-radius: 12px;
-          padding: 0.75rem 1rem;
-          font-size: 0.95rem;
-          transition: all 0.3s ease;
-          background: white;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        }
-
-        .professional-input:focus,
-        .professional-select:focus {
-          border-color: #0072ff;
-          box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.1), 0 4px 16px rgba(0, 114, 255, 0.08);
-          outline: none;
-        }
-
-        .professional-help-text {
-          color: #6c757d;
-          font-size: 0.8rem;
-          margin-top: 0.5rem;
-          font-style: italic;
-        }
-
-        /* Professional Alert */
-        .professional-alert {
-          border: none;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-          border-left: 4px solid #dc3545;
-          box-shadow: 0 4px 16px rgba(220, 53, 69, 0.15);
-        }
-
-        .alert-icon {
-          font-size: 1.2rem;
-        }
-
-        /* Textarea Specific */
-        .professional-textarea {
-          border: 2px solid #e9ecef;
-          border-radius: 12px;
-          padding: 1rem;
-          font-size: 0.95rem;
-          transition: all 0.3s ease;
-          background: white;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-          resize: vertical;
-          min-height: 120px;
-        }
-
-        .professional-textarea:focus {
-          border-color: #0072ff;
-          box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.1), 0 4px 16px rgba(0, 114, 255, 0.08);
-          outline: none;
-        }
-
-        /* Character Counter */
-        .character-counter {
-          font-size: 0.8rem;
-          color: #6c757d;
-          text-align: right;
-          margin-top: 0.5rem;
-          font-weight: 500;
-        }
-
-        /* Photo Section */
-        .photo-section {
-          background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 100%);
-          border-radius: 12px;
-          padding: 1.5rem;
-          border: 2px dashed #0072ff;
-          margin: 1rem 0;
-          transition: all 0.3s ease;
-        }
-
-        .photo-section:hover {
-          border-color: #0056b3;
-          background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-        }
-
-        /* Priority Section */
-        .priority-section {
-          background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
-          border-radius: 12px;
-          padding: 1.5rem;
-          border: 2px solid #ffc107;
-          margin: 1rem 0;
-        }
-
-        .priority-section.high-priority {
-          background: linear-gradient(135deg, #f8d7da 0%, #ffffff 100%);
-          border-color: #dc3545;
-        }
-
-        /* Professional Buttons */
-        .professional-btn {
-          border-radius: 10px;
-          padding: 0.75rem 2rem;
-          font-weight: 600;
-          font-size: 0.95rem;
-          transition: all 0.3s ease;
-          border: none;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        }
-
-        .professional-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        .professional-btn:active {
-          transform: translateY(0);
-        }
-
-        .professional-btn-primary {
-          background: linear-gradient(135deg, #0072ff, #00c6ff);
-          color: white;
-        }
-
-        .professional-btn-secondary {
-          background: linear-gradient(135deg, #6c757d, #495057);
-          color: white;
-        }
-
-        .professional-btn-danger {
-          background: linear-gradient(135deg, #dc3545, #c82333);
-          color: white;
-        }
-
-        /* Modal Footer */
-        .professional-modal .modal-footer,
-        .professional-modal-footer {
-          border: none;
-          padding: 1.5rem 2rem 2rem 2rem;
-          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-          border-top: 1px solid rgba(0, 31, 63, 0.1);
-        }
-
-        /* Group Assignment Styling */
-        .group-assignment-container {
-          background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-          border-radius: 12px;
-          padding: 1rem;
-          border: 2px solid #2196f3;
-          margin-top: 1rem;
-        }
-
-        .technician-checkbox {
-          padding: 0.5rem;
-          border-radius: 8px;
-          margin-bottom: 0.5rem;
-          transition: all 0.2s ease;
-        }
-
-        .technician-checkbox:hover {
-          background: rgba(33, 150, 243, 0.1);
-        }
-
-        /* Animation */
-        .professional-modal .modal-dialog {
-          animation: modalSlideIn 0.4s ease-out;
-        }
-
-        @keyframes modalSlideIn {
-          from {
-            opacity: 0;
-            transform: translateY(-50px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-          .professional-modal-header {
-            padding: 1.5rem 1rem 1rem 1rem;
-          }
-
-          .professional-modal-body {
-            padding: 1rem;
-          }
-
-          .form-section {
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-          }
-
-          .modal-icon {
-            width: 50px;
-            height: 50px;
-            font-size: 1.5rem;
-          }
-
-          .title-text {
-            font-size: 1.3rem;
-          }
-        }
-
-        /* Loading State */
-        .professional-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-          transform: none;
-        }
-
-        .spinner-border-sm {
-          width: 1rem;
-          height: 1rem;
-        }
-
-        /* Custom Scrollbar */
-        .professional-modal-body::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        .professional-modal-body::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
-        }
-
-        .professional-modal-body::-webkit-scrollbar-thumb {
-          background: linear-gradient(135deg, #0072ff, #00c6ff);
-          border-radius: 4px;
-        }
-
-        .professional-modal-body::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(135deg, #0056b3, #0099cc);
         }
       `}</style>
     </>

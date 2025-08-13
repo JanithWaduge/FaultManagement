@@ -22,6 +22,8 @@ import { useFaultNotes } from "./useFaultNotes";
 import PhotoUploadForm from "./PhotoUploadForm";
 import { PhotoModal } from "./components/PhotoModal";
 import { useMultiFaults } from "./useMultiFaults";
+import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
+import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
 
 const assignablePersons = [
   "John Doe",
@@ -199,7 +201,7 @@ function FaultsTable({
                         const faultDate = new Date(f.DateTime);
                         const currentDate = new Date();
                         const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-                        return (currentDate - faultDate) > weekInMs;
+                        return currentDate - faultDate > weekInMs;
                       };
 
                       const getRowClassName = () => {
@@ -222,117 +224,121 @@ function FaultsTable({
                         <tr
                           key={f.id}
                           className={`table-row-hover ${getRowClassName()}`}
-                      >
-                        <td className="text-center">
-                          <PriorityFlag priority={f.Priority} fault={f} />
-                        </td>
-                        <td className="text-center">{f.id}</td>
-                        <td className="text-center">{f.SystemID}</td>
-                        <td>{f.ReportedBy}</td>
-                        <td className="d-none d-md-table-cell">{f.Location}</td>
-                        <td className="d-none d-lg-table-cell">
-                          {f.LocationOfFault}
-                        </td>
-                        <td className="description-col">{f.DescFault}</td>
-                        <td>
-                          <select
-                            value={f.Status}
-                            onChange={async (e) => {
-                              if (isResolved) return;
-                              if (handleStatusChange) {
-                                handleStatusChange(f, e.target.value);
-                              } else {
-                                try {
-                                  await onEdit({
-                                    ...f,
-                                    Status: e.target.value,
-                                  });
-                                } catch (err) {
-                                  alert(
-                                    "Failed to update status: " + err.message
-                                  );
-                                }
-                              }
-                            }}
-                            className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
-                              /\s+/g,
-                              "-"
-                            )}`}
-                            disabled={isResolved}
-                            style={{
-                              backgroundColor:
-                                f.Status === "In Progress"
-                                  ? "#fff3cd"
-                                  : f.Status === "Pending"
-                                  ? "#cff4fc"
-                                  : f.Status === "Closed"
-                                  ? "#d1e7dd"
-                                  : "",
-                              color: "#000",
-                              fontWeight: "500",
-                            }}
-                          >
-                            {["In Progress", "Pending", "Closed"].map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>{f.AssignTo}</td>
-                        <td
-                          className="d-none d-md-table-cell"
-                          style={{ whiteSpace: "nowrap" }}
                         >
-                          {f.DateTime
-                            ? new Date(f.DateTime).toLocaleString()
-                            : ""}
-                        </td>
-                        {!isResolved && (
+                          <td className="text-center">
+                            <PriorityFlag priority={f.Priority} fault={f} />
+                          </td>
+                          <td className="text-center">{f.id}</td>
+                          <td className="text-center">{f.SystemID}</td>
+                          <td>{f.ReportedBy}</td>
+                          <td className="d-none d-md-table-cell">
+                            {f.Location}
+                          </td>
+                          <td className="d-none d-lg-table-cell">
+                            {f.LocationOfFault}
+                          </td>
+                          <td className="description-col">{f.DescFault}</td>
+                          <td>
+                            <select
+                              value={f.Status}
+                              onChange={async (e) => {
+                                if (isResolved) return;
+                                if (handleStatusChange) {
+                                  handleStatusChange(f, e.target.value);
+                                } else {
+                                  try {
+                                    await onEdit({
+                                      ...f,
+                                      Status: e.target.value,
+                                    });
+                                  } catch (err) {
+                                    alert(
+                                      "Failed to update status: " + err.message
+                                    );
+                                  }
+                                }
+                              }}
+                              className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
+                                /\s+/g,
+                                "-"
+                              )}`}
+                              disabled={isResolved}
+                              style={{
+                                backgroundColor:
+                                  f.Status === "In Progress"
+                                    ? "#fff3cd"
+                                    : f.Status === "Pending"
+                                    ? "#cff4fc"
+                                    : f.Status === "Closed"
+                                    ? "#d1e7dd"
+                                    : "",
+                                color: "#000",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {["In Progress", "Pending", "Hold", "Closed"].map(
+                                (s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </td>
+                          <td>{f.AssignTo}</td>
+                          <td
+                            className="d-none d-md-table-cell"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            {f.DateTime
+                              ? new Date(f.DateTime).toLocaleString()
+                              : ""}
+                          </td>
+                          {!isResolved && (
+                            <td className="text-center">
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                className="me-1 mb-1"
+                                onClick={() => onOpenEditModal(f)}
+                                title="Edit Fault"
+                              >
+                                ✏️
+                              </Button>
+                            </td>
+                          )}
                           <td className="text-center">
                             <Button
-                              variant="outline-primary"
+                              variant="outline-secondary"
                               size="sm"
-                              className="me-1 mb-1"
-                              onClick={() => onOpenEditModal(f)}
-                              title="Edit Fault"
+                              onClick={() => handlePhotosClick(f.id)}
+                              title="View Photos"
+                              disabled={loadingPhotos}
+                              className="me-1"
                             >
-                              ✏️
+                              📷
+                            </Button>
+                            <Button
+                              variant="outline-success"
+                              size="sm"
+                              onClick={() => setUploadModalOpen(f.id)}
+                              title="Upload Photo"
+                            >
+                              ➕
                             </Button>
                           </td>
-                        )}
-                        <td className="text-center">
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            onClick={() => handlePhotosClick(f.id)}
-                            title="View Photos"
-                            disabled={loadingPhotos}
-                            className="me-1"
-                          >
-                            📷
-                          </Button>
-                          <Button
-                            variant="outline-success"
-                            size="sm"
-                            onClick={() => setUploadModalOpen(f.id)}
-                            title="Upload Photo"
-                          >
-                            ➕
-                          </Button>
-                        </td>
-                        <td>
-                          <Button
-                            variant="outline-info"
-                            size="sm"
-                            onClick={() => onOpenNotesModal(f)}
-                            className="px-2 py-1"
-                            title="View/Add Notes"
-                          >
-                            📝
-                          </Button>
-                        </td>
-                      </tr>
+                          <td>
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => onOpenNotesModal(f)}
+                              className="px-2 py-1"
+                              title="View/Add Notes"
+                            >
+                              📝
+                            </Button>
+                          </td>
+                        </tr>
                       );
                     })
                   )}
@@ -449,12 +455,12 @@ export default function Dashboard({
 
   // Calculate overdue faults
   const overdueFaults = useMemo(() => {
-    return open.filter(fault => {
+    return open.filter((fault) => {
       if (!fault.DateTime || fault.Status === "Closed") return false;
       const faultDate = new Date(fault.DateTime);
       const currentDate = new Date();
       const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-      return (currentDate - faultDate) > weekInMs;
+      return currentDate - faultDate > weekInMs;
     });
   }, [open]);
 
@@ -811,12 +817,21 @@ export default function Dashboard({
                   {" "}
                   🌐𝖶𝖾𝗅𝖼𝗈𝗆𝖾 𝗍𝗈 𝖭𝖾𝗍𝗐𝗈𝗋𝗄 𝖥𝖺𝗎𝗅𝗍 𝖬𝖺𝗇𝖺𝗀𝖾𝗆𝖾𝗇𝗍 𝖲𝗒𝗌𝗍𝖾𝗆
                 </h2>
-                <TechnicianCards
-                  technicians={assignablePersons}
-                  faults={[...open, ...resolved]}
-                  onTechnicianClick={handleTechnicianClick}
-                  onStatusClick={handleStatusClick}
-                />
+                <Row>
+                  <Col md={9}>
+                    <AllPendingFaultsTable
+                      faults={open}
+                      onViewDetails={(fault) => openEditModal(fault)}
+                    />
+                  </Col>
+                  <Col md={3}>
+                    <SimplifiedTechnicianCards
+                      technicians={assignablePersons}
+                      faults={[...open, ...resolved]}
+                      onTechnicianClick={handleTechnicianClick}
+                    />
+                  </Col>
+                </Row>
               </div>
             ) : (
               <Tabs activeKey={view} className="custom-tabs" justify>
@@ -842,15 +857,32 @@ export default function Dashboard({
                         />
                       ) : (
                         <>
-                          <Row className="mb-3 px-3">
-                            <Col md={4} className="mb-2">
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder={`Search ${tabKey}...`}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                              />
+                          <Row className="mb-3 px-3 justify-content-center">
+                            <Col md={6} className="mb-2">
+                              <div className="search-container position-relative">
+                                <i
+                                  className="bi bi-search position-absolute"
+                                  style={{
+                                    left: "15px",
+                                    top: "10px",
+                                    color: "#6c757d",
+                                  }}
+                                ></i>
+                                <input
+                                  type="text"
+                                  className="form-control search-input pl-4"
+                                  placeholder={`Search ${tabKey}...`}
+                                  value={search}
+                                  onChange={(e) => setSearch(e.target.value)}
+                                  style={{
+                                    paddingLeft: "40px",
+                                    borderRadius: "20px",
+                                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                                    border: "1px solid #dee2e6",
+                                    height: "45px",
+                                  }}
+                                />
+                              </div>
                             </Col>
                           </Row>
                           <div className="mb-2 px-3">
@@ -862,16 +894,32 @@ export default function Dashboard({
                               :
                             </strong>{" "}
                             {filtered.length}
-                            {tabKey === "faults" && overdueFaults.length > 0 && (
-                              <span style={{ color: "#dc3545", fontWeight: "bold", marginLeft: "10px" }}>
-                                | Overdue: {overdueFaults.filter(f => 
-                                  [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID]
-                                    .join(" ")
-                                    .toLowerCase()
-                                    .includes(search.toLowerCase())
-                                ).length}
-                              </span>
-                            )}
+                            {tabKey === "faults" &&
+                              overdueFaults.length > 0 && (
+                                <span
+                                  style={{
+                                    color: "#dc3545",
+                                    fontWeight: "bold",
+                                    marginLeft: "10px",
+                                  }}
+                                >
+                                  | Overdue:{" "}
+                                  {
+                                    overdueFaults.filter((f) =>
+                                      [
+                                        f.DescFault,
+                                        f.Location,
+                                        f.LocationOfFault,
+                                        f.ReportedBy,
+                                        f.SystemID,
+                                      ]
+                                        .join(" ")
+                                        .toLowerCase()
+                                        .includes(search.toLowerCase())
+                                    ).length
+                                  }
+                                </span>
+                              )}
                           </div>
                           <FaultsTable
                             faults={current}
@@ -909,13 +957,14 @@ export default function Dashboard({
           </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Open: {open.length} | Resolved: {resolved.length} | 
+          Total Open: {open.length} | Resolved: {resolved.length} |
           {overdueFaults.length > 0 && (
             <span style={{ color: "#dc3545", fontWeight: "bold" }}>
-              {" "}Overdue: {overdueFaults.length} |
+              {" "}
+              Overdue: {overdueFaults.length} |
             </span>
-          )}
-          {" "}Unread Notifications: {notifications.filter((n) => !n.isRead).length}
+          )}{" "}
+          Unread Notifications: {notifications.filter((n) => !n.isRead).length}
         </div>
         <div className="text-center text-sm-end">
           <Button
