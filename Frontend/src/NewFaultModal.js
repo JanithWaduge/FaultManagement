@@ -479,35 +479,15 @@ export default function NewFaultModal({
         backdrop={isSubmitting ? "static" : true}
         size="lg"
         aria-labelledby="new-fault-modal"
+        className="professional-modal"
       >
-        <Modal.Header
-          closeButton={!isSubmitting}
-          className="enhanced-modal-header"
-        >
-          <Modal.Title
-            id="new-fault-modal"
-            className="fw-bold fs-4 d-flex align-items-center"
-          >
-            <span className="me-2 fs-3">{initialData ? "✏️" : ""}</span>
-            {initialData ? "Edit Fault Report" : "Create New Fault Report"}
-          </Modal.Title>
-        </Modal.Header>
 
-        <Modal.Body className="p-4" style={{ backgroundColor: "#f8f9fa" }}>
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
-              style={{
-                background: "linear-gradient(135deg, #ff6b6b, #ee5a24)",
-                color: "white",
-              }}
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
-                {error}
+
               </div>
             </Alert>
           )}
@@ -518,67 +498,10 @@ export default function NewFaultModal({
             validated={validated}
             onSubmit={handleSubmit}
             autoComplete="off"
+            className="professional-form"
           >
             {/* System Information Section */}
-            <Card className="mb-4 border-0 shadow-sm">
-              <Card.Header
-                className="bg-light border-bottom-0 py-3"
-                style={{
-                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
-                }}
-              >
-                <h6 className="mb-0 fw-bold text-primary d-flex align-items-center">
-                  <span className="me-2"></span>
-                  System Information
-                </h6>
-              </Card.Header>
-              <Card.Body className="p-4">
-                <Row>
-                  <Col md={6} className="mb-3">
-                    <Form.Group controlId="formSystemID">
-                      <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2"></span>
-                        System <span className="text-danger ms-1">*</span>
-                      </Form.Label>
-                      <div className="d-flex">
-                        <Form.Select
-                          name="SystemID"
-                          value={formData.SystemID}
-                          onChange={handleChange}
-                          required
-                          disabled={isSubmitting}
-                          aria-required="true"
-                          aria-describedby="systemHelp"
-                          className="border-2 shadow-sm me-2"
-                          style={{
-                            borderColor: "#e3f2fd",
-                            borderRadius: "8px",
-                            padding: "12px",
-                          }}
-                        >
-                          {systemOptions.map((system) => (
-                            <option key={system} value={system}>
-                              {system}
-                            </option>
-                          ))}
-                        </Form.Select>
-                        <Button
-                          variant="outline-primary"
-                          className="add-button"
-                          onClick={() => setShowAddSystemModal(true)}
-                          disabled={isSubmitting}
-                        >
-                          <i className="bi bi-plus-lg"></i> Add
-                        </Button>
-                      </div>
-                      <Form.Control.Feedback type="invalid">
-                        Please select a system.
-                      </Form.Control.Feedback>
-                      <Form.Text id="systemHelp" className="text-muted">
-                        <small>Select the system related to the fault.</small>
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
+
 
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formReportedBy">
@@ -804,76 +727,103 @@ export default function NewFaultModal({
                     <small>{formData.DescFault.length}/500 characters</small>
                   </Form.Text>
                 </Form.Group>
-              </Card.Body>
-            </Card>
+
+
+              <Form.Group className="professional-form-group" controlId="formDescFault">
+                <Form.Label className="professional-label">
+                  <span className="label-icon">📄</span>
+                  Detailed Description <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Control
+                  name="DescFault"
+                  as="textarea"
+                  rows={5}
+                  value={formData.DescFault}
+                  onChange={handleChange}
+                  placeholder="Please describe the fault in detail including when it occurred, what happened, and any error messages..."
+                  required
+                  maxLength="500"
+                  disabled={isSubmitting}
+                  aria-required="true"
+                  aria-describedby="descHelp"
+                  className="professional-textarea"
+                />
+                <Form.Control.Feedback type="invalid">
+                  Please provide a detailed description of the fault.
+                </Form.Control.Feedback>
+                <div className="character-counter">
+                  {formData.DescFault.length}/500 characters
+                </div>
+                <Form.Text id="descHelp" className="professional-help-text">
+                  Include as much detail as possible to help technicians understand and resolve the issue quickly
+                </Form.Text>
+              </Form.Group>
+            </div>
 
             {/* Photos Section */}
-            <Form.Group controlId="formAddPhotos" className="mb-4">
-              <Form.Label className="fw-semibold">Photos</Form.Label>
-              <div className="d-flex align-items-center mb-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => setPhotosModalOpen(true)}
-                  disabled={loadingPhotos || !initialData?.id}
-                  title="View Existing Photos"
-                  className="me-2"
-                >
-                  📷 View Photos
-                </Button>
-                <Form.Control
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  disabled={isSubmitting}
-                  style={{ flex: 1 }}
-                  aria-describedby="photosHelp"
-                />
+            <div className="form-section photo-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">📷</span>
+                  Photo Attachments
+                </h5>
+                <p className="section-subtitle">Upload photos to help illustrate the problem</p>
               </div>
-              <Form.Text id="photosHelp" muted>
-                You can upload one or more photos showcasing the fault.
-              </Form.Text>
-            </Form.Group>
 
-            {/* Photo previews */}
-            {photos.length > 0 && (
-              <div
-                className="mb-4"
-                style={{
-                  maxHeight: "150px",
-                  overflowX: "auto",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {renderPhotoPreviews()}
-              </div>
-            )}
-
-            <div className="row mb-4">
-              <div className="col-md-6 mb-3 mb-md-0">
-                <Form.Group controlId="formStatus">
-                  <Form.Label className="fw-semibold">
-                    Status <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="Status"
-                    value={formData.Status}
-                    onChange={handleChange}
-                    required
-                    disabled={isSubmitting}
-                    aria-required="true"
+              <Form.Group controlId="formAddPhotos" className="professional-form-group">
+                <div className="d-flex align-items-center mb-3">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setPhotosModalOpen(true)}
+                    disabled={loadingPhotos || !initialData?.id}
+                    title="View Existing Photos"
+                    className="professional-btn professional-btn-secondary me-3"
                   >
-                    <option value="In Progress">In Progress</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Hold">Hold</option>
-                    <option value="Closed">Closed</option>
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a status.
-                  </Form.Control.Feedback>
-                </Form.Group>
+                    📷 View Existing Photos
+                  </Button>
+                  <Form.Control
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    disabled={isSubmitting}
+                    style={{ flex: 1 }}
+                    aria-describedby="photosHelp"
+                    className="professional-input"
+                  />
+                </div>
+                <Form.Text id="photosHelp" className="professional-help-text">
+                  You can upload multiple photos (JPG, PNG, GIF) to showcase the fault. Maximum 10MB per file.
+                </Form.Text>
+
+                {/* Photo previews */}
+                {photos.length > 0 && (
+                  <div
+                    className="mt-3 p-3 bg-light rounded"
+                    style={{
+                      maxHeight: "150px",
+                      overflowX: "auto",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {renderPhotoPreviews()}
+                  </div>
+                )}
+              </Form.Group>
+            </div>
+
+            {/* Assignment Section */}
+            <div className="form-section">
+              <div className="section-header">
+                <h5 className="section-title">
+                  <span className="section-icon">👥</span>
+                  Assignment & Priority
+                </h5>
+                <p className="section-subtitle">Assign technicians and set priority level</p>
               </div>
+
+
 
               <div className="col-md-6">
                 <Form.Group controlId="formAssignTo">
@@ -1061,6 +1011,7 @@ export default function NewFaultModal({
                 </div>
               )}
             </div>
+
           </Form>
         </Modal.Body>
 
@@ -1331,178 +1282,52 @@ export default function NewFaultModal({
       />
 
       <style>{`
-        .fw-semibold {
-          font-weight: 600 !important;
-        }
-        
-        /* Enhanced Modal Styles */
-        .modal-content {
+        /* Professional Modal Styling */
+        .professional-modal .modal-content {
           border: none;
-          border-radius: 15px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
           overflow: hidden;
         }
-        
-        .modal-header {
-          background: #001f3f;
-          border: none;
+
+        .professional-modal-header {
+          background: linear-gradient(135deg, #001f3f 0%, #0072ff 100%);
           color: white;
-          padding: 1.5rem;
+          border: none;
+          padding: 2rem 2rem 1.5rem 2rem;
+          position: relative;
         }
-        
-        .modal-header .btn-close {
-          filter: brightness(0) invert(1);
-          opacity: 0.8;
+
+        .professional-modal-header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" patternUnits="userSpaceOnUse" width="100" height="100"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+          opacity: 0.3;
         }
-        
-        .modal-header .btn-close:hover {
-          opacity: 1;
+
+        .professional-modal-title {
+          position: relative;
+          z-index: 1;
         }
-        
-        .modal-body {
-          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-          padding: 2rem;
-          max-height: 75vh;
-          overflow-y: auto;
-        }
-        
-        /* Enhanced Form Controls */
-        .form-control, .form-select {
-          border: 2px solid #e3f2fd;
-          border-radius: 10px;
-          padding: 12px 16px;
-          transition: all 0.3s ease;
-          background: rgba(255,255,255,0.9);
-          backdrop-filter: blur(10px);
-        }
-        
-        .form-control:focus, .form-select:focus {
-          border-color: #667eea;
-          box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-          background: white;
-        }
-        
-        .form-label {
-          font-weight: 600;
-          color: #2c3e50;
-          margin-bottom: 8px;
+
+        .modal-icon {
+          width: 60px;
+          height: 60px;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 50%;
           display: flex;
           align-items: center;
-        }
-        
-        /* Section Cards */
-        .section-card {
-          background: rgba(255,255,255,0.95);
-          border: none;
-          border-radius: 15px;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-          margin-bottom: 1.5rem;
-          overflow: hidden;
+          justify-content: center;
+          font-size: 1.8rem;
           backdrop-filter: blur(10px);
+          border: 2px solid rgba(255, 255, 255, 0.2);
         }
-        
-        .section-header {
-          background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-          border: none;
-          padding: 1rem 1.5rem;
-        }
-        
-        .section-header h6 {
-          margin: 0;
-          font-weight: 700;
-          color: #2c3e50;
-        }
-        
-        /* Priority Section */
-        .priority-section {
-          background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-          border-radius: 10px;
-          padding: 1rem;
-          border: 2px solid #ff9800;
-        }
-        
-        /* Button Enhancements */
-        .btn-primary {
-          background: #001f3f;
-          border: none;
-          border-radius: 10px;
-          padding: 12px 24px;
-          font-weight: 600;
-          transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(0, 31, 63, 0.3);
-          background: #003366;
-        }
-        
-        .btn-danger {
-          background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-          border: none;
-          border-radius: 10px;
-          padding: 12px 24px;
-          font-weight: 600;
-        }
-        
-        .btn-outline-secondary {
-          border: 2px solid #6c757d;
-          border-radius: 10px;
-          padding: 12px 24px;
-          font-weight: 600;
-          transition: all 0.3s ease;
-        }
-        
-        /* Photo Upload Section */
-        .photo-upload-section {
-          background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-          border-radius: 10px;
-          padding: 1rem;
-          border: 2px dashed #4caf50;
-        }
-        
-        /* Alert Enhancements */
-        .alert {
-          border: none;
-          border-radius: 10px;
-          backdrop-filter: blur(10px);
-        }
-        
-        /* Text Area Enhancements */
-        textarea.form-control {
-          resize: vertical;
-          min-height: 120px;
-        }
-        
-        /* Icon Enhancements */
-        .form-label span {
-          font-size: 1.2em;
-          margin-right: 8px;
-        }
-        
-        /* Animated Loading */
-        .loading-spinner {
-          animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        /* Mobile Responsiveness */
-        @media (max-width: 768px) {
-          .modal-body {
-            padding: 1rem;
-          }
-          
-          .section-header {
-            padding: 0.75rem 1rem;
-          }
-          
-          .form-control, .form-select {
-            padding: 10px 12px;
-          }
+
         }
       `}</style>
     </>
