@@ -500,15 +500,34 @@ export default function Dashboard({
   );
   const filtered = useMemo(
     () =>
-      sortedFaults.filter(
-        (f) =>
-          f &&
-          [f.DescFault, f.Location, f.LocationOfFault, f.ReportedBy, f.SystemID]
-            .join(" ")
-            .toLowerCase()
-            .includes(search.toLowerCase())
-      ),
-    [sortedFaults, search]
+      sortedFaults.filter((f) => {
+        if (!f) return false;
+
+        // Text search filter
+        const textMatch = [
+          f.DescFault,
+          f.Location,
+          f.LocationOfFault,
+          f.ReportedBy,
+          f.SystemID,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(search.toLowerCase());
+
+        // Technician filter - handle case insensitive matching and trim whitespace
+        const technicianMatch =
+          !filteredTechnician ||
+          (f.AssignTo &&
+            f.AssignTo.trim().toLowerCase() ===
+              filteredTechnician.trim().toLowerCase());
+
+        // Status filter
+        const statusMatch = !filteredStatus || f.Status === filteredStatus;
+
+        return textMatch && technicianMatch && statusMatch;
+      }),
+    [sortedFaults, search, filteredTechnician, filteredStatus]
   );
 
   const [page, setPage] = useState(1);
@@ -590,19 +609,36 @@ export default function Dashboard({
   };
 
   const handleStatusClick = (technician, status) => {
+    console.log("Status clicked:", technician, status);
     setFilteredTechnician(technician);
     setFilteredStatus(status);
     setDetailedView(true);
-    setView(status === "Closed" ? "resolved" : "faults");
-    setSearch(technician || "");
+
+    // If status is null, show all faults for the technician
+    // If status is specified, filter by that status
+    if (status === "Closed" || status === "Resolved") {
+      setView("resolved");
+    } else {
+      setView("faults");
+    }
+
+    setSearch(""); // Clear search to avoid interference with filters
   };
 
   const handleTechnicianClick = (technician) => {
+    console.log("Technician clicked:", technician);
     setFilteredTechnician(technician);
     setFilteredStatus(null);
     setDetailedView(true);
     setView("faults");
-    setSearch(technician);
+    setSearch(""); // Clear search to avoid interference with technician filter
+  };
+
+  const clearAllFilters = () => {
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setDetailedView(false);
+    setSearch("");
   };
 
   const sidebarItems = [
@@ -857,6 +893,98 @@ export default function Dashboard({
                         />
                       ) : (
                         <>
+                          {/* Filter Indicators */}
+                          {(filteredTechnician || filteredStatus) && (
+                            <Row className="mb-3 px-3">
+                              <Col>
+                                <div className="d-flex flex-wrap gap-2 align-items-center">
+                                  <span className="text-muted">
+                                    Filters active:
+                                  </span>
+                                  {filteredTechnician && (
+                                    <span className="badge bg-primary d-flex align-items-center gap-1">
+                                      Technician: {filteredTechnician}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() =>
+                                          setFilteredTechnician(null)
+                                        }
+                                        aria-label="Clear technician filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  {filteredStatus && (
+                                    <span className="badge bg-secondary d-flex align-items-center gap-1">
+                                      Status: {filteredStatus}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() => setFilteredStatus(null)}
+                                        aria-label="Clear status filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  <button
+                                    className="btn btn-outline-secondary btn-sm"
+                                    onClick={() => {
+                                      setFilteredTechnician(null);
+                                      setFilteredStatus(null);
+                                      setDetailedView(false);
+                                    }}
+                                  >
+                                    Clear All Filters
+                                  </button>
+                                </div>
+                              </Col>
+                            </Row>
+                          )}
+
+                          {/* Filter Indicators */}
+                          {(filteredTechnician || filteredStatus) && (
+                            <Row className="mb-2 px-3">
+                              <Col>
+                                <div className="d-flex flex-wrap gap-2 align-items-center">
+                                  <small className="text-muted">
+                                    Active filters:
+                                  </small>
+                                  {filteredTechnician && (
+                                    <span className="badge bg-primary d-flex align-items-center gap-1">
+                                      Technician: {filteredTechnician}
+                                      <button
+                                        type="button"
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() =>
+                                          setFilteredTechnician(null)
+                                        }
+                                        aria-label="Clear technician filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  {filteredStatus && (
+                                    <span className="badge bg-secondary d-flex align-items-center gap-1">
+                                      Status: {filteredStatus}
+                                      <button
+                                        type="button"
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() => setFilteredStatus(null)}
+                                        aria-label="Clear status filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  <button
+                                    className="btn btn-sm btn-outline-secondary"
+                                    onClick={clearAllFilters}
+                                  >
+                                    Clear All
+                                  </button>
+                                </div>
+                              </Col>
+                            </Row>
+                          )}
+
                           <Row className="mb-3 px-3 justify-content-center">
                             <Col md={6} className="mb-2">
                               <div className="search-container position-relative">
