@@ -481,13 +481,35 @@ export default function NewFaultModal({
         aria-labelledby="new-fault-modal"
         className="professional-modal"
       >
+        <Modal.Header closeButton className="professional-modal-header">
+          <Modal.Title id="new-fault-modal" className="professional-modal-title d-flex align-items-center">
+            <div className="modal-icon me-3">
+              <span>🔧</span>
+            </div>
+            <div>
+              <h4 className="mb-0 fw-bold">
+                {initialData ? "Edit Fault" : "New Fault Report"}
+              </h4>
+              <small className="opacity-75">
+                {initialData 
+                  ? "Update fault information and assignment" 
+                  : "Report a new system fault or issue"}
+              </small>
+            </div>
+          </Modal.Title>
+        </Modal.Header>
 
+        <Modal.Body className="px-4 py-4">
           {error && (
             <Alert
               variant="danger"
               dismissible
               onClose={() => setError("")}
-
+              className="mb-4 border-0 shadow-sm"
+            >
+              <div className="d-flex align-items-center">
+                <span className="me-2 fs-5">⚠️</span>
+                {error}
               </div>
             </Alert>
           )}
@@ -501,12 +523,90 @@ export default function NewFaultModal({
             className="professional-form"
           >
             {/* System Information Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-primary d-flex align-items-center">
+                  <span className="me-2">🖥️</span>
+                  System Information
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formSystemID">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2">⚙️</span>
+                        System <span className="text-danger ms-1">*</span>
+                      </Form.Label>
+                      <div className="d-flex">
+                        <Form.Select
+                          name="SystemID"
+                          value={formData.SystemID}
+                          onChange={handleChange}
+                          required
+                          disabled={isSubmitting}
+                          aria-required="true"
+                          className="border-2 shadow-sm me-2"
+                          style={{
+                            borderColor: "#e3f2fd",
+                            borderRadius: "8px",
+                            padding: "12px",
+                          }}
+                        >
+                          {systemOptions.map((system) => (
+                            <option key={system} value={system}>
+                              {system}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Button
+                          variant="outline-primary"
+                          className="add-button"
+                          onClick={() => setShowAddSystemModal(true)}
+                          disabled={isSubmitting}
+                        >
+                          <i className="bi bi-plus-lg"></i> Add
+                        </Button>
+                      </div>
+                      <Form.Control.Feedback type="invalid">
+                        Please select the system.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
 
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formSectionID">
+                      <Form.Label className="fw-semibold d-flex align-items-center">
+                        <span className="me-2">📋</span>
+                        Section ID
+                      </Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="SectionID"
+                        value={formData.SectionID}
+                        onChange={handleChange}
+                        placeholder="Enter section identifier"
+                        maxLength="50"
+                        disabled={isSubmitting}
+                        className="border-2 shadow-sm"
+                        style={{
+                          borderColor: "#e3f2fd",
+                          borderRadius: "8px",
+                          padding: "12px",
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
 
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formReportedBy">
                       <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2"></span>
+                        <span className="me-2">👤</span>
                         Reported By <span className="text-danger ms-1">*</span>
                       </Form.Label>
                       <Form.Control
@@ -544,7 +644,7 @@ export default function NewFaultModal({
                 }}
               >
                 <h6 className="mb-0 fw-bold text-warning d-flex align-items-center">
-                  <span className="me-2"></span>
+                  <span className="me-2">📍</span>
                   Location Details
                 </h6>
               </Card.Header>
@@ -553,7 +653,7 @@ export default function NewFaultModal({
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formLocation">
                       <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2"></span>
+                        <span className="me-2">🏢</span>
                         Location <span className="text-danger ms-1">*</span>
                       </Form.Label>
                       <div className="d-flex">
@@ -595,7 +695,7 @@ export default function NewFaultModal({
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formLocationOfFault">
                       <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2"></span>
+                        <span className="me-2">🎯</span>
                         Location of Fault
                       </Form.Label>
                       <Form.Select
@@ -632,7 +732,7 @@ export default function NewFaultModal({
                 }}
               >
                 <h6 className="mb-0 fw-bold text-success d-flex align-items-center">
-                  <span className="me-2"></span>
+                  <span className="me-2">⚙️</span>
                   Additional Details
                 </h6>
               </Card.Header>
@@ -641,7 +741,7 @@ export default function NewFaultModal({
                   <Col md={6} className="mb-3">
                     <Form.Group controlId="formSubSystem">
                       <Form.Label className="fw-semibold d-flex align-items-center">
-                        <span className="me-2"></span>
+                        <span className="me-2">🔧</span>
                         Sub System
                       </Form.Label>
                       <div className="d-flex">
@@ -687,14 +787,14 @@ export default function NewFaultModal({
                 }}
               >
                 <h6 className="mb-0 fw-bold text-danger d-flex align-items-center">
-                  <span className="me-2"></span>
+                  <span className="me-2">📝</span>
                   Fault Description
                 </h6>
               </Card.Header>
               <Card.Body className="p-4">
                 <Form.Group className="mb-4" controlId="formDescFault">
                   <Form.Label className="fw-semibold d-flex align-items-center">
-                    <span className="me-2"></span>
+                    <span className="me-2">📄</span>
                     Description <span className="text-danger ms-1">*</span>
                   </Form.Label>
                   <Form.Control
@@ -727,295 +827,275 @@ export default function NewFaultModal({
                     <small>{formData.DescFault.length}/500 characters</small>
                   </Form.Text>
                 </Form.Group>
-
-
-              <Form.Group className="professional-form-group" controlId="formDescFault">
-                <Form.Label className="professional-label">
-                  <span className="label-icon">📄</span>
-                  Detailed Description <span className="text-danger">*</span>
-                </Form.Label>
-                <Form.Control
-                  name="DescFault"
-                  as="textarea"
-                  rows={5}
-                  value={formData.DescFault}
-                  onChange={handleChange}
-                  placeholder="Please describe the fault in detail including when it occurred, what happened, and any error messages..."
-                  required
-                  maxLength="500"
-                  disabled={isSubmitting}
-                  aria-required="true"
-                  aria-describedby="descHelp"
-                  className="professional-textarea"
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a detailed description of the fault.
-                </Form.Control.Feedback>
-                <div className="character-counter">
-                  {formData.DescFault.length}/500 characters
-                </div>
-                <Form.Text id="descHelp" className="professional-help-text">
-                  Include as much detail as possible to help technicians understand and resolve the issue quickly
-                </Form.Text>
-              </Form.Group>
-            </div>
+              </Card.Body>
+            </Card>
 
             {/* Photos Section */}
-            <div className="form-section photo-section">
-              <div className="section-header">
-                <h5 className="section-title">
-                  <span className="section-icon">📷</span>
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-info d-flex align-items-center">
+                  <span className="me-2">📷</span>
                   Photo Attachments
-                </h5>
-                <p className="section-subtitle">Upload photos to help illustrate the problem</p>
-              </div>
-
-              <Form.Group controlId="formAddPhotos" className="professional-form-group">
-                <div className="d-flex align-items-center mb-3">
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => setPhotosModalOpen(true)}
-                    disabled={loadingPhotos || !initialData?.id}
-                    title="View Existing Photos"
-                    className="professional-btn professional-btn-secondary me-3"
-                  >
-                    📷 View Existing Photos
-                  </Button>
-                  <Form.Control
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    disabled={isSubmitting}
-                    style={{ flex: 1 }}
-                    aria-describedby="photosHelp"
-                    className="professional-input"
-                  />
-                </div>
-                <Form.Text id="photosHelp" className="professional-help-text">
-                  You can upload multiple photos (JPG, PNG, GIF) to showcase the fault. Maximum 10MB per file.
-                </Form.Text>
-
-                {/* Photo previews */}
-                {photos.length > 0 && (
-                  <div
-                    className="mt-3 p-3 bg-light rounded"
-                    style={{
-                      maxHeight: "150px",
-                      overflowX: "auto",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {renderPhotoPreviews()}
-                  </div>
-                )}
-              </Form.Group>
-            </div>
-
-            {/* Assignment Section */}
-            <div className="form-section">
-              <div className="section-header">
-                <h5 className="section-title">
-                  <span className="section-icon">👥</span>
-                  Assignment & Priority
-                </h5>
-                <p className="section-subtitle">Assign technicians and set priority level</p>
-              </div>
-
-
-
-              <div className="col-md-6">
-                <Form.Group controlId="formAssignTo">
-                  <Form.Label className="fw-semibold">
-                    Assigned To <span className="text-danger">*</span>
-                  </Form.Label>
-
-                  {/* Group Assignment Toggle */}
-                  <div className="mb-2">
-                    <Form.Check
-                      type="checkbox"
-                      id="groupAssignmentToggle"
-                      label="Assign to multiple technicians (Group Assignment)"
-                      checked={isGroupAssignment}
-                      onChange={(e) => {
-                        console.log(
-                          "Group assignment toggle changed:",
-                          e.target.checked
-                        );
-                        setIsGroupAssignment(e.target.checked);
-                        if (!e.target.checked) {
-                          setSelectedTechnicians([]);
-                          setFormData((prev) => ({
-                            ...prev,
-                            AssignTo:
-                              assignablePersons.length > 0
-                                ? assignablePersons[0]
-                                : "",
-                          }));
-                        } else {
-                          setSelectedTechnicians(
-                            [formData.AssignTo].filter(Boolean)
-                          );
-                        }
-                      }}
-                      disabled={isSubmitting || assignablePersons.length < 2}
-                    />
-                    {assignablePersons.length < 2 && (
-                      <small className="text-muted d-block">
-                        Group assignment requires at least 2 available
-                        technicians. Currently available:{" "}
-                        {assignablePersons.length}
-                      </small>
-                    )}
-                  </div>
-
-                  {/* Single Assignment */}
-                  {!isGroupAssignment && (
-                    <Form.Select
-                      name="AssignTo"
-                      value={formData.AssignTo}
-                      onChange={handleChange}
-                      required={!isGroupAssignment}
-                      disabled={
-                        assignablePersons.length === 0 ||
-                        isSubmitting ||
-                        [
-                          "John Doe",
-                          "Jane Smith",
-                          "Alex Johnson",
-                          "Emily Davis",
-                        ].includes(
-                          JSON.parse(localStorage.getItem("user"))?.username
-                        )
-                      }
-                      aria-required="true"
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Form.Group controlId="formAddPhotos" className="mb-3">
+                  <div className="d-flex align-items-center mb-3">
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => setPhotosModalOpen(true)}
+                      disabled={loadingPhotos || !initialData?.id}
+                      title="View Existing Photos"
+                      className="me-3"
                     >
-                      {assignablePersons.length === 0 ? (
-                        <option value="" disabled>
-                          No persons available
-                        </option>
-                      ) : (
-                        assignablePersons.map((person) => (
-                          <option key={person} value={person}>
-                            {person}
-                          </option>
-                        ))
-                      )}
-                    </Form.Select>
-                  )}
+                      📷 View Existing Photos
+                    </Button>
+                    <Form.Control
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      disabled={isSubmitting}
+                      style={{ flex: 1 }}
+                      aria-describedby="photosHelp"
+                    />
+                  </div>
+                  <Form.Text id="photosHelp" className="text-muted">
+                    You can upload multiple photos (JPG, PNG, GIF) to showcase the fault. Maximum 10MB per file.
+                  </Form.Text>
 
-                  {/* Group Assignment */}
-                  {isGroupAssignment && (
-                    <div>
-                      <div
-                        className="border rounded p-2"
-                        style={{ maxHeight: "200px", overflowY: "auto" }}
-                      >
-                        {assignablePersons.length === 0 && (
-                          <p className="text-muted">
-                            No technicians available for selection.
-                          </p>
-                        )}
-                        {assignablePersons.map((person) => (
-                          <Form.Check
-                            key={person}
-                            type="checkbox"
-                            id={`tech-${person}`}
-                            label={person}
-                            checked={selectedTechnicians.includes(person)}
-                            onChange={(e) => {
-                              console.log(
-                                `Technician ${person} ${
-                                  e.target.checked ? "selected" : "deselected"
-                                }`
-                              );
-                              if (e.target.checked) {
-                                setSelectedTechnicians((prev) => {
-                                  const newSelection = [...prev, person];
-                                  console.log("New selection:", newSelection);
-                                  return newSelection;
-                                });
-                              } else {
-                                setSelectedTechnicians((prev) => {
-                                  const newSelection = prev.filter(
-                                    (tech) => tech !== person
-                                  );
-                                  console.log("New selection:", newSelection);
-                                  return newSelection;
-                                });
-                              }
-                            }}
-                            disabled={isSubmitting}
-                          />
-                        ))}
-                      </div>
-                      {selectedTechnicians.length > 0 && (
-                        <div className="mt-2">
-                          <small className="text-muted">
-                            Selected: {selectedTechnicians.join(", ")} (
-                            {selectedTechnicians.length} technicians)
-                          </small>
-                        </div>
-                      )}
-                      {selectedTechnicians.length < 2 && isGroupAssignment && (
-                        <div className="mt-1">
-                          <small className="text-danger">
-                            Please select at least 2 technicians for group
-                            assignment
-                          </small>
-                        </div>
-                      )}
+                  {/* Photo previews */}
+                  {photos.length > 0 && (
+                    <div
+                      className="mt-3 p-3 bg-light rounded"
+                      style={{
+                        maxHeight: "150px",
+                        overflowX: "auto",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {renderPhotoPreviews()}
                     </div>
                   )}
-
-                  <Form.Control.Feedback type="invalid">
-                    Please select an assignee.
-                  </Form.Control.Feedback>
                 </Form.Group>
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
 
-            {/* High Priority Checkbox */}
-            <div className="mb-4 p-3 border rounded bg-light">
-              <Form.Check
-                type="checkbox"
-                id="high-priority-checkbox"
-                checked={formData.isHighPriority}
-                onChange={(e) =>
-                  setFormData({ ...formData, isHighPriority: e.target.checked })
-                }
-                disabled={isSubmitting}
-                label={
-                  <span
-                    className={`fs-6 ${
-                      formData.isHighPriority
-                        ? "text-danger fw-bold"
-                        : "text-dark"
-                    }`}
-                  >
-                    🚩 High Priority
-                  </span>
-                }
-              />
-              <Form.Text className="text-muted d-block mt-1">
-                Check this box for critical issues requiring immediate attention
-              </Form.Text>
+            {/* Assignment Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Header
+                className="bg-light border-bottom-0 py-3"
+                style={{
+                  background: "linear-gradient(135deg, #e3f2fd, #f3e5f5)",
+                }}
+              >
+                <h6 className="mb-0 fw-bold text-secondary d-flex align-items-center">
+                  <span className="me-2">👥</span>
+                  Assignment & Priority
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Row>
+                  <Col md={6} className="mb-3">
+                    <Form.Group controlId="formAssignTo">
+                      <Form.Label className="fw-semibold">
+                        Assigned To <span className="text-danger">*</span>
+                      </Form.Label>
 
-              {formData.isHighPriority && (
-                <div className="alert alert-warning mt-2 mb-0 py-2">
-                  <small>
-                    <strong>⚠️ High Priority Selected:</strong> This fault will
-                    be flagged with a red flag for immediate attention.
-                  </small>
-                </div>
-              )}
-            </div>
+                      {/* Group Assignment Toggle */}
+                      <div className="mb-2">
+                        <Form.Check
+                          type="checkbox"
+                          id="groupAssignmentToggle"
+                          label="Assign to multiple technicians (Group Assignment)"
+                          checked={isGroupAssignment}
+                          onChange={(e) => {
+                            console.log(
+                              "Group assignment toggle changed:",
+                              e.target.checked
+                            );
+                            setIsGroupAssignment(e.target.checked);
+                            if (!e.target.checked) {
+                              setSelectedTechnicians([]);
+                              setFormData((prev) => ({
+                                ...prev,
+                                AssignTo:
+                                  assignablePersons.length > 0
+                                    ? assignablePersons[0]
+                                    : "",
+                              }));
+                            } else {
+                              setSelectedTechnicians(
+                                [formData.AssignTo].filter(Boolean)
+                              );
+                            }
+                          }}
+                          disabled={isSubmitting || assignablePersons.length < 2}
+                        />
+                        {assignablePersons.length < 2 && (
+                          <small className="text-muted d-block">
+                            Group assignment requires at least 2 available
+                            technicians. Currently available:{" "}
+                            {assignablePersons.length}
+                          </small>
+                        )}
+                      </div>
 
+                      {/* Single Assignment */}
+                      {!isGroupAssignment && (
+                        <Form.Select
+                          name="AssignTo"
+                          value={formData.AssignTo}
+                          onChange={handleChange}
+                          required={!isGroupAssignment}
+                          disabled={
+                            assignablePersons.length === 0 ||
+                            isSubmitting ||
+                            [
+                              "John Doe",
+                              "Jane Smith",
+                              "Alex Johnson",
+                              "Emily Davis",
+                            ].includes(
+                              JSON.parse(localStorage.getItem("user"))?.username
+                            )
+                          }
+                          aria-required="true"
+                        >
+                          {assignablePersons.length === 0 ? (
+                            <option value="" disabled>
+                              No persons available
+                            </option>
+                          ) : (
+                            assignablePersons.map((person) => (
+                              <option key={person} value={person}>
+                                {person}
+                              </option>
+                            ))
+                          )}
+                        </Form.Select>
+                      )}
+
+                      {/* Group Assignment */}
+                      {isGroupAssignment && (
+                        <div>
+                          <div
+                            className="border rounded p-2"
+                            style={{ maxHeight: "200px", overflowY: "auto" }}
+                          >
+                            {assignablePersons.length === 0 && (
+                              <p className="text-muted">
+                                No technicians available for selection.
+                              </p>
+                            )}
+                            {assignablePersons.map((person) => (
+                              <Form.Check
+                                key={person}
+                                type="checkbox"
+                                id={`tech-${person}`}
+                                label={person}
+                                checked={selectedTechnicians.includes(person)}
+                                onChange={(e) => {
+                                  console.log(
+                                    `Technician ${person} ${
+                                      e.target.checked ? "selected" : "deselected"
+                                    }`
+                                  );
+                                  if (e.target.checked) {
+                                    setSelectedTechnicians((prev) => {
+                                      const newSelection = [...prev, person];
+                                      console.log("New selection:", newSelection);
+                                      return newSelection;
+                                    });
+                                  } else {
+                                    setSelectedTechnicians((prev) => {
+                                      const newSelection = prev.filter(
+                                        (tech) => tech !== person
+                                      );
+                                      console.log("New selection:", newSelection);
+                                      return newSelection;
+                                    });
+                                  }
+                                }}
+                                disabled={isSubmitting}
+                              />
+                            ))}
+                          </div>
+                          {selectedTechnicians.length > 0 && (
+                            <div className="mt-2">
+                              <small className="text-muted">
+                                Selected: {selectedTechnicians.join(", ")} (
+                                {selectedTechnicians.length} technicians)
+                              </small>
+                            </div>
+                          )}
+                          {selectedTechnicians.length < 2 && isGroupAssignment && (
+                            <div className="mt-1">
+                              <small className="text-danger">
+                                Please select at least 2 technicians for group
+                                assignment
+                              </small>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <Form.Control.Feedback type="invalid">
+                        Please select an assignee.
+                      </Form.Control.Feedback>
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* High Priority Section */}
+            <Card className="mb-4 border-0 shadow-sm">
+              <Card.Body className="p-4">
+                <Form.Check
+                  type="checkbox"
+                  id="high-priority-checkbox"
+                  checked={formData.isHighPriority}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isHighPriority: e.target.checked })
+                  }
+                  disabled={isSubmitting}
+                  label={
+                    <span
+                      className={`fs-6 ${
+                        formData.isHighPriority
+                          ? "text-danger fw-bold"
+                          : "text-dark"
+                      }`}
+                    >
+                      🚩 High Priority
+                    </span>
+                  }
+                />
+                <Form.Text className="text-muted d-block mt-1">
+                  Check this box for critical issues requiring immediate attention
+                </Form.Text>
+
+                {formData.isHighPriority && (
+                  <div className="alert alert-warning mt-2 mb-0 py-2">
+                    <small>
+                      <strong>⚠️ High Priority Selected:</strong> This fault will
+                      be flagged with a red flag for immediate attention.
+                    </small>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
           </Form>
         </Modal.Body>
 
-        <Modal.Footer className="px-0 pt-0 border-0">
+        <Modal.Footer className="px-4 pt-0 border-0">
           <Button
             variant="outline-secondary"
             onClick={handleModalClose}
@@ -1328,9 +1408,24 @@ export default function NewFaultModal({
           border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
+        .add-button {
+          min-width: 80px;
+          font-size: 0.875rem;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          transition: all 0.2s ease;
+        }
+
+        .add-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .enhanced-modal-header {
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+          border-bottom: 1px solid #dee2e6;
         }
       `}</style>
     </>
   );
 }
-//test comment
