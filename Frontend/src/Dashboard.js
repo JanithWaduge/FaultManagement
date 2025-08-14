@@ -987,7 +987,7 @@ export default function Dashboard({
                 </Row>
               </div>
             ) : (
-              <Tabs activeKey={view} className="custom-tabs" justify>
+              <Tabs activeKey={view} onSelect={(k) => setView(k)} className="custom-tabs" justify>
                 {["faults", "resolved", "active-chart"].map((tabKey) => (
                   <Tab
                     key={tabKey}
@@ -1103,30 +1103,35 @@ export default function Dashboard({
                           )}
 
                           <Row className="mb-3 px-3 justify-content-center">
-                            <Col md={6} className="mb-2">
-                              <div className="search-container position-relative">
+                            <Col md={5} className="mb-2">
+                              <div className="enhanced-search-container position-relative">
                                 <i
                                   className="bi bi-search position-absolute"
                                   style={{
-                                    left: "15px",
-                                    top: "10px",
-                                    color: "#6c757d",
+                                    left: "12px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    color: "#0072ff",
+                                    fontSize: "14px",
+                                    zIndex: 2,
                                   }}
                                 ></i>
                                 <input
                                   type="text"
-                                  className="form-control search-input pl-4"
-                                  placeholder={`Search ${tabKey}...`}
+                                  className="form-control enhanced-search-input"
+                                  placeholder={`🔍 Search ${tabKey === "faults" ? "faults" : tabKey === "resolved" ? "resolved faults" : "charts"}...`}
                                   value={search}
                                   onChange={(e) => setSearch(e.target.value)}
-                                  style={{
-                                    paddingLeft: "40px",
-                                    borderRadius: "20px",
-                                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-                                    border: "1px solid #dee2e6",
-                                    height: "45px",
-                                  }}
                                 />
+                                {search && (
+                                  <button
+                                    className="search-clear-btn"
+                                    onClick={() => setSearch("")}
+                                    type="button"
+                                  >
+                                    <i className="bi bi-x"></i>
+                                  </button>
+                                )}
                               </div>
                             </Col>
                           </Row>
@@ -1304,7 +1309,8 @@ export default function Dashboard({
         .form-select.status-closed:focus { border-color: #198754; box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25); }
         .glass-button { background: rgba(255, 255, 255, 0.1); border: 1.5px solid rgba(255, 255, 255, 0.4); border-radius: 12px; backdrop-filter: blur(10px); color: white; font-weight: 600; padding: 0.4rem 0.9rem; transition: all 0.3s ease-in-out; cursor: pointer; }
         .glass-button:hover { background: rgba(255, 255, 255, 0.35); color: #001f3f; transform: scale(1.07); box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
-        .custom-tabs .nav-link { font-weight: 600; color: #001f3f; border-radius: 10px; transition: all 0.3s ease; }
+        .custom-tabs .nav-link { font-weight: 600; color: #001f3f; border-radius: 10px; transition: all 0.3s ease; cursor: pointer; }
+        .custom-tabs .nav-link:hover { background: rgba(0, 114, 255, 0.1); color: #0072ff; transform: translateY(-2px); }
         .custom-tabs .nav-link.active { background: linear-gradient(to right, #00c6ff, #0072ff); color: white !important; box-shadow: 0 0 8px rgba(0, 114, 255, 0.5); }
         .table-fixed-header thead.sticky-top th { position: sticky; top: 0; z-index: 10; background: linear-gradient(180deg, #001f3f, #002952); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
         .table-fit td, .table-fit th { font-size: 0.98rem; padding: 0.45rem 0.5rem; vertical-align: middle; }
@@ -1371,6 +1377,66 @@ export default function Dashboard({
         .clickable-status:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .legend-item.clickable-status { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; }
         .legend-item.clickable-status:hover { background-color: rgba(0, 31, 63, 0.1); }
+        
+        /* Enhanced Search Bar Styles */
+        .enhanced-search-container {
+          max-width: 400px;
+          margin: 0 auto;
+        }
+        
+        .enhanced-search-input {
+          height: 38px !important;
+          padding-left: 35px !important;
+          padding-right: 35px !important;
+          border-radius: 25px !important;
+          border: 3px solid #d1d9e3 !important;
+          background: linear-gradient(145deg, #ffffff, #f8fafc) !important;
+          box-shadow: 0 4px 15px rgba(0, 114, 255, 0.08), inset 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          font-size: 14px !important;
+          font-weight: 500 !important;
+          color: #374151 !important;
+        }
+        
+        .enhanced-search-input:focus {
+          outline: none !important;
+          border: 4px solid #0072ff !important;
+          box-shadow: 0 0 0 2px rgba(0, 114, 255, 0.2), 0 8px 25px rgba(0, 114, 255, 0.15) !important;
+          background: #ffffff !important;
+          transform: translateY(-1px) !important;
+        }
+        
+        .enhanced-search-input::placeholder {
+          color: #9ca3af !important;
+          font-weight: 400 !important;
+        }
+        
+        .search-clear-btn {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #6b7280;
+          font-size: 16px;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 50%;
+          transition: all 0.2s ease;
+          z-index: 2;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .search-clear-btn:hover {
+          background-color: #f3f4f6;
+          color: #374151;
+          transform: translateY(-50%) scale(1.1);
+        }
       `}</style>
     </>
   );
