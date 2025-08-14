@@ -391,7 +391,7 @@ function FaultsTable({
                                 fontWeight: "500",
                               }}
                             >
-                              {["In Progress", "Pending", "Hold", "Closed"].map(
+                              {["Pending", "In Progress", "Hold", "Closed"].map(
                                 (s) => (
                                   <option key={s} value={s}>
                                     {s}
@@ -548,6 +548,7 @@ export default function Dashboard({
   const [footerInfo, setFooterInfo] = useState(false);
   const [filteredTechnician, setFilteredTechnician] = useState(null);
   const [filteredStatus, setFilteredStatus] = useState(null);
+  const [filteredType, setFilteredType] = useState(null); // 'open', 'resolved', 'overdue'
   const [detailedView, setDetailedView] = useState(false);
   const [err, setErr] = useState("");
   // State variables for mandatory note workflow
@@ -610,7 +611,7 @@ export default function Dashboard({
     return () => document.removeEventListener("mousedown", outside);
   }, [showNotif, setNotifications]);
 
-  const currentFaultArr = view === "faults" ? open : resolved;
+  const currentFaultArr = filteredType ? [...open, ...resolved] : (view === "faults" ? open : resolved);
   const sortedFaults = useMemo(
     () => [...currentFaultArr].sort((a, b) => b.id - a.id),
     [currentFaultArr]
@@ -642,9 +643,28 @@ export default function Dashboard({
         // Status filter
         const statusMatch = !filteredStatus || f.Status === filteredStatus;
 
-        return textMatch && technicianMatch && statusMatch;
+        // Type filter (open, resolved, overdue)
+        let typeMatch = true;
+        if (filteredType) {
+          if (filteredType === 'open') {
+            typeMatch = f.Status !== "Closed";
+          } else if (filteredType === 'resolved') {
+            typeMatch = f.Status === "Closed";
+          } else if (filteredType === 'overdue') {
+            if (!f.DateTime || f.Status === "Closed") {
+              typeMatch = false;
+            } else {
+              const faultDate = new Date(f.DateTime);
+              const currentDate = new Date();
+              const weekInMs = 7 * 24 * 60 * 60 * 1000;
+              typeMatch = currentDate - faultDate > weekInMs;
+            }
+          }
+        }
+
+        return textMatch && technicianMatch && statusMatch && typeMatch;
       }),
-    [sortedFaults, search, filteredTechnician, filteredStatus]
+    [sortedFaults, search, filteredTechnician, filteredStatus, filteredType]
   );
 
   const [page, setPage] = useState(1);
@@ -754,8 +774,38 @@ export default function Dashboard({
   const clearAllFilters = () => {
     setFilteredTechnician(null);
     setFilteredStatus(null);
+    setFilteredType(null);
     setDetailedView(false);
     setSearch("");
+  };
+
+  // Click handlers for footer statistics
+  const handleTotalOpenClick = () => {
+    setFilteredType('open');
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("faults");
+    setSearch("");
+  };
+
+  const handleResolvedClick = () => {
+    setFilteredType('resolved');
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("resolved");
+    setSearch("");
+  };
+
+  const handleOverdueClick = () => {
+    setFilteredType('overdue');
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("faults");
+    setSearch("");
+  };
+
+  const handleNotificationsClick = () => {
+    setShowNotif(true);
   };
 
   const sidebarItems = [
@@ -1011,13 +1061,24 @@ export default function Dashboard({
                       ) : (
                         <>
                           {/* Filter Indicators */}
-                          {(filteredTechnician || filteredStatus) && (
+                          {(filteredTechnician || filteredStatus || filteredType) && (
                             <Row className="mb-3 px-3">
                               <Col>
                                 <div className="d-flex flex-wrap gap-2 align-items-center">
                                   <span className="text-muted">
                                     Filters active:
                                   </span>
+                                  {filteredType && (
+                                    <span className="badge bg-info d-flex align-items-center gap-1">
+                                      Type: {filteredType === 'open' ? 'Open Faults' : filteredType === 'resolved' ? 'Resolved Faults' : 'Overdue Faults'}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() => setFilteredType(null)}
+                                        aria-label="Clear type filter"
+                                      ></button>
+                                    </span>
+                                  )}
                                   {filteredTechnician && (
                                     <span className="badge bg-primary d-flex align-items-center gap-1">
                                       Technician: {filteredTechnician}
@@ -1044,58 +1105,9 @@ export default function Dashboard({
                                   )}
                                   <button
                                     className="btn btn-outline-secondary btn-sm"
-                                    onClick={() => {
-                                      setFilteredTechnician(null);
-                                      setFilteredStatus(null);
-                                      setDetailedView(false);
-                                    }}
-                                  >
-                                    Clear All Filters
-                                  </button>
-                                </div>
-                              </Col>
-                            </Row>
-                          )}
-
-                          {/* Filter Indicators */}
-                          {(filteredTechnician || filteredStatus) && (
-                            <Row className="mb-2 px-3">
-                              <Col>
-                                <div className="d-flex flex-wrap gap-2 align-items-center">
-                                  <small className="text-muted">
-                                    Active filters:
-                                  </small>
-                                  {filteredTechnician && (
-                                    <span className="badge bg-primary d-flex align-items-center gap-1">
-                                      Technician: {filteredTechnician}
-                                      <button
-                                        type="button"
-                                        className="btn-close btn-close-white"
-                                        style={{ fontSize: "0.6em" }}
-                                        onClick={() =>
-                                          setFilteredTechnician(null)
-                                        }
-                                        aria-label="Clear technician filter"
-                                      ></button>
-                                    </span>
-                                  )}
-                                  {filteredStatus && (
-                                    <span className="badge bg-secondary d-flex align-items-center gap-1">
-                                      Status: {filteredStatus}
-                                      <button
-                                        type="button"
-                                        className="btn-close btn-close-white"
-                                        style={{ fontSize: "0.6em" }}
-                                        onClick={() => setFilteredStatus(null)}
-                                        aria-label="Clear status filter"
-                                      ></button>
-                                    </span>
-                                  )}
-                                  <button
-                                    className="btn btn-sm btn-outline-secondary"
                                     onClick={clearAllFilters}
                                   >
-                                    Clear All
+                                    Clear All Filters
                                   </button>
                                 </div>
                               </Col>
@@ -1207,14 +1219,40 @@ export default function Dashboard({
           </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Open: {open.length} | Resolved: {resolved.length} |
+          <span 
+            className="footer-stat-clickable" 
+            onClick={handleTotalOpenClick}
+            title="Click to filter open faults"
+          >
+            Total Open: {open.length}
+          </span> | 
+          <span 
+            className="footer-stat-clickable" 
+            onClick={handleResolvedClick}
+            title="Click to filter resolved faults"
+          >
+            Resolved: {resolved.length}
+          </span> |
           {overdueFaults.length > 0 && (
-            <span style={{ color: "#dc3545", fontWeight: "bold" }}>
-              {" "}
-              Overdue: {overdueFaults.length} |
-            </span>
+            <>
+              <span 
+                className="footer-stat-clickable" 
+                style={{ color: "#dc3545", fontWeight: "bold" }}
+                onClick={handleOverdueClick}
+                title="Click to filter overdue faults"
+              >
+                {" "}
+                Overdue: {overdueFaults.length}
+              </span> |
+            </>
           )}{" "}
-          Unread Notifications: {notifications.filter((n) => !n.isRead).length}
+          <span 
+            className="footer-stat-clickable" 
+            onClick={handleNotificationsClick}
+            title="Click to view notifications"
+          >
+            Unread Notifications: {notifications.filter((n) => !n.isRead).length}
+          </span>
         </div>
         <div className="text-center text-sm-end">
           <Button
@@ -1436,6 +1474,28 @@ export default function Dashboard({
           background-color: #f3f4f6;
           color: #374151;
           transform: translateY(-50%) scale(1.1);
+        }
+
+        /* Footer Statistics Clickable Styles */
+        .footer-stat-clickable {
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+          text-decoration: none;
+          position: relative;
+        }
+        
+        .footer-stat-clickable:hover {
+          background-color: rgba(0, 114, 255, 0.1);
+          color: #0072ff !important;
+          transform: translateY(-1px);
+          text-decoration: none;
+        }
+        
+        .footer-stat-clickable:active {
+          transform: translateY(0);
+          background-color: rgba(0, 114, 255, 0.2);
         }
       `}</style>
     </>
