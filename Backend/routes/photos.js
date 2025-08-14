@@ -62,7 +62,7 @@ router.post('/upload', authenticateToken, upload.single('photo'), async (req, re
     }
 });
 
-// READ: Get photos by faultId
+// READ: Get photos by faultId with caching
 router.get('/fault/:faultId', authenticateToken, async (req, res) => {
     let pool;
     try {
@@ -71,6 +71,12 @@ router.get('/fault/:faultId', authenticateToken, async (req, res) => {
         if (!faultId || isNaN(parseInt(faultId))) {
             return res.status(400).json({ error: 'Invalid fault ID.' });
         }
+
+        // Set cache headers to reduce repeated requests
+        res.set({
+            'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+            'ETag': `"fault-${faultId}-${Date.now()}"`,
+        });
 
         pool = await database.getPool();
         const request = pool.request();

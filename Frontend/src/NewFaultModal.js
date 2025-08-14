@@ -100,7 +100,7 @@ export default function NewFaultModal({
   const [newSubSystemName, setNewSubSystemName] = useState("");
   const [newFaultLocationName, setNewFaultLocationName] = useState("");
 
-  // Fetch existing photos for the fault
+  // Fetch existing photos for the fault with error handling for rate limiting
   const fetchPhotos = useCallback(
     async (faultId) => {
       setLoadingPhotos(true);
@@ -122,6 +122,13 @@ export default function NewFaultModal({
 
         console.log("Response status:", res.status);
 
+        if (res.status === 429) {
+          console.warn("Rate limited when fetching photos for fault", faultId);
+          setExistingPhotos([]);
+          setError("Too many requests. Photo loading may be temporarily limited.");
+          return;
+        }
+
         if (!res.ok) {
           const errorText = await res.text();
           console.error("Error response:", errorText);
@@ -134,7 +141,12 @@ export default function NewFaultModal({
       } catch (error) {
         console.error("Error fetching photos:", error);
         setExistingPhotos([]);
-        setError(`Failed to load existing photos: ${error.message}`);
+        
+        if (error.message.includes("Too many requests")) {
+          setError("Too many requests. Please wait a moment before loading photos.");
+        } else {
+          setError(`Failed to load existing photos: ${error.message}`);
+        }
       } finally {
         setLoadingPhotos(false);
       }

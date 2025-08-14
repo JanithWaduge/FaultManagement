@@ -25,6 +25,15 @@ import { useMultiFaults } from "./useMultiFaults";
 import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
 import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
 
+// Debounce utility function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
+  };
+};
+
 const assignablePersons = [
   "John Doe",
   "Jane Smith",
@@ -71,6 +80,10 @@ function FaultsTable({
 
       console.log("Response status:", res.status);
 
+      if (res.status === 429) {
+        throw new Error("Too many requests. Please wait a moment and try again.");
+      }
+
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Error response:", errorText);
@@ -85,7 +98,12 @@ function FaultsTable({
       console.error("Error fetching photos:", error);
       setSelectedPhotos([]);
       setPhotosModalOpen(true);
-      alert(`Failed to load photos: ${error.message}`);
+      
+      if (error.message.includes("Too many requests")) {
+        alert("Too many requests. Please wait a moment before trying to view photos again.");
+      } else {
+        alert(`Failed to load photos: ${error.message}`);
+      }
     } finally {
       setLoadingPhotos(false);
     }
@@ -97,7 +115,7 @@ function FaultsTable({
     handlePhotosClick(faultId);
   };
 
-  // Function to check if a fault has photos
+  // Function to check if a fault has photos with caching
   const checkFaultPhotos = async (faultId) => {
     try {
       const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
@@ -111,6 +129,11 @@ function FaultsTable({
         },
       });
 
+      if (res.status === 429) {
+        console.warn(`Rate limited for fault ${faultId}, using cache or skipping`);
+        return false; // Return false when rate limited to avoid errors
+      }
+
       if (res.ok) {
         const photos = await res.json();
         return photos && photos.length > 0;
@@ -122,25 +145,65 @@ function FaultsTable({
     }
   };
 
-  // Use effect to check photos for all faults when faults change
-  React.useEffect(() => {
-    const checkAllFaultPhotos = async () => {
+  // Cache for photo check results to avoid repeated API calls
+  const [photoCheckCache, setPhotoCheckCache] = React.useState(new Map());
+  
+  // Debounced photo checking to prevent too many simultaneous requests
+  const checkAllFaultPhotosDebounced = React.useCallback(
+    debounce(async (faultsList) => {
       const faultsWithPhotosSet = new Set();
+      const newCache = new Map(photoCheckCache);
       
-      for (const fault of faults) {
-        const hasPhotos = await checkFaultPhotos(fault.id);
-        if (hasPhotos) {
-          faultsWithPhotosSet.add(fault.id);
+      // Check only faults that aren't in cache or need refresh
+      const faultsToCheck = faultsList.filter(fault => 
+        !newCache.has(fault.id) || 
+        Date.now() - newCache.get(fault.id).timestamp > 300000 // 5 minutes cache
+      );
+      
+      // Process in batches to avoid overwhelming the server
+      const batchSize = 5;
+      for (let i = 0; i < faultsToCheck.length; i += batchSize) {
+        const batch = faultsToCheck.slice(i, i + batchSize);
+        
+        await Promise.all(
+          batch.map(async (fault) => {
+            try {
+              const hasPhotos = await checkFaultPhotos(fault.id);
+              newCache.set(fault.id, { hasPhotos, timestamp: Date.now() });
+              if (hasPhotos) {
+                faultsWithPhotosSet.add(fault.id);
+              }
+            } catch (error) {
+              console.error(`Error checking photos for fault ${fault.id}:`, error);
+            }
+          })
+        );
+        
+        // Add delay between batches
+        if (i + batchSize < faultsToCheck.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
+      // Add cached results to the set
+      newCache.forEach((value, faultId) => {
+        if (value.hasPhotos && faultsList.some(f => f.id === faultId)) {
+          faultsWithPhotosSet.add(faultId);
+        }
+      });
+      
+      setPhotoCheckCache(newCache);
       setFaultsWithPhotos(faultsWithPhotosSet);
-    };
+    }, 500), // 500ms debounce
+    [photoCheckCache]
+  );
 
+  // Use effect to check photos for all faults when faults change
+  React.useEffect(() => {
     if (faults && faults.length > 0) {
-      checkAllFaultPhotos();
+      checkAllFaultPhotosDebounced(faults);
     }
-  }, [faults, token]);
+  }, [faults, token, checkAllFaultPhotosDebounced]);
 
   return (
     <>

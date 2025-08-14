@@ -36,15 +36,30 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-// Rate limiting
+// Rate limiting with more lenient settings for photo requests
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 200, // increased from 100 to 200 requests per windowMs
   message: {
     message: "Too many requests from this IP, please try again later.",
   },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
+
+// Special rate limiter for photo endpoints with higher limits
+const photoLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50, // 50 requests per 5 minutes for photos
+  message: {
+    message: "Too many photo requests from this IP, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use("/api/", limiter);
+app.use("/api/photos/", photoLimiter);
 
 // Body parsing middleware (ensure this is correctly configured)
 app.use(express.json({ limit: "10mb" })); // Ensure JSON is parsed
