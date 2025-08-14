@@ -81,7 +81,9 @@ function FaultsTable({
       console.log("Response status:", res.status);
 
       if (res.status === 429) {
-        throw new Error("Too many requests. Please wait a moment and try again.");
+        throw new Error(
+          "Too many requests. Please wait a moment and try again."
+        );
       }
 
       if (!res.ok) {
@@ -98,9 +100,11 @@ function FaultsTable({
       console.error("Error fetching photos:", error);
       setSelectedPhotos([]);
       setPhotosModalOpen(true);
-      
+
       if (error.message.includes("Too many requests")) {
-        alert("Too many requests. Please wait a moment before trying to view photos again.");
+        alert(
+          "Too many requests. Please wait a moment before trying to view photos again."
+        );
       } else {
         alert(`Failed to load photos: ${error.message}`);
       }
@@ -111,14 +115,15 @@ function FaultsTable({
 
   const handleUploadSuccess = (faultId) => {
     setUploadModalOpen(null);
-    setFaultsWithPhotos(prev => new Set([...prev, faultId]));
+    setFaultsWithPhotos((prev) => new Set([...prev, faultId]));
     handlePhotosClick(faultId);
   };
 
   // Function to check if a fault has photos with caching
   const checkFaultPhotos = async (faultId) => {
     try {
-      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const baseUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
       const url = `${baseUrl}/api/photos/fault/${faultId}`;
 
       const res = await fetch(url, {
@@ -130,7 +135,9 @@ function FaultsTable({
       });
 
       if (res.status === 429) {
-        console.warn(`Rate limited for fault ${faultId}, using cache or skipping`);
+        console.warn(
+          `Rate limited for fault ${faultId}, using cache or skipping`
+        );
         return false; // Return false when rate limited to avoid errors
       }
 
@@ -147,24 +154,25 @@ function FaultsTable({
 
   // Cache for photo check results to avoid repeated API calls
   const [photoCheckCache, setPhotoCheckCache] = React.useState(new Map());
-  
+
   // Debounced photo checking to prevent too many simultaneous requests
   const checkAllFaultPhotosDebounced = React.useCallback(
     debounce(async (faultsList) => {
       const faultsWithPhotosSet = new Set();
       const newCache = new Map(photoCheckCache);
-      
+
       // Check only faults that aren't in cache or need refresh
-      const faultsToCheck = faultsList.filter(fault => 
-        !newCache.has(fault.id) || 
-        Date.now() - newCache.get(fault.id).timestamp > 300000 // 5 minutes cache
+      const faultsToCheck = faultsList.filter(
+        (fault) =>
+          !newCache.has(fault.id) ||
+          Date.now() - newCache.get(fault.id).timestamp > 300000 // 5 minutes cache
       );
-      
+
       // Process in batches to avoid overwhelming the server
       const batchSize = 5;
       for (let i = 0; i < faultsToCheck.length; i += batchSize) {
         const batch = faultsToCheck.slice(i, i + batchSize);
-        
+
         await Promise.all(
           batch.map(async (fault) => {
             try {
@@ -174,24 +182,27 @@ function FaultsTable({
                 faultsWithPhotosSet.add(fault.id);
               }
             } catch (error) {
-              console.error(`Error checking photos for fault ${fault.id}:`, error);
+              console.error(
+                `Error checking photos for fault ${fault.id}:`,
+                error
+              );
             }
           })
         );
-        
+
         // Add delay between batches
         if (i + batchSize < faultsToCheck.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
-      
+
       // Add cached results to the set
       newCache.forEach((value, faultId) => {
-        if (value.hasPhotos && faultsList.some(f => f.id === faultId)) {
+        if (value.hasPhotos && faultsList.some((f) => f.id === faultId)) {
           faultsWithPhotosSet.add(faultId);
         }
       });
-      
+
       setPhotoCheckCache(newCache);
       setFaultsWithPhotos(faultsWithPhotosSet);
     }, 500), // 500ms debounce
@@ -611,7 +622,11 @@ export default function Dashboard({
     return () => document.removeEventListener("mousedown", outside);
   }, [showNotif, setNotifications]);
 
-  const currentFaultArr = filteredType ? [...open, ...resolved] : (view === "faults" ? open : resolved);
+  const currentFaultArr = filteredType
+    ? [...open, ...resolved]
+    : view === "faults"
+    ? open
+    : resolved;
   const sortedFaults = useMemo(
     () => [...currentFaultArr].sort((a, b) => b.id - a.id),
     [currentFaultArr]
@@ -646,11 +661,11 @@ export default function Dashboard({
         // Type filter (open, resolved, overdue)
         let typeMatch = true;
         if (filteredType) {
-          if (filteredType === 'open') {
+          if (filteredType === "open") {
             typeMatch = f.Status !== "Closed";
-          } else if (filteredType === 'resolved') {
+          } else if (filteredType === "resolved") {
             typeMatch = f.Status === "Closed";
-          } else if (filteredType === 'overdue') {
+          } else if (filteredType === "overdue") {
             if (!f.DateTime || f.Status === "Closed") {
               typeMatch = false;
             } else {
@@ -781,7 +796,7 @@ export default function Dashboard({
 
   // Click handlers for footer statistics
   const handleTotalOpenClick = () => {
-    setFilteredType('open');
+    setFilteredType("open");
     setFilteredTechnician(null);
     setFilteredStatus(null);
     setView("faults");
@@ -789,7 +804,7 @@ export default function Dashboard({
   };
 
   const handleResolvedClick = () => {
-    setFilteredType('resolved');
+    setFilteredType("resolved");
     setFilteredTechnician(null);
     setFilteredStatus(null);
     setView("resolved");
@@ -797,7 +812,7 @@ export default function Dashboard({
   };
 
   const handleOverdueClick = () => {
-    setFilteredType('overdue');
+    setFilteredType("overdue");
     setFilteredTechnician(null);
     setFilteredStatus(null);
     setView("faults");
@@ -1037,7 +1052,12 @@ export default function Dashboard({
                 </Row>
               </div>
             ) : (
-              <Tabs activeKey={view} onSelect={(k) => setView(k)} className="custom-tabs" justify>
+              <Tabs
+                activeKey={view}
+                onSelect={(k) => setView(k)}
+                className="custom-tabs"
+                justify
+              >
                 {["faults", "resolved", "active-chart"].map((tabKey) => (
                   <Tab
                     key={tabKey}
@@ -1061,7 +1081,9 @@ export default function Dashboard({
                       ) : (
                         <>
                           {/* Filter Indicators */}
-                          {(filteredTechnician || filteredStatus || filteredType) && (
+                          {(filteredTechnician ||
+                            filteredStatus ||
+                            filteredType) && (
                             <Row className="mb-3 px-3">
                               <Col>
                                 <div className="d-flex flex-wrap gap-2 align-items-center">
@@ -1070,7 +1092,12 @@ export default function Dashboard({
                                   </span>
                                   {filteredType && (
                                     <span className="badge bg-info d-flex align-items-center gap-1">
-                                      Type: {filteredType === 'open' ? 'Open Faults' : filteredType === 'resolved' ? 'Resolved Faults' : 'Overdue Faults'}
+                                      Type:{" "}
+                                      {filteredType === "open"
+                                        ? "Open Faults"
+                                        : filteredType === "resolved"
+                                        ? "Resolved Faults"
+                                        : "Overdue Faults"}
                                       <button
                                         className="btn-close btn-close-white"
                                         style={{ fontSize: "0.6em" }}
@@ -1131,7 +1158,13 @@ export default function Dashboard({
                                 <input
                                   type="text"
                                   className="form-control enhanced-search-input"
-                                  placeholder={`🔍 Search ${tabKey === "faults" ? "faults" : tabKey === "resolved" ? "resolved faults" : "charts"}...`}
+                                  placeholder={`🔍 Search ${
+                                    tabKey === "faults"
+                                      ? "faults"
+                                      : tabKey === "resolved"
+                                      ? "resolved faults"
+                                      : "charts"
+                                  }...`}
                                   value={search}
                                   onChange={(e) => setSearch(e.target.value)}
                                 />
@@ -1219,39 +1252,43 @@ export default function Dashboard({
           </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          <span 
-            className="footer-stat-clickable" 
+          <span
+            className="footer-stat-clickable"
             onClick={handleTotalOpenClick}
             title="Click to filter open faults"
           >
             Total Open: {open.length}
-          </span> | 
-          <span 
-            className="footer-stat-clickable" 
+          </span>{" "}
+          |
+          <span
+            className="footer-stat-clickable"
             onClick={handleResolvedClick}
             title="Click to filter resolved faults"
           >
             Resolved: {resolved.length}
-          </span> |
+          </span>{" "}
+          |
           {overdueFaults.length > 0 && (
             <>
-              <span 
-                className="footer-stat-clickable" 
+              <span
+                className="footer-stat-clickable"
                 style={{ color: "#dc3545", fontWeight: "bold" }}
                 onClick={handleOverdueClick}
                 title="Click to filter overdue faults"
               >
                 {" "}
                 Overdue: {overdueFaults.length}
-              </span> |
+              </span>{" "}
+              |
             </>
           )}{" "}
-          <span 
-            className="footer-stat-clickable" 
+          <span
+            className="footer-stat-clickable"
             onClick={handleNotificationsClick}
             title="Click to view notifications"
           >
-            Unread Notifications: {notifications.filter((n) => !n.isRead).length}
+            Unread Notifications:{" "}
+            {notifications.filter((n) => !n.isRead).length}
           </span>
         </div>
         <div className="text-center text-sm-end">

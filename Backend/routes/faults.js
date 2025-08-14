@@ -76,12 +76,9 @@ router.post(
   "/",
   [
     authenticateToken,
-    body("SystemID").isIn(VALID_SYSTEM_IDS).withMessage("Invalid System ID"),
+    body("SystemID").trim().notEmpty().withMessage("System ID is required"),
     body("Location").trim().notEmpty().withMessage("Location is required"),
-    body("LocationOfFault")
-      .optional()
-      .isIn(VALID_FAULT_LOCATIONS)
-      .withMessage("Invalid fault location"),
+    body("LocationOfFault").optional().trim(),
     body("DescFault").trim().notEmpty().withMessage("Description is required"),
     body("ReportedBy")
       .trim()
@@ -112,6 +109,92 @@ router.post(
           message: "Validation failed",
           errors: errors.array(),
         });
+      }
+
+      // Flexible validation for SystemID and LocationOfFault
+      const {
+        SystemID: systemIdToValidate,
+        LocationOfFault: locationToValidate,
+      } = req.body;
+
+      // Validate SystemID (required for POST)
+      if (systemIdToValidate && systemIdToValidate.trim() !== "") {
+        let systemValid = false;
+
+        // Check hardcoded list first
+        if (VALID_SYSTEM_IDS.includes(systemIdToValidate)) {
+          systemValid = true;
+        } else {
+          // Check database
+          try {
+            const systemCheck = await db.query(
+              "SELECT COUNT(*) as count FROM tblSystem WHERE System = @systemId",
+              { systemId: systemIdToValidate }
+            );
+
+            if (systemCheck.recordset[0].count > 0) {
+              systemValid = true;
+            }
+          } catch (dbError) {
+            console.error("Database error checking system:", dbError);
+            // If database check fails, fall back to hardcoded validation only
+          }
+        }
+
+        if (!systemValid) {
+          return res.status(400).json({
+            message: "Validation failed",
+            errors: [
+              {
+                type: "field",
+                value: systemIdToValidate,
+                msg: "Invalid System ID - not found",
+                path: "SystemID",
+                location: "body",
+              },
+            ],
+          });
+        }
+      }
+
+      // Validate LocationOfFault if provided
+      if (locationToValidate && locationToValidate.trim() !== "") {
+        let locationValid = false;
+
+        // Check hardcoded list first
+        if (VALID_FAULT_LOCATIONS.includes(locationToValidate)) {
+          locationValid = true;
+        } else {
+          // Check database
+          try {
+            const locationCheck = await db.query(
+              "SELECT COUNT(*) as count FROM tblFaultLoc WHERE LocaFault = @locationName",
+              { locationName: locationToValidate }
+            );
+
+            if (locationCheck.recordset[0].count > 0) {
+              locationValid = true;
+            }
+          } catch (dbError) {
+            console.error("Database error checking location:", dbError);
+            // If database check fails, fall back to hardcoded validation only
+          }
+        }
+
+        if (!locationValid) {
+          return res.status(400).json({
+            message: "Validation failed",
+            errors: [
+              {
+                type: "field",
+                value: locationToValidate,
+                msg: "Invalid fault location - not found",
+                path: "LocationOfFault",
+                location: "body",
+              },
+            ],
+          });
+        }
       }
 
       const {
@@ -248,17 +331,15 @@ router.put(
     param("id").isInt().withMessage("Fault ID must be an integer"),
     body("SystemID")
       .optional()
-      .isIn(VALID_SYSTEM_IDS)
-      .withMessage("Invalid System ID"),
+      .trim()
+      .notEmpty()
+      .withMessage("System ID cannot be empty"),
     body("Location")
       .optional()
       .trim()
       .notEmpty()
       .withMessage("Location is required"),
-    body("LocationOfFault")
-      .optional()
-      .isIn(VALID_FAULT_LOCATIONS)
-      .withMessage("Invalid fault location"),
+    body("LocationOfFault").optional().trim(),
     body("DescFault")
       .optional()
       .trim()
@@ -300,6 +381,89 @@ router.put(
           errors: errors.array(),
           receivedBody: req.body,
         });
+      }
+
+      // Flexible validation for SystemID and LocationOfFault
+      const { SystemID, LocationOfFault } = req.body;
+
+      // Validate SystemID if provided
+      if (SystemID && SystemID.trim() !== "") {
+        let systemValid = false;
+
+        // Check hardcoded list first
+        if (VALID_SYSTEM_IDS.includes(SystemID)) {
+          systemValid = true;
+        } else {
+          // Check database
+          try {
+            const systemCheck = await db.query(
+              "SELECT COUNT(*) as count FROM tblSystem WHERE System = @systemId",
+              { systemId: SystemID }
+            );
+
+            if (systemCheck.recordset[0].count > 0) {
+              systemValid = true;
+            }
+          } catch (dbError) {
+            console.error("Database error checking system:", dbError);
+            // If database check fails, fall back to hardcoded validation only
+          }
+        }
+
+        if (!systemValid) {
+          return res.status(400).json({
+            message: "Validation failed",
+            errors: [
+              {
+                type: "field",
+                value: SystemID,
+                msg: "Invalid System ID - not found",
+                path: "SystemID",
+                location: "body",
+              },
+            ],
+          });
+        }
+      }
+
+      // Validate LocationOfFault if provided
+      if (LocationOfFault && LocationOfFault.trim() !== "") {
+        let locationValid = false;
+
+        // Check hardcoded list first
+        if (VALID_FAULT_LOCATIONS.includes(LocationOfFault)) {
+          locationValid = true;
+        } else {
+          // Check database
+          try {
+            const locationCheck = await db.query(
+              "SELECT COUNT(*) as count FROM tblFaultLoc WHERE LocaFault = @locationName",
+              { locationName: LocationOfFault }
+            );
+
+            if (locationCheck.recordset[0].count > 0) {
+              locationValid = true;
+            }
+          } catch (dbError) {
+            console.error("Database error checking location:", dbError);
+            // If database check fails, fall back to hardcoded validation only
+          }
+        }
+
+        if (!locationValid) {
+          return res.status(400).json({
+            message: "Validation failed",
+            errors: [
+              {
+                type: "field",
+                value: LocationOfFault,
+                msg: "Invalid fault location - not found",
+                path: "LocationOfFault",
+                location: "body",
+              },
+            ],
+          });
+        }
       }
 
       const faultId = req.params.id;

@@ -9,14 +9,17 @@ const path = require("path");
 
 const faultsRouter = require("./routes/faults");
 const authRouter = require("./routes/auth");
-const photosRouter = require('./routes/photos');
+const systemsRouter = require("./routes/systems");
+const photosRouter = require("./routes/photos");
 
 const app = express();
 
 // Security middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // Add this for images
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Add this for images
+  })
+);
 
 // CORS configuration - make sure this comes before routes
 app.use(
@@ -30,11 +33,14 @@ app.use(
 );
 
 // Serve static files from uploads directory - MOVED AFTER CORS
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res, path) => {
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  }
-}));
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    setHeaders: (res, path) => {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  })
+);
 
 // Rate limiting with more lenient settings for photo requests
 const limiter = rateLimit({
@@ -82,7 +88,8 @@ app.get("/api/health", (req, res) => {
 // Mount your routes
 app.use("/api/auth", authRouter);
 app.use("/api/faults", faultsRouter);
-app.use('/api/photos', photosRouter);
+app.use("/api/systems", systemsRouter);
+app.use("/api/photos", photosRouter);
 
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === "production") {
