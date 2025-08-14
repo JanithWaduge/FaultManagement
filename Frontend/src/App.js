@@ -149,10 +149,7 @@ const App = () => {
     const navigate = useNavigate();
     return (
       <Layout onLogout={handleLogout}>
-        <FaultDetailsView
-          faults={faults}
-          onBackClick={() => navigate("/")}
-        />
+        <FaultDetailsView faults={faults} onBackClick={() => navigate("/")} />
       </Layout>
     );
   };

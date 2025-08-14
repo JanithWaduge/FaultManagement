@@ -11,6 +11,8 @@ import {
   Col,
 } from "react-bootstrap";
 import { PhotoModal } from "./components/PhotoModal";
+import AddSystemModal from "./components/AddSystemModal";
+import AddFaultLocationModal from "./components/AddFaultLocationModal";
 
 // Options arrays
 const locationOptions = ["BIA", "BDA", "JIA", "MRIA", "RMA"];
@@ -87,18 +89,24 @@ export default function NewFaultModal({
   const [error, setError] = useState("");
   const [validated, setValidated] = useState(false);
   const [success, setSuccess] = useState("");
+
+  // Clear success message after a delay
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
   const token = localStorage.getItem("token");
 
   // States for "Add" modals
   const [showAddSystemModal, setShowAddSystemModal] = useState(false);
-  const [showAddLocationModal, setShowAddLocationModal] = useState(false);
-  const [showAddSubSystemModal, setShowAddSubSystemModal] = useState(false);
   const [showAddFaultLocationModal, setShowAddFaultLocationModal] =
     useState(false);
-  const [newSystemName, setNewSystemName] = useState("");
-  const [newLocationName, setNewLocationName] = useState("");
-  const [newSubSystemName, setNewSubSystemName] = useState("");
-  const [newFaultLocationName, setNewFaultLocationName] = useState("");
+
+  // Dynamic options states
+  const [systemOptionsDB, setSystemOptionsDB] = useState([]);
+  const [faultLocationOptionsDB, setFaultLocationOptionsDB] = useState([]);
 
   // Fetch existing photos for the fault with error handling for rate limiting
   const fetchPhotos = useCallback(
@@ -125,7 +133,9 @@ export default function NewFaultModal({
         if (res.status === 429) {
           console.warn("Rate limited when fetching photos for fault", faultId);
           setExistingPhotos([]);
-          setError("Too many requests. Photo loading may be temporarily limited.");
+          setError(
+            "Too many requests. Photo loading may be temporarily limited."
+          );
           return;
         }
 
@@ -141,9 +151,11 @@ export default function NewFaultModal({
       } catch (error) {
         console.error("Error fetching photos:", error);
         setExistingPhotos([]);
-        
+
         if (error.message.includes("Too many requests")) {
-          setError("Too many requests. Please wait a moment before loading photos.");
+          setError(
+            "Too many requests. Please wait a moment before loading photos."
+          );
         } else {
           setError(`Failed to load existing photos: ${error.message}`);
         }
@@ -153,6 +165,54 @@ export default function NewFaultModal({
     },
     [token]
   );
+
+  // Fetch systems from backend
+  const fetchSystems = useCallback(async () => {
+    try {
+      const baseUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const response = await fetch(`${baseUrl}/api/systems`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const systems = await response.json();
+        setSystemOptionsDB(systems);
+      }
+    } catch (error) {
+      console.error("Error fetching systems:", error);
+    }
+  }, [token]);
+
+  // Fetch fault locations from backend
+  const fetchFaultLocations = useCallback(async () => {
+    try {
+      const baseUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const response = await fetch(`${baseUrl}/api/systems/locations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const locations = await response.json();
+        setFaultLocationOptionsDB(locations);
+      }
+    } catch (error) {
+      console.error("Error fetching fault locations:", error);
+    }
+  }, [token]);
+
+  // Load options when component mounts
+  useEffect(() => {
+    if (show) {
+      fetchSystems();
+      fetchFaultLocations();
+    }
+  }, [show, fetchSystems, fetchFaultLocations]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user"));
@@ -219,87 +279,22 @@ export default function NewFaultModal({
     setIsSubmitting(false);
   }, [initialData, assignablePersons, show, fetchPhotos]);
 
-  // Handler for adding a new system
-  const handleAddSystem = () => {
-    if (newSystemName.trim() === "") {
-      setError("System name cannot be empty");
-      return;
-    }
-
-    // Add the new system to the options list if it doesn't already exist
-    if (!systemOptions.includes(newSystemName.trim())) {
-      // In a real application, you would make an API call to save this to the database
-      systemOptions.push(newSystemName.trim());
-      setFormData({ ...formData, SystemID: newSystemName.trim() });
-      setNewSystemName("");
-      setShowAddSystemModal(false);
-      setSuccess("New system added successfully!");
-    } else {
-      setError("This system already exists!");
-    }
+  // Handler for when a new system is added via modal
+  const handleSystemAdded = (newSystem) => {
+    // Add to database options
+    setSystemOptionsDB((prev) => [...prev, newSystem]);
+    // Update form data to select the new system
+    setFormData({ ...formData, SystemID: newSystem.System });
+    setSuccess("New system added successfully!");
   };
 
-  // Handler for adding a new location
-  const handleAddLocation = () => {
-    if (newLocationName.trim() === "") {
-      setError("Location name cannot be empty");
-      return;
-    }
-
-    // Add the new location to the options list if it doesn't already exist
-    if (!locationOptions.includes(newLocationName.trim())) {
-      // In a real application, you would make an API call to save this to the database
-      locationOptions.push(newLocationName.trim());
-      setFormData({ ...formData, Location: newLocationName.trim() });
-      setNewLocationName("");
-      setShowAddLocationModal(false);
-      setSuccess("New location added successfully!");
-    } else {
-      setError("This location already exists!");
-    }
-  };
-
-  // Handler for adding a new subsystem
-  const handleAddSubSystem = () => {
-    if (newSubSystemName.trim() === "") {
-      setError("Subsystem name cannot be empty");
-      return;
-    }
-
-    // Add the new subsystem to the options list if it doesn't already exist
-    if (!subSystemOptions.includes(newSubSystemName.trim())) {
-      // In a real application, you would make an API call to save this to the database
-      subSystemOptions.push(newSubSystemName.trim());
-      setFormData({ ...formData, SubSystem: newSubSystemName.trim() });
-      setNewSubSystemName("");
-      setShowAddSubSystemModal(false);
-      setSuccess("New subsystem added successfully!");
-    } else {
-      setError("This subsystem already exists!");
-    }
-  };
-
-  // Handler for adding a new fault location
-  const handleAddFaultLocation = () => {
-    if (newFaultLocationName.trim() === "") {
-      setError("Fault location name cannot be empty");
-      return;
-    }
-
-    // Add the new fault location to the options list if it doesn't already exist
-    if (!faultLocationOptions.includes(newFaultLocationName.trim())) {
-      // In a real application, you would make an API call to save this to the database
-      faultLocationOptions.push(newFaultLocationName.trim());
-      setFormData({
-        ...formData,
-        LocationOfFault: newFaultLocationName.trim(),
-      });
-      setNewFaultLocationName("");
-      setShowAddFaultLocationModal(false);
-      setSuccess("New fault location added successfully!");
-    } else {
-      setError("This fault location already exists!");
-    }
+  // Handler for when a new fault location is added via modal
+  const handleFaultLocationAdded = (newLocation) => {
+    // Add to database options
+    setFaultLocationOptionsDB((prev) => [...prev, newLocation]);
+    // Update form data to select the new location
+    setFormData({ ...formData, LocationOfFault: newLocation.LocaFault });
+    setSuccess("New fault location added successfully!");
   };
 
   // Handle text/select input changes
@@ -581,9 +576,19 @@ export default function NewFaultModal({
                           className="form-control-modern"
                           style={{ flex: 1 }}
                         >
+                          {/* Hardcoded options */}
                           {systemOptions.map((system) => (
-                            <option key={system} value={system}>
+                            <option key={`hardcoded-${system}`} value={system}>
                               {system}
+                            </option>
+                          ))}
+                          {/* Database options */}
+                          {systemOptionsDB.map((system) => (
+                            <option
+                              key={`db-${system.id}`}
+                              value={system.System}
+                            >
+                              {system.System}
                             </option>
                           ))}
                         </Form.Select>
@@ -664,6 +669,7 @@ export default function NewFaultModal({
                             </option>
                           ))}
                         </Form.Select>
+                        {/* Location add button removed per user request
                         <Button
                           variant="outline-warning"
                           className="btn-modern-outline"
@@ -672,6 +678,7 @@ export default function NewFaultModal({
                         >
                           +
                         </Button>
+                        */}
                       </div>
                       <Form.Control.Feedback type="invalid">
                         Please select the location.
@@ -694,9 +701,16 @@ export default function NewFaultModal({
                           style={{ flex: 1 }}
                         >
                           <option value="">Select location of fault</option>
+                          {/* Hardcoded options */}
                           {faultLocationOptions.map((loc) => (
-                            <option key={loc} value={loc}>
+                            <option key={`hardcoded-${loc}`} value={loc}>
                               {loc}
+                            </option>
+                          ))}
+                          {/* Database options */}
+                          {faultLocationOptionsDB.map((loc) => (
+                            <option key={`db-${loc.id}`} value={loc.LocaFault}>
+                              {loc.LocaFault}
                             </option>
                           ))}
                         </Form.Select>
@@ -749,6 +763,7 @@ export default function NewFaultModal({
                             </option>
                           ))}
                         </Form.Select>
+                        {/* SubSystem add button not implemented
                         <Button
                           variant="outline-success"
                           className="btn-modern-outline"
@@ -757,6 +772,7 @@ export default function NewFaultModal({
                         >
                           +
                         </Button>
+                        */}
                       </div>
                     </Form.Group>
                   </Col>
@@ -1187,314 +1203,19 @@ export default function NewFaultModal({
         </Modal.Footer>
       </Modal>
 
-      {/* Modal for adding a new system */}
-      <Modal
+      {/* Add System Modal */}
+      <AddSystemModal
         show={showAddSystemModal}
         onHide={() => setShowAddSystemModal(false)}
-        centered
-        backdrop="static"
-        size="md"
-      >
-        <Modal.Header closeButton className="enhanced-modal-header">
-          <Modal.Title className="fw-bold fs-5">Add New System</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {error && showAddSystemModal && (
-            <Alert
-              variant="danger"
-              dismissible
-              onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
-                {error}
-              </div>
-            </Alert>
-          )}
-          {success && showAddSystemModal && (
-            <Alert
-              variant="success"
-              dismissible
-              onClose={() => setSuccess("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">✅</span>
-                {success}
-              </div>
-            </Alert>
-          )}
-          <Form.Group controlId="formAddSystem">
-            <Form.Label className="fw-semibold">System Name</Form.Label>
-            <Form.Control
-              type="text"
-              value={newSystemName}
-              onChange={(e) => setNewSystemName(e.target.value)}
-              placeholder="Enter new system name"
-              className="border-2 shadow-sm"
-              style={{
-                borderColor: "#e3f2fd",
-                borderRadius: "8px",
-                padding: "12px",
-              }}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-end gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddSystemModal(false);
-              setNewSystemName("");
-              setError("");
-            }}
-            className="btn-modern-secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleAddSystem}
-            className="btn-modern-primary"
-          >
-            Add System
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        onSystemAdded={handleSystemAdded}
+      />
 
-      {/* Modal for adding a new location */}
-      <Modal
-        show={showAddLocationModal}
-        onHide={() => setShowAddLocationModal(false)}
-        centered
-        backdrop="static"
-        size="md"
-      >
-        <Modal.Header closeButton className="enhanced-modal-header">
-          <Modal.Title className="fw-bold fs-5">Add New Location</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {error && showAddLocationModal && (
-            <Alert
-              variant="danger"
-              dismissible
-              onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
-                {error}
-              </div>
-            </Alert>
-          )}
-          {success && showAddLocationModal && (
-            <Alert
-              variant="success"
-              dismissible
-              onClose={() => setSuccess("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">✅</span>
-                {success}
-              </div>
-            </Alert>
-          )}
-          <Form.Group controlId="formAddLocation">
-            <Form.Label className="fw-semibold">Location Name</Form.Label>
-            <Form.Control
-              type="text"
-              value={newLocationName}
-              onChange={(e) => setNewLocationName(e.target.value)}
-              placeholder="Enter new location name"
-              className="border-2 shadow-sm"
-              style={{
-                borderColor: "#fff3e0",
-                borderRadius: "8px",
-                padding: "12px",
-              }}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-end gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddLocationModal(false);
-              setNewLocationName("");
-              setError("");
-            }}
-            className="btn-modern-secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="warning"
-            onClick={handleAddLocation}
-            className="btn-modern-success"
-          >
-            Add Location
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal for adding a new subsystem */}
-      <Modal
-        show={showAddSubSystemModal}
-        onHide={() => setShowAddSubSystemModal(false)}
-        centered
-        backdrop="static"
-        size="md"
-      >
-        <Modal.Header closeButton className="enhanced-modal-header">
-          <Modal.Title className="fw-bold fs-5">Add New Subsystem</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {error && showAddSubSystemModal && (
-            <Alert
-              variant="danger"
-              dismissible
-              onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
-                {error}
-              </div>
-            </Alert>
-          )}
-          {success && showAddSubSystemModal && (
-            <Alert
-              variant="success"
-              dismissible
-              onClose={() => setSuccess("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">✅</span>
-                {success}
-              </div>
-            </Alert>
-          )}
-          <Form.Group controlId="formAddSubSystem">
-            <Form.Label className="fw-semibold">Subsystem Name</Form.Label>
-            <Form.Control
-              type="text"
-              value={newSubSystemName}
-              onChange={(e) => setNewSubSystemName(e.target.value)}
-              placeholder="Enter new subsystem name"
-              className="border-2 shadow-sm"
-              style={{
-                borderColor: "#e8f5e8",
-                borderRadius: "8px",
-                padding: "12px",
-              }}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-end gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddSubSystemModal(false);
-              setNewSubSystemName("");
-              setError("");
-            }}
-            className="btn-modern-secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            onClick={handleAddSubSystem}
-            className="btn-modern-success"
-          >
-            Add Subsystem
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal for adding a new fault location */}
-      <Modal
+      {/* Add Fault Location Modal */}
+      <AddFaultLocationModal
         show={showAddFaultLocationModal}
         onHide={() => setShowAddFaultLocationModal(false)}
-        centered
-        backdrop="static"
-        size="md"
-      >
-        <Modal.Header closeButton className="enhanced-modal-header">
-          <Modal.Title className="fw-bold fs-5">
-            Add New Fault Location
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {error && showAddFaultLocationModal && (
-            <Alert
-              variant="danger"
-              dismissible
-              onClose={() => setError("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">⚠️</span>
-                {error}
-              </div>
-            </Alert>
-          )}
-          {success && showAddFaultLocationModal && (
-            <Alert
-              variant="success"
-              dismissible
-              onClose={() => setSuccess("")}
-              className="mb-4 border-0 shadow-sm"
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-2 fs-5">✅</span>
-                {success}
-              </div>
-            </Alert>
-          )}
-          <Form.Group controlId="formAddFaultLocation">
-            <Form.Label className="fw-semibold">Fault Location Name</Form.Label>
-            <Form.Control
-              type="text"
-              value={newFaultLocationName}
-              onChange={(e) => setNewFaultLocationName(e.target.value)}
-              placeholder="Enter new fault location name"
-              className="border-2 shadow-sm"
-              style={{
-                borderColor: "#e8f5e8",
-                borderRadius: "8px",
-                padding: "12px",
-              }}
-            />
-            <Form.Text className="text-muted">
-              The fault location name should be unique and descriptive.
-            </Form.Text>
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-end gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddFaultLocationModal(false);
-              setNewFaultLocationName("");
-              setError("");
-            }}
-            className="btn-modern-secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="info"
-            onClick={handleAddFaultLocation}
-            className="btn-modern-success"
-          >
-            Add Fault Location
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        onLocationAdded={handleFaultLocationAdded}
+      />
 
       <PhotoModal
         show={photosModalOpen}
