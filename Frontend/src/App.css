@@ -41,13 +41,14 @@
 
 /* Overdue fault highlighting */
 .overdue-fault-row {
-  background-color: #fee2e2 !important; /* Light red background */
+  color: #dc2626 !important; /* Red font color */
+  font-weight: 600 !important; /* Bold font for visibility */
   border-left: 4px solid #dc2626 !important; /* Red left border */
   animation: pulse-warning 2s infinite;
 }
 
 .overdue-fault-row:hover {
-  background-color: #fecaca !important; /* Slightly darker red on hover */
+  color: #b91c1c !important; /* Darker red on hover */
 }
 
 /* Status-based row styling */

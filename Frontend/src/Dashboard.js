@@ -1277,13 +1277,12 @@ export default function Dashboard({
         .status-hold-row, .status-hold-row td { background-color: #fce4ec !important; }
         .status-closed-row, .status-closed-row td { background-color: #d1e7dd !important; }
         .overdue-row, .overdue-row td { 
-          background: linear-gradient(145deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.3)) !important; 
+          color: #dc3545 !important;
+          font-weight: 600 !important;
           border-left: 4px solid #dc3545 !important;
-          color: #721c24 !important;
-          font-weight: 500 !important;
         }
         .overdue-row:hover, .overdue-row:hover td {
-          background: linear-gradient(145deg, rgba(220, 53, 69, 0.3), rgba(220, 53, 69, 0.4)) !important;
+          color: #b02a37 !important;
           box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2) !important;
         }
         @keyframes pulse {
