@@ -170,13 +170,6 @@ const SimplifiedTechnicianCards = ({
                 Available
               </span>
             </div>
-            <Button
-              size="sm"
-              variant="outline-primary"
-              onClick={() => setShowAddModal(true)}
-            >
-              <i className="bi bi-person-plus-fill me-1"></i> Add Technician
-            </Button>
           </div>
         </Card.Footer>
       </Card>
