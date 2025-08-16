@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   Table,
   Button,
@@ -9,115 +9,876 @@ import {
   Tabs,
   Tab,
   Modal,
-  Form,
-  Badge,
+  Image,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
-import Activecharts from "./components/Activecharts"; // Add this import
+import NewFaultModal from "./NewFaultModal";
+import NotesModal from "./NotesModal";
+import Activecharts from "./components/Activecharts";
+import TechnicianCards from "./components/TechnicianCards";
+import PriorityFlag from "./components/PriorityFlag";
+import { useFaultNotes } from "./useFaultNotes";
+import PhotoUploadForm from "./PhotoUploadForm";
+import { PhotoModal } from "./components/PhotoModal";
+import { useMultiFaults } from "./useMultiFaults";
+import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
+import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
 
-export default function DashboardViewOnly({
-  userInfo,
+// Debounce utility function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
+  };
+};
+
+const assignablePersons = [
+  "John Doe",
+  "Jane Smith",
+  "Alex Johnson",
+  "Emily Davis",
+];
+
+function FaultsTable({
   faults,
+  onEdit,
+  onMarkResolved,
+  isResolved,
+  page,
+  setPage,
+  max,
+  onOpenEditModal,
+  onOpenNotesModal,
+  handleStatusChange,
+}) {
+  const [photosModalOpen, setPhotosModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(null);
+  const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [faultsWithPhotos, setFaultsWithPhotos] = useState(new Set());
+  const token = localStorage.getItem("token");
+
+  const handlePhotosClick = async (faultId) => {
+    setLoadingPhotos(true);
+    try {
+      const baseUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const url = `${baseUrl}/api/photos/fault/${faultId}`;
+
+      console.log("Fetching photos from:", url);
+      console.log("Token:", token ? "Present" : "Missing");
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("Response status:", res.status);
+
+      if (res.status === 429) {
+        throw new Error(
+          "Too many requests. Please wait a moment and try again."
+        );
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Error response:", errorText);
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+
+      const photos = await res.json();
+      console.log("Photos fetched successfully:", photos);
+      setSelectedPhotos(photos);
+      setPhotosModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching photos:", error);
+      setSelectedPhotos([]);
+      setPhotosModalOpen(true);
+
+      if (error.message.includes("Too many requests")) {
+        alert(
+          "Too many requests. Please wait a moment before trying to view photos again."
+        );
+      } else {
+        alert(`Failed to load photos: ${error.message}`);
+      }
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
+  const handleUploadSuccess = (faultId) => {
+    setUploadModalOpen(null);
+    setFaultsWithPhotos((prev) => new Set([...prev, faultId]));
+    handlePhotosClick(faultId);
+  };
+
+  // Function to check if a fault has photos with caching
+  const checkFaultPhotos = async (faultId) => {
+    try {
+      const baseUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const url = `${baseUrl}/api/photos/fault/${faultId}`;
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (res.status === 429) {
+        console.warn(
+          `Rate limited for fault ${faultId}, using cache or skipping`
+        );
+        return false; // Return false when rate limited to avoid errors
+      }
+
+      if (res.ok) {
+        const photos = await res.json();
+        return photos && photos.length > 0;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking photos for fault", faultId, error);
+      return false;
+    }
+  };
+
+  // Cache for photo check results to avoid repeated API calls
+  const [photoCheckCache, setPhotoCheckCache] = React.useState(new Map());
+
+  // Debounced photo checking to prevent too many simultaneous requests
+  const checkAllFaultPhotosDebounced = React.useCallback(
+    debounce(async (faultsList) => {
+      const faultsWithPhotosSet = new Set();
+      const newCache = new Map(photoCheckCache);
+
+      // Check only faults that aren't in cache or need refresh
+      const faultsToCheck = faultsList.filter(
+        (fault) =>
+          !newCache.has(fault.id) ||
+          Date.now() - newCache.get(fault.id).timestamp > 300000 // 5 minutes cache
+      );
+
+      // Process in batches to avoid overwhelming the server
+      const batchSize = 5;
+      for (let i = 0; i < faultsToCheck.length; i += batchSize) {
+        const batch = faultsToCheck.slice(i, i + batchSize);
+
+        await Promise.all(
+          batch.map(async (fault) => {
+            try {
+              const hasPhotos = await checkFaultPhotos(fault.id);
+              newCache.set(fault.id, { hasPhotos, timestamp: Date.now() });
+              if (hasPhotos) {
+                faultsWithPhotosSet.add(fault.id);
+              }
+            } catch (error) {
+              console.error(
+                `Error checking photos for fault ${fault.id}:`,
+                error
+              );
+            }
+          })
+        );
+
+        // Add delay between batches
+        if (i + batchSize < faultsToCheck.length) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
+      // Add cached results to the set
+      newCache.forEach((value, faultId) => {
+        if (value.hasPhotos && faultsList.some((f) => f.id === faultId)) {
+          faultsWithPhotosSet.add(faultId);
+        }
+      });
+
+      setPhotoCheckCache(newCache);
+      setFaultsWithPhotos(faultsWithPhotosSet);
+    }, 500), // 500ms debounce
+    [photoCheckCache]
+  );
+
+  // Use effect to check photos for all faults when faults change
+  React.useEffect(() => {
+    if (faults && faults.length > 0) {
+      checkAllFaultPhotosDebounced(faults);
+    }
+  }, [faults, token, checkAllFaultPhotosDebounced]);
+
+  return (
+    <>
+      <Row
+        style={{
+          height: "calc(100vh - 60px - 130px - 80px)",
+          overflowY: "auto",
+        }}
+      >
+        <Card
+          className="glass-card w-100"
+          style={{ background: "rgba(255,255,255,0.95)", borderRadius: 20 }}
+        >
+          <Card.Body className="p-3 d-flex flex-column">
+            <div className="table-responsive">
+              <Table
+                responsive
+                className="table-fixed-header table-fit mb-0 flex-grow-1 align-middle custom-align-table table-borderless glass-table"
+                aria-label="Faults Table"
+              >
+                <colgroup className="d-none d-lg-table-column-group">
+                  {[
+                    3,
+                    3.5,
+                    6,
+                    10,
+                    10,
+                    10,
+                    18,
+                    7,
+                    10,
+                    7.5,
+                    !isResolved && 5,
+                    7.5,
+                    10,
+                  ]
+                    .filter(Boolean)
+                    .map((w, i) => (
+                      <col
+                        key={i}
+                        style={{
+                          width: `${w}%`,
+                          textAlign: w === 3 || w === 3.5 ? "center" : "left",
+                        }}
+                      />
+                    ))}
+                </colgroup>
+                <thead className="sticky-top bg-light">
+                  <tr>
+                    {[
+                      "🚩",
+                      "ID",
+                      "Systems",
+                      "Reported By",
+                      "Location",
+                      "Location of Fault",
+                      "Description",
+                      "Status",
+                      "Assigned To",
+                      "Date",
+                      !isResolved && "Actions",
+                      "Photos",
+                      "Notes",
+                    ]
+                      .filter(Boolean)
+                      .map((h, i) => (
+                        <th
+                          key={i}
+                          className={
+                            i === 0 ||
+                            i === 1 ||
+                            i === 2 ||
+                            (!isResolved && i === 9) ||
+                            i === 10
+                              ? "text-center"
+                              : i === 4
+                              ? "d-none d-md-table-cell"
+                              : i === 5
+                              ? "d-none d-lg-table-cell"
+                              : i === 8
+                              ? "d-none d-md-table-cell"
+                              : ""
+                          }
+                        >
+                          {h}
+                        </th>
+                      ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {faults.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={isResolved ? 12 : 13}
+                        className="text-center text-muted py-4"
+                      >
+                        No faults.
+                      </td>
+                    </tr>
+                  ) : (
+                    faults.map((f) => {
+                      // Check if fault is overdue (more than a week old)
+                      const isOverdue = () => {
+                        if (!f.DateTime || f.Status === "Closed") return false;
+                        const faultDate = new Date(f.DateTime);
+                        const currentDate = new Date();
+                        const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+                        return currentDate - faultDate > weekInMs;
+                      };
+
+                      const getRowClassName = () => {
+                        if (isOverdue()) {
+                          return "overdue-row";
+                        }
+                        if (f.Status === "In Progress") {
+                          return "status-in-progress-row";
+                        }
+                        if (f.Status === "Pending") {
+                          return "status-pending-row";
+                        }
+                        if (f.Status === "Hold") {
+                          return "status-hold-row";
+                        }
+                        if (f.Status === "Closed") {
+                          return "status-closed-row";
+                        }
+                        return "";
+                      };
+
+                      return (
+                        <tr
+                          key={f.id}
+                          className={`table-row-hover ${getRowClassName()}`}
+                        >
+                          <td className="text-center">
+                            <PriorityFlag priority={f.Priority} fault={f} />
+                          </td>
+                          <td className="text-center">{f.id}</td>
+                          <td className="text-center">{f.SystemID}</td>
+                          <td>{f.ReportedBy}</td>
+                          <td className="d-none d-md-table-cell">
+                            {f.Location}
+                          </td>
+                          <td className="d-none d-lg-table-cell">
+                            {f.LocationOfFault}
+                          </td>
+                          <td className="description-col">{f.DescFault}</td>
+                          <td>
+                            <select
+                              value={f.Status}
+                              onChange={async (e) => {
+                                if (isResolved) return;
+                                if (handleStatusChange) {
+                                  handleStatusChange(f, e.target.value);
+                                } else {
+                                  try {
+                                    await onEdit({
+                                      ...f,
+                                      Status: e.target.value,
+                                    });
+                                  } catch (err) {
+                                    alert(
+                                      "Failed to update status: " + err.message
+                                    );
+                                  }
+                                }
+                              }}
+                              className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
+                                /\s+/g,
+                                "-"
+                              )}`}
+                              disabled={isResolved}
+                              style={{
+                                backgroundColor:
+                                  f.Status === "In Progress"
+                                    ? "#fff3cd"
+                                    : f.Status === "Pending"
+                                    ? "#cff4fc"
+                                    : f.Status === "Hold"
+                                    ? "#fce4ec"
+                                    : f.Status === "Closed"
+                                    ? "#d1e7dd"
+                                    : "",
+                                color: "#000",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {["Pending", "In Progress", "Hold", "Closed"].map(
+                                (s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </td>
+                          <td>{f.AssignTo}</td>
+                          <td
+                            className="d-none d-md-table-cell"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            {f.DateTime
+                              ? new Date(f.DateTime).toLocaleDateString()
+                              : ""}
+                          </td>
+                          {!isResolved && (
+                            <td className="text-center">
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                className="me-1 mb-1"
+                                onClick={() => onOpenEditModal(f)}
+                                title="Edit Fault"
+                              >
+                                ✏️
+                              </Button>
+                            </td>
+                          )}
+                          <td className="text-center">
+                            {faultsWithPhotos.has(f.id) && (
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => handlePhotosClick(f.id)}
+                                title="View Photos"
+                                disabled={loadingPhotos}
+                                className="me-1"
+                              >
+                                📷
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline-success"
+                              size="sm"
+                              onClick={() => setUploadModalOpen(f.id)}
+                              title="Upload Photo"
+                            >
+                              ➕
+                            </Button>
+                          </td>
+                          <td>
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => onOpenNotesModal(f)}
+                              className="px-2 py-1"
+                              title="View/Add Notes"
+                            >
+                              📝
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </Table>
+            </div>
+            <nav className="mt-3 px-3" style={{ flexShrink: 0 }}>
+              <ul className="pagination justify-content-center mb-0">
+                <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => setPage(Math.max(page - 1, 1))}
+                  >
+                    Previous
+                  </button>
+                </li>
+                {Array.from({ length: max }).map((_, idx) => (
+                  <li
+                    key={idx + 1}
+                    className={`page-item ${page === idx + 1 ? "active" : ""}`}
+                  >
+                    <button
+                      className="page-link"
+                      onClick={() => setPage(idx + 1)}
+                    >
+                      {idx + 1}
+                    </button>
+                  </li>
+                ))}
+                <li
+                  className={`page-item ${
+                    page === max || max === 0 ? "disabled" : ""
+                  }`}
+                >
+                  <button
+                    className="page-link"
+                    onClick={() => setPage(Math.min(page + 1, max))}
+                  >
+                    Next
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </Card.Body>
+        </Card>
+      </Row>
+
+      <PhotoModal
+        show={photosModalOpen}
+        photos={selectedPhotos}
+        onHide={() => {
+          setPhotosModalOpen(false);
+          setSelectedPhotos([]);
+        }}
+        title="Fault Photos"
+      />
+
+      <Modal
+        show={uploadModalOpen !== null}
+        onHide={() => setUploadModalOpen(null)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Upload Photo for Fault {uploadModalOpen}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <PhotoUploadForm
+            faultId={uploadModalOpen}
+            onUploadSuccess={() => handleUploadSuccess(uploadModalOpen)}
+          />
+        </Modal.Body>
+      </Modal>
+    </>
+  );
+}
+
+export default function Dashboard({
+  userInfo,
   notifications,
   setNotifications,
   onLogout,
-  onNewFault,
 }) {
-  const [showFooterInfo, setShowFooterInfo] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showNewFaultModal, setShowNewFaultModal] = useState(false); // modal control
+  const [modal, setModal] = useState(false);
+  const [edit, setEdit] = useState(null);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState("");
+  const [showNotif, setShowNotif] = useState(false);
+  const [notesModal, setNotesModal] = useState(false);
+  const [selectedFaultForNotes, setSelectedFaultForNotes] = useState(null);
+  const [footerInfo, setFooterInfo] = useState(false);
+  const [filteredTechnician, setFilteredTechnician] = useState(null);
+  const [filteredStatus, setFilteredStatus] = useState(null);
+  const [filteredType, setFilteredType] = useState(null); // 'open', 'resolved', 'overdue'
+  const [detailedView, setDetailedView] = useState(false);
+  const [err, setErr] = useState("");
+  // State variables for mandatory note workflow
+  const [faultPendingClose, setFaultPendingClose] = useState(null);
+  const [closeNoteRequired, setCloseNoteRequired] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  const [success, setSuccess] = useState("");
   const notifRef = useRef();
 
-  const assignablePersons = ["John Doe", "Jane Smith", "Alex Johnson"];
+  // Get data from useMultiFaults hook
+  const {
+    open,
+    resolved,
+    create,
+    update,
+    remove,
+    resolve,
+    error: faultsError,
+    setOpen,
+    setResolved,
+  } = useMultiFaults();
 
-  const [view, setView] = useState(""); // Add this for view management
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterUrgency, setFilterUrgency] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
+  // Calculate overdue faults
+  const overdueFaults = useMemo(() => {
+    return open.filter((fault) => {
+      if (!fault.DateTime || fault.Status === "Closed") return false;
+      const faultDate = new Date(fault.DateTime);
+      const currentDate = new Date();
+      const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+      return currentDate - faultDate > weekInMs;
+    });
+  }, [open]);
 
-  // New Fault form state
-  const [newFaultData, setNewFaultData] = useState({
-    systemID: "",
-    sectionID: "",
-    reportedBy: userInfo?.name || "", // default to current user
-    location: "",
-    description: "",
-    urgency: "medium",
-    status: "open",
-    assignedTo: "",
-  });
+  const token = localStorage.getItem("token");
+  const {
+    notes,
+    loading,
+    error: notesError,
+    fetchNotes,
+    addNote,
+    editNote,
+    deleteNote,
+  } = useFaultNotes(token);
 
-  const filteredFaults = faults.filter((fault) => {
-    const matchesSearch =
-      fault.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fault.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fault.reportedBy.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesUrgency =
-      filterUrgency === "all" || fault.urgency === filterUrgency;
-    const matchesStatus =
-      filterStatus === "all" || fault.status === filterStatus;
-
-    return matchesSearch && matchesUrgency && matchesStatus;
-  });
-
+  // Set error from faults hook
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (showNotifications && notifications.some((n) => !n.isRead)) {
-      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+    if (faultsError) {
+      setErr(faultsError);
     }
-  }, [showNotifications, notifications, setNotifications]);
+  }, [faultsError]);
 
-  // Handle new fault form input change
-  const handleNewFaultChange = (e) => {
-    const { name, value } = e.target;
-    setNewFaultData((prev) => ({ ...prev, [name]: value }));
+  useEffect(() => {
+    if (showNotif)
+      setNotifications((n) => n.map((e) => ({ ...e, isRead: true })));
+    const outside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target))
+        setShowNotif(false);
+    };
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [showNotif, setNotifications]);
+
+  const currentFaultArr = filteredType
+    ? [...open, ...resolved]
+    : view === "faults"
+    ? open
+    : resolved;
+  const sortedFaults = useMemo(
+    () => [...currentFaultArr].sort((a, b) => b.id - a.id),
+    [currentFaultArr]
+  );
+  const filtered = useMemo(
+    () =>
+      sortedFaults.filter((f) => {
+        if (!f) return false;
+
+        // Text search filter
+        const textMatch = [
+          f.DescFault,
+          f.Location,
+          f.LocationOfFault,
+          f.ReportedBy,
+          f.SystemID,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(search.toLowerCase());
+
+        // Technician filter - handle case insensitive matching and trim whitespace
+        const technicianMatch =
+          !filteredTechnician ||
+          (f.AssignTo &&
+            f.AssignTo.trim().toLowerCase() ===
+              filteredTechnician.trim().toLowerCase());
+
+        // Status filter
+        const statusMatch = !filteredStatus || f.Status === filteredStatus;
+
+        // Type filter (open, resolved, overdue)
+        let typeMatch = true;
+        if (filteredType) {
+          if (filteredType === "open") {
+            typeMatch = f.Status !== "Closed";
+          } else if (filteredType === "resolved") {
+            typeMatch = f.Status === "Closed";
+          } else if (filteredType === "overdue") {
+            if (!f.DateTime || f.Status === "Closed") {
+              typeMatch = false;
+            } else {
+              const faultDate = new Date(f.DateTime);
+              const currentDate = new Date();
+              const weekInMs = 7 * 24 * 60 * 60 * 1000;
+              typeMatch = currentDate - faultDate > weekInMs;
+            }
+          }
+        }
+
+        return textMatch && technicianMatch && statusMatch && typeMatch;
+      }),
+    [sortedFaults, search, filteredTechnician, filteredStatus, filteredType]
+  );
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [filtered]);
+  const max = Math.ceil(filtered.length / 10);
+  const current = filtered.slice((page - 1) * 10, page * 10);
+
+  const openEditModal = (fault) => {
+    setEdit(fault);
+    setModal(true);
+  };
+  const openNotesModal = (fault) => {
+    setSelectedFaultForNotes(fault);
+    setNotesModal(true);
   };
 
-  // Handle new fault submission
-  const handleAddNewFault = () => {
-    // Basic validation
-    if (
-      !newFaultData.systemID.trim() ||
-      !newFaultData.sectionID.trim() ||
-      !newFaultData.reportedBy.trim() ||
-      !newFaultData.location.trim() ||
-      !newFaultData.description.trim() ||
-      !newFaultData.urgency.trim() ||
-      !newFaultData.status.trim()
-    ) {
-      alert("Please fill in all required fields");
+  // Status change interceptor function for mandatory closing notes
+  const handleStatusChange = async (fault, newStatus) => {
+    // Check if status is being changed to "Closed"
+    if (newStatus === "Closed" && fault.Status !== "Closed") {
+      console.log("Requiring a closing note for fault:", fault.id);
+
+      // Store the fault and status change for later completion
+      setFaultPendingClose({
+        ...fault,
+        Status: newStatus,
+      });
+      setPendingStatusChange({ fault, newStatus });
+      setCloseNoteRequired(true);
+      setSelectedFaultForNotes(fault);
+      setNotesModal(true);
+
+      // Don't proceed with status change yet
       return;
     }
 
-    onNewFault(newFaultData);
-    setShowNewFaultModal(false);
-    // Reset form
-    setNewFaultData({
-      systemID: "",
-      sectionID: "",
-      reportedBy: userInfo?.name || "",
-      location: "",
-      description: "",
-      urgency: "medium",
-      status: "open",
-      assignedTo: "",
-    });
+    // For non-closing status changes, proceed normally
+    try {
+      const updatedFault = { ...fault, Status: newStatus };
+      await update(updatedFault);
+    } catch (err) {
+      setErr(`Failed to update status: ${err.message}`);
+    }
   };
 
-  // Separate faults by status
-  const open = faults.filter((f) => f.status !== "Closed");
-  const resolved = faults.filter((f) => f.status === "Closed");
+  // Function to handle what happens after a closing note is successfully added
+  const handleClosingNoteComplete = async () => {
+    if (!faultPendingClose || !pendingStatusChange) {
+      console.error("No pending close operation found");
+      return;
+    }
+
+    try {
+      // Now perform the actual status update to "Closed"
+      await update(faultPendingClose);
+
+      // Close the notes modal
+      setNotesModal(false);
+
+      // Clear the pending state
+      setFaultPendingClose(null);
+      setPendingStatusChange(null);
+      setCloseNoteRequired(false);
+      setSelectedFaultForNotes(null);
+
+      // Show success message
+      setSuccess(
+        `Fault #${faultPendingClose.id} has been closed and moved to resolved faults.`
+      );
+
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (error) {
+      console.error("Error completing fault closure:", error);
+      setErr(`Failed to close fault: ${error.message}`);
+    }
+  };
+
+  const handleStatusClick = (technician, status) => {
+    console.log("Status clicked:", technician, status);
+    setFilteredTechnician(technician);
+    setFilteredStatus(status);
+    setDetailedView(true);
+
+    // If status is null, show all faults for the technician
+    // If status is specified, filter by that status
+    if (status === "Closed" || status === "Resolved") {
+      setView("resolved");
+    } else {
+      setView("faults");
+    }
+
+    setSearch(""); // Clear search to avoid interference with filters
+  };
+
+  const handleTechnicianClick = (technician) => {
+    console.log("Technician clicked:", technician);
+    setFilteredTechnician(technician);
+    setFilteredStatus(null);
+    setDetailedView(true);
+    setView("faults");
+    setSearch(""); // Clear search to avoid interference with technician filter
+  };
+
+  const clearAllFilters = () => {
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setFilteredType(null);
+    setDetailedView(false);
+    setSearch("");
+  };
+
+  // Click handlers for footer statistics
+  const handleTotalOpenClick = () => {
+    setFilteredType("open");
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("faults");
+    setSearch("");
+  };
+
+  const handleResolvedClick = () => {
+    setFilteredType("resolved");
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("resolved");
+    setSearch("");
+  };
+
+  const handleOverdueClick = () => {
+    setFilteredType("overdue");
+    setFilteredTechnician(null);
+    setFilteredStatus(null);
+    setView("faults");
+    setSearch("");
+  };
+
+  const handleNotificationsClick = () => {
+    setShowNotif(true);
+  };
+
+  const sidebarItems = [
+    {
+      label: "+ Add Fault",
+      onClick: () => {
+        setModal(true);
+        setEdit(null);
+      },
+    },
+    {
+      label: "🖥️ Fault Review Panel",
+      onClick: () => setView("faults"),
+      active: view === "faults",
+    },
+    {
+      label: "🛠️ Resolved Faults",
+      onClick: () => setView("resolved"),
+      active: view === "resolved",
+    },
+    {
+      label: "📊 Active Chart",
+      onClick: () => setView("active-chart"),
+      active: view === "active-chart",
+    },
+  ];
+
+  // Fixed handleAdd function
+  const handleAdd = async (data) => {
+    try {
+      console.log("handleAdd called with data:", data);
+
+      let result;
+      if (data.id) {
+        // Update existing fault
+        console.log("Updating existing fault with ID:", data.id);
+        result = await update(data);
+      } else {
+        // Create new fault
+        console.log("Creating new fault");
+        result = await create(data);
+      }
+
+      console.log("handleAdd result:", result);
+
+      // Verify we have a valid result with ID
+      if (!result || !result.id) {
+        throw new Error("No fault ID returned from operation");
+      }
+
+      // Return the complete fault object
+      return result;
+    } catch (error) {
+      console.error("Error in handleAdd:", error);
+      setErr(error.message);
+      throw error;
+    }
+  };
 
   return (
     <>
@@ -129,30 +890,30 @@ export default function DashboardViewOnly({
           fluid
           className="d-flex justify-content-between align-items-center"
         >
-          <div style={{ width: 120 }}></div>
+          <div style={{ width: 120 }} />
           <span
             className="navbar-brand mb-0 h1 mx-auto"
             style={{ cursor: "pointer" }}
             onClick={() => (window.location.href = "/")}
             title="Go to Dashboard"
           >
-            ⚡ N F M System Version 1.0.1 (View Only)
+            N F M System Version 1.0.1
           </span>
           <div className="d-flex align-items-center gap-3 position-relative">
             <div ref={notifRef} style={{ position: "relative" }}>
               <Button
                 variant="link"
                 className="text-white p-0"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => setShowNotif((v) => !v)}
                 style={{ fontSize: "1.3rem" }}
               >
                 <BellFill />
-                {notifications.filter((n) => !n.isRead).length > 0 && (
+                {notifications.some((n) => !n.isRead) && (
                   <span
                     className="position-absolute top-0 end-0 bg-danger text-white rounded-circle px-2 py-0"
                     style={{
                       fontSize: "0.7rem",
-                      lineHeight: "1",
+                      lineHeight: 1,
                       fontWeight: "bold",
                     }}
                   >
@@ -160,30 +921,30 @@ export default function DashboardViewOnly({
                   </span>
                 )}
               </Button>
-              {showNotifications && (
+              {showNotif && (
                 <div
                   className="position-absolute"
                   style={{
-                    top: "35px",
+                    top: 35,
                     right: 0,
                     backgroundColor: "white",
                     color: "#222",
-                    width: "280px",
-                    maxHeight: "300px",
+                    width: 280,
+                    maxHeight: 300,
                     overflowY: "auto",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    borderRadius: "8px",
+                    borderRadius: 8,
                     zIndex: 1500,
                   }}
                 >
                   {notifications.length === 0 ? (
-                    <div style={{ padding: "10px" }}>No notifications</div>
+                    <div style={{ padding: 10 }}>No notifications</div>
                   ) : (
                     notifications.map((note) => (
                       <div
                         key={note.id}
                         style={{
-                          padding: "10px",
+                          padding: 10,
                           borderBottom: "1px solid #eee",
                           backgroundColor: note.isRead ? "#f8f9fa" : "white",
                           fontWeight: note.isRead ? "normal" : "600",
@@ -205,6 +966,28 @@ export default function DashboardViewOnly({
       </nav>
 
       <Container fluid className="pt-5 mt-4">
+        {err && (
+          <div className="alert alert-danger" role="alert">
+            {err}
+            <button
+              type="button"
+              className="btn-close float-end"
+              onClick={() => setErr("")}
+            />
+          </div>
+        )}
+
+        {success && (
+          <div className="alert alert-success" role="alert">
+            {success}
+            <button
+              type="button"
+              className="btn-close float-end"
+              onClick={() => setSuccess("")}
+            />
+          </div>
+        )}
+
         <Row>
           <Col
             xs={2}
@@ -220,42 +1003,18 @@ export default function DashboardViewOnly({
               <span className="sidebar-title-text">Dashboard</span>
             </div>
             <ul className="nav flex-column">
-              <li className="nav-item mb-2">
-                <button
-                  className="nav-link btn btn-link text-white p-0"
-                  onClick={() => setShowNewFaultModal(true)}
-                >
-                  + Add Fault
-                </button>
-              </li>
-              <li className="nav-item mb-2">
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "faults" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("faults")}
-                >
-                  📋 Fault Review Panel
-                </button>
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "resolved" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("resolved")}
-                >
-                  ✅ Resolved Faults
-                </button>
-              </li>
-              <li className="nav-item mb-2">
-                <button
-                  className={`nav-link btn btn-link text-white p-0${
-                    view === "active-chart" ? " fw-bold" : ""
-                  }`}
-                  onClick={() => setView("active-chart")}
-                >
-                  📊 Active Chart
-                </button>
-              </li>
+              {sidebarItems.map((item, i) => (
+                <li key={i} className="nav-item mb-2">
+                  <button
+                    className={`nav-link btn btn-link text-white p-0${
+                      item.active ? " fw-bold" : ""
+                    }`}
+                    onClick={item.onClick}
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </Col>
 
@@ -265,354 +1024,214 @@ export default function DashboardViewOnly({
               marginLeft: "16.666667%",
               width: "calc(100% - 16.666667%)",
               height: "calc(100vh - 60px)",
-              overflow: "hidden",
+              overflow: "auto",
               paddingLeft: 0,
               maxWidth: "82%",
             }}
           >
             {!view ? (
               <div className="p-4">
-                <h2 className="mb-4 text-center">👋 Welcome to NFM System</h2>
+                <h2 className="mb-4 text-center">
+                  {" "}
+                  🌐𝖶𝖾𝗅𝖼𝗈𝗆𝖾 𝗍𝗈 𝖭𝖾𝗍𝗐𝗈𝗋𝗄 𝖥𝖺𝗎𝗅𝗍 𝖬𝖺𝗇𝖺𝗀𝖾𝗆𝖾𝗇𝗍 𝖲𝗒𝗌𝗍𝖾𝗆
+                </h2>
                 <Row>
-                  {assignablePersons.map((technician) => {
-                    const techFaults = [...open, ...resolved].filter(
-                      (f) => f.AssignTo === technician
-                    );
-                    const completedFaults = techFaults.filter(
-                      (f) => f.Status === "Closed"
-                    );
-                    const inProgressFaults = techFaults.filter(
-                      (f) => f.Status === "In Progress"
-                    );
-                    const pendingFaults = techFaults.filter(
-                      (f) => f.Status === "Pending"
-                    );
-
-                    return (
-                      <Col key={technician} md={3} className="mb-4">
-                        <Card className="glass-card h-100 performance-card">
-                          <Card.Body>
-                            <Card.Title className="d-flex align-items-center mb-3">
-                              <span className="tech-avatar">
-                                {technician
-                                  .split(" ")
-                                  .map((word) => word[0])
-                                  .join("")}
-                              </span>
-                              <span className="ms-2">{technician}</span>
-                            </Card.Title>
-                            <div className="donut-chart-container mb-3">
-                              <div className="donut-chart">
-                                <svg
-                                  viewBox="0 0 36 36"
-                                  className="circular-chart"
-                                >
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#f3f3f3"
-                                    strokeWidth="1"
-                                  />
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#198754"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (completedFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    className="donut-segment completed"
-                                  />
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#ffc107"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (inProgressFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    strokeDashoffset={`${
-                                      -(
-                                        (completedFaults.length /
-                                          techFaults.length) *
-                                        100
-                                      ) || 0
-                                    }`}
-                                    className="donut-segment in-progress"
-                                  />
-                                  <circle
-                                    cx="18"
-                                    cy="18"
-                                    r="15.91549430918954"
-                                    fill="transparent"
-                                    stroke="#0dcaf0"
-                                    strokeWidth="3"
-                                    strokeDasharray={`${
-                                      (pendingFaults.length /
-                                        techFaults.length) *
-                                        100 || 0
-                                    }, 100`}
-                                    strokeDashoffset={`${
-                                      -(
-                                        ((completedFaults.length +
-                                          inProgressFaults.length) /
-                                          techFaults.length) *
-                                        100
-                                      ) || 0
-                                    }`}
-                                    className="donut-segment pending"
-                                  />
-                                  <text
-                                    x="18"
-                                    y="18.5"
-                                    textAnchor="middle"
-                                    dominantBaseline="middle"
-                                    fontSize="8"
-                                    fill="#2d3748"
-                                    transform="rotate(90, 18, 18.5)"
-                                  >
-                                    {techFaults.length}
-                                  </text>
-                                </svg>
-                              </div>
-                              <div className="donut-legend">
-                                <div className="legend-item">
-                                  <span className="legend-dot completed"></span>
-                                  <span>Completed</span>
-                                </div>
-                                <div className="legend-item">
-                                  <span className="legend-dot in-progress"></span>
-                                  <span>In Progress</span>
-                                </div>
-                                <div className="legend-item">
-                                  <span className="legend-dot pending"></span>
-                                  <span>Pending</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="performance-stats">
-                              <div className="stat-item">
-                                <span className="stat-label">
-                                  Total Assigned
-                                </span>
-                                <span className="stat-value">
-                                  {techFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item completed">
-                                <span className="stat-label">Completed</span>
-                                <span className="stat-value">
-                                  {completedFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item in-progress">
-                                <span className="stat-label">In Progress</span>
-                                <span className="stat-value">
-                                  {inProgressFaults.length}
-                                </span>
-                              </div>
-                              <div className="stat-item pending">
-                                <span className="stat-label">Pending</span>
-                                <span className="stat-value">
-                                  {pendingFaults.length}
-                                </span>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    );
-                  })}
+                  <Col md={9}>
+                    <AllPendingFaultsTable
+                      faults={open}
+                      onViewDetails={(fault) => openEditModal(fault)}
+                    />
+                  </Col>
+                  <Col md={3}>
+                    <SimplifiedTechnicianCards
+                      technicians={assignablePersons}
+                      faults={[...open, ...resolved]}
+                      onTechnicianClick={handleTechnicianClick}
+                    />
+                  </Col>
                 </Row>
               </div>
             ) : (
-              <Tabs activeKey={view} className="custom-tabs" justify>
-                <Tab
-                  eventKey="faults"
-                  title={
-                    <span className="tab-title-lg">🚧 Faults Review Panel</span>
-                  }
-                >
-                  {view === "faults" && (
-                    <>
-                      <Row className="mb-3 px-3">
-                        <Col md={4} className="mb-2">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Search faults..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            aria-label="Search faults"
-                          />
-                        </Col>
-                      </Row>
-                      <div className="mb-2 px-3">
-                        <strong>Total Faults:</strong> {open.length}
-                      </div>
-                      <Card className="shadow-sm mt-3">
-                        <Card.Body className="p-0">
-                          <Table
-                            striped
-                            bordered
-                            hover
-                            responsive
-                            className="table-fixed-header table-lg mb-0"
-                          >
-                            <thead className="sticky-top bg-light">
-                              <tr>
-                                <th>ID</th>
-                                <th>System ID</th>
-                                <th>Section ID</th>
-                                <th>Reported By</th>
-                                <th>Location</th>
-                                <th>Description</th>
-                                <th>Urgency</th>
-                                <th>Status</th>
-                                <th>Assigned To</th>
-                                <th>Reported At</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {filteredFaults.map((fault) => (
-                                <tr key={fault.id} className="table-row-hover">
-                                  <td>{fault.id}</td>
-                                  <td>{fault.systemID}</td>
-                                  <td>{fault.sectionID}</td>
-                                  <td>{fault.reportedBy}</td>
-                                  <td>{fault.location}</td>
-                                  <td className="description-col">
-                                    {fault.description}
-                                  </td>
-                                  <td>
-                                    <span
-                                      className={`badge bg-${getUrgencyColor(
-                                        fault.urgency
-                                      )}`}
-                                    >
-                                      {fault.urgency}
+              <Tabs
+                activeKey={view}
+                onSelect={(k) => setView(k)}
+                className="custom-tabs"
+                justify
+              >
+                {["faults", "resolved", "active-chart"].map((tabKey) => (
+                  <Tab
+                    key={tabKey}
+                    eventKey={tabKey}
+                    title={
+                      <span className="tab-title-lg">
+                        {tabKey === "faults"
+                          ? " Faults Review Panel"
+                          : tabKey === "resolved"
+                          ? " Resolved Faults"
+                          : " Active Chart"}
+                      </span>
+                    }
+                  >
+                    {view === tabKey &&
+                      (tabKey === "active-chart" ? (
+                        <Activecharts
+                          faults={[...open, ...resolved]}
+                          onStatusClick={handleStatusClick}
+                        />
+                      ) : (
+                        <>
+                          {/* Filter Indicators */}
+                          {(filteredTechnician ||
+                            filteredStatus ||
+                            filteredType) && (
+                            <Row className="mb-3 px-3">
+                              <Col>
+                                <div className="d-flex flex-wrap gap-2 align-items-center">
+                                  <span className="text-muted">
+                                    Filters active:
+                                  </span>
+                                  {filteredType && (
+                                    <span className="badge bg-info d-flex align-items-center gap-1">
+                                      Type:{" "}
+                                      {filteredType === "open"
+                                        ? "Open Faults"
+                                        : filteredType === "resolved"
+                                        ? "Resolved Faults"
+                                        : "Overdue Faults"}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() => setFilteredType(null)}
+                                        aria-label="Clear type filter"
+                                      ></button>
                                     </span>
-                                  </td>
-                                  <td>{fault.status}</td>
-                                  <td>{fault.assignedTo}</td>
-                                  <td>{fault.reportedAt}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </Table>
-                        </Card.Body>
-                      </Card>
-                    </>
-                  )}
-                </Tab>
-
-                <Tab
-                  eventKey="resolved"
-                  title={
-                    <span className="tab-title-lg">✅ Resolved Faults</span>
-                  }
-                >
-                  {view === "resolved" && (
-                    <>
-                      <Row className="mb-3 px-3">
-                        <Col md={4} className="mb-2">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Search resolved faults..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            aria-label="Search resolved faults"
-                          />
-                        </Col>
-                      </Row>
-                      <div className="mb-2 px-3">
-                        <strong>Total Resolved Faults:</strong>{" "}
-                        {resolved.length}
-                      </div>
-                      <Card className="shadow-sm mt-3">
-                        <Card.Body className="p-0">
-                          <Table
-                            striped
-                            bordered
-                            hover
-                            responsive
-                            className="table-fixed-header table-lg mb-0"
-                          >
-                            <thead className="sticky-top bg-light">
-                              <tr>
-                                <th>ID</th>
-                                <th>System ID</th>
-                                <th>Section ID</th>
-                                <th>Reported By</th>
-                                <th>Location</th>
-                                <th>Description</th>
-                                <th>Urgency</th>
-                                <th>Status</th>
-                                <th>Assigned To</th>
-                                <th>Reported At</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {resolved
-                                .filter((fault) =>
-                                  fault.description
-                                    .toLowerCase()
-                                    .includes(searchTerm.toLowerCase())
-                                )
-                                .map((fault) => (
-                                  <tr
-                                    key={fault.id}
-                                    className="table-row-hover"
+                                  )}
+                                  {filteredTechnician && (
+                                    <span className="badge bg-primary d-flex align-items-center gap-1">
+                                      Technician: {filteredTechnician}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() =>
+                                          setFilteredTechnician(null)
+                                        }
+                                        aria-label="Clear technician filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  {filteredStatus && (
+                                    <span className="badge bg-secondary d-flex align-items-center gap-1">
+                                      Status: {filteredStatus}
+                                      <button
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: "0.6em" }}
+                                        onClick={() => setFilteredStatus(null)}
+                                        aria-label="Clear status filter"
+                                      ></button>
+                                    </span>
+                                  )}
+                                  <button
+                                    className="btn btn-outline-secondary btn-sm"
+                                    onClick={clearAllFilters}
                                   >
-                                    <td>{fault.id}</td>
-                                    <td>{fault.systemID}</td>
-                                    <td>{fault.sectionID}</td>
-                                    <td>{fault.reportedBy}</td>
-                                    <td>{fault.location}</td>
-                                    <td className="description-col">
-                                      {fault.description}
-                                    </td>
-                                    <td>
-                                      <span
-                                        className={`badge bg-${getUrgencyColor(
-                                          fault.urgency
-                                        )}`}
-                                      >
-                                        {fault.urgency}
-                                      </span>
-                                    </td>
-                                    <td>{fault.status}</td>
-                                    <td>{fault.assignedTo}</td>
-                                    <td>{fault.reportedAt}</td>
-                                  </tr>
-                                ))}
-                            </tbody>
-                          </Table>
-                        </Card.Body>
-                      </Card>
-                    </>
-                  )}
-                </Tab>
+                                    Clear All Filters
+                                  </button>
+                                </div>
+                              </Col>
+                            </Row>
+                          )}
 
-                <Tab
-                  eventKey="active-chart"
-                  title={<span className="tab-title-lg">📊 Active Chart</span>}
-                >
-                  {view === "active-chart" && (
-                    <Activecharts faults={[...open, ...resolved]} />
-                  )}
-                </Tab>
+                          <Row className="mb-3 px-3 justify-content-center">
+                            <Col md={5} className="mb-2">
+                              <div className="enhanced-search-container position-relative">
+                                <i
+                                  className="bi bi-search position-absolute"
+                                  style={{
+                                    left: "12px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    color: "#0072ff",
+                                    fontSize: "14px",
+                                    zIndex: 2,
+                                  }}
+                                ></i>
+                                <input
+                                  type="text"
+                                  className="form-control enhanced-search-input"
+                                  placeholder={`🔍 Search ${
+                                    tabKey === "faults"
+                                      ? "faults"
+                                      : tabKey === "resolved"
+                                      ? "resolved faults"
+                                      : "charts"
+                                  }...`}
+                                  value={search}
+                                  onChange={(e) => setSearch(e.target.value)}
+                                />
+                                {search && (
+                                  <button
+                                    className="search-clear-btn"
+                                    onClick={() => setSearch("")}
+                                    type="button"
+                                  >
+                                    <i className="bi bi-x"></i>
+                                  </button>
+                                )}
+                              </div>
+                            </Col>
+                          </Row>
+                          <div className="mb-2 px-3">
+                            <strong>
+                              Total{" "}
+                              {tabKey === "faults"
+                                ? "Faults"
+                                : "Resolved Faults"}
+                              :
+                            </strong>{" "}
+                            {filtered.length}
+                            {tabKey === "faults" &&
+                              overdueFaults.length > 0 && (
+                                <span
+                                  style={{
+                                    color: "#dc3545",
+                                    fontWeight: "bold",
+                                    marginLeft: "10px",
+                                  }}
+                                >
+                                  | Overdue:{" "}
+                                  {
+                                    overdueFaults.filter((f) =>
+                                      [
+                                        f.DescFault,
+                                        f.Location,
+                                        f.LocationOfFault,
+                                        f.ReportedBy,
+                                        f.SystemID,
+                                      ]
+                                        .join(" ")
+                                        .toLowerCase()
+                                        .includes(search.toLowerCase())
+                                    ).length
+                                  }
+                                </span>
+                              )}
+                          </div>
+                          <FaultsTable
+                            faults={current}
+                            onEdit={update}
+                            onMarkResolved={resolve}
+                            isResolved={tabKey === "resolved"}
+                            page={page}
+                            setPage={setPage}
+                            max={max}
+                            onOpenEditModal={openEditModal}
+                            onOpenNotesModal={openNotesModal}
+                            handleStatusChange={handleStatusChange}
+                          />
+                        </>
+                      ))}
+                  </Tab>
+                ))}
               </Tabs>
             )}
           </Col>
@@ -633,505 +1252,289 @@ export default function DashboardViewOnly({
           </Button>
         </div>
         <div className="text-center flex-grow-1 mb-2 mb-sm-0">
-          Total Faults: {faults.length} | Unread Notifications:{" "}
-          {notifications.filter((n) => !n.isRead).length}
+          <span
+            className="footer-stat-clickable"
+            onClick={handleTotalOpenClick}
+            title="Click to filter open faults"
+          >
+            Total Open: {open.length}
+          </span>{" "}
+          |
+          <span
+            className="footer-stat-clickable"
+            onClick={handleResolvedClick}
+            title="Click to filter resolved faults"
+          >
+            Resolved: {resolved.length}
+          </span>{" "}
+          |
+          {overdueFaults.length > 0 && (
+            <>
+              <span
+                className="footer-stat-clickable"
+                style={{ color: "#dc3545", fontWeight: "bold" }}
+                onClick={handleOverdueClick}
+                title="Click to filter overdue faults"
+              >
+                {" "}
+                Overdue: {overdueFaults.length}
+              </span>{" "}
+              |
+            </>
+          )}{" "}
+          <span
+            className="footer-stat-clickable"
+            onClick={handleNotificationsClick}
+            title="Click to view notifications"
+          >
+            Unread Notifications:{" "}
+            {notifications.filter((n) => !n.isRead).length}
+          </span>
         </div>
         <div className="text-center text-sm-end">
           <Button
             className="glass-button"
             size="sm"
-            onClick={() => setShowFooterInfo(!showFooterInfo)}
+            onClick={() => setFooterInfo((v) => !v)}
           >
-            {showFooterInfo ? "Hide Info" : "Show Info"}
+            {footerInfo ? "Hide Info" : "Show Info"}
           </Button>
-          {showFooterInfo && (
+          {footerInfo && (
             <div className="mt-1" style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-              &copy; 2025 Network Fault Management System. All rights reserved.
+              © 2025 Network Fault Management System. All rights reserved.
             </div>
           )}
         </div>
       </footer>
 
-      {/* New Fault Modal */}
-      <Modal
-        show={showNewFaultModal}
-        onHide={() => setShowNewFaultModal(false)}
-        centered
-        size="lg"
-        className="fault-modal"
-      >
-        <Modal.Header closeButton className="border-0 pb-0">
-          <Modal.Title as="h4" className="text-primary fw-bold">
-            <span className="fs-4">📝 Add New Fault</span>
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="pt-0">
-          <Form className="glass-form p-3">
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3" controlId="formSystemID">
-                  <Form.Label className="text-muted fw-bold">
-                    System ID
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="systemID"
-                    value={newFaultData.systemID}
-                    onChange={handleNewFaultChange}
-                    placeholder="Enter system ID"
-                    className="glass-input"
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3" controlId="formSectionID">
-                  <Form.Label className="text-muted fw-bold">
-                    Section ID
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="sectionID"
-                    value={newFaultData.sectionID}
-                    onChange={handleNewFaultChange}
-                    placeholder="Enter section ID"
-                    className="glass-input"
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+      <NewFaultModal
+        show={modal}
+        handleClose={() => {
+          setModal(false);
+          setEdit(null);
+        }}
+        handleAdd={handleAdd}
+        assignablePersons={assignablePersons}
+        initialData={edit}
+      />
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3" controlId="formReportedBy">
-                  <Form.Label className="text-muted fw-bold">
-                    Reported By
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="reportedBy"
-                    value={newFaultData.reportedBy}
-                    onChange={handleNewFaultChange}
-                    placeholder="Enter reporter name"
-                    disabled
-                    className="glass-input"
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3" controlId="formLocation">
-                  <Form.Label className="text-muted fw-bold">
-                    Location
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="location"
-                    value={newFaultData.location}
-                    onChange={handleNewFaultChange}
-                    placeholder="Enter location"
-                    className="glass-input"
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <Form.Group className="mb-3" controlId="formDescription">
-              <Form.Label className="text-muted fw-bold">
-                Description
-              </Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                name="description"
-                value={newFaultData.description}
-                onChange={handleNewFaultChange}
-                placeholder="Enter fault description"
-                className="glass-input"
-              />
-            </Form.Group>
-
-            <Row>
-              <Col md={4}>
-                <Form.Group className="mb-3" controlId="formUrgency">
-                  <Form.Label className="text-muted fw-bold">
-                    Urgency Level
-                  </Form.Label>
-                  <Form.Select
-                    name="urgency"
-                    value={newFaultData.urgency}
-                    onChange={handleNewFaultChange}
-                    className={`glass-input status-${newFaultData.urgency}`}
-                  >
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group className="mb-3" controlId="formStatus">
-                  <Form.Label className="text-muted fw-bold">Status</Form.Label>
-                  <Form.Select
-                    name="status"
-                    value={newFaultData.status}
-                    onChange={handleNewFaultChange}
-                    className={`glass-input status-${newFaultData.status}`}
-                  >
-                    <option value="open">Open</option>
-                    <option value="closed">Closed</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group className="mb-3" controlId="formAssignedTo">
-                  <Form.Label className="text-muted fw-bold">
-                    Assign To
-                  </Form.Label>
-                  <Form.Select
-                    name="assignedTo"
-                    value={newFaultData.assignedTo}
-                    onChange={handleNewFaultChange}
-                    className="glass-input"
-                  >
-                    <option value="">Select Technician</option>
-                    {assignablePersons.map((person) => (
-                      <option key={person} value={person}>
-                        {person}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="border-0">
-          <Button
-            variant="light"
-            onClick={() => setShowNewFaultModal(false)}
-            className="me-2 glass-button-secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleAddNewFault}
-            className="px-4 glass-button-primary"
-          >
-            Add Fault
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <NotesModal
+        show={notesModal}
+        onHide={() => {
+          if (closeNoteRequired) {
+            // Show confirmation before closing if this is for closing a fault
+            if (
+              window.confirm(
+                "Closing without adding a note will cancel the status change. Are you sure?"
+              )
+            ) {
+              setNotesModal(false);
+              setCloseNoteRequired(false);
+              setFaultPendingClose(null);
+              setPendingStatusChange(null);
+              setSelectedFaultForNotes(null);
+            }
+          } else {
+            setNotesModal(false);
+            setSelectedFaultForNotes(null);
+          }
+        }}
+        fault={selectedFaultForNotes}
+        notes={notes}
+        loading={loading}
+        error={notesError}
+        onAddNote={addNote}
+        onEditNote={editNote}
+        onDeleteNote={deleteNote}
+        onFetchNotes={fetchNotes}
+        isClosingNote={closeNoteRequired}
+        onClosingNoteComplete={handleClosingNoteComplete}
+      />
 
       <style>{`
-        .glass-button {
-          background: rgba(255, 255, 255, 0.1);
-          border: 1.5px solid rgba(255, 255, 255, 0.4);
-          border-radius: 12px;
-          backdrop-filter: blur(10px);
-          color: white;
-          font-weight: 600;
-          padding: 0.4rem 0.9rem;
-          transition: all 0.3s ease-in-out;
+        .status-in-progress-row, .status-in-progress-row td { background-color: #fff3cd !important; }
+        .status-pending-row, .status-pending-row td { background-color: #cff4fc !important; }
+        .status-hold-row, .status-hold-row td { background-color: #fce4ec !important; }
+        .status-closed-row, .status-closed-row td { background-color: #d1e7dd !important; }
+        .overdue-row, .overdue-row td { 
+          color: #dc3545 !important;
+          font-weight: 600 !important;
+          border-left: 4px solid #dc3545 !important;
+        }
+        .overdue-row:hover, .overdue-row:hover td {
+          color: #b02a37 !important;
+          box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2) !important;
+        }
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .overdue-flag {
+          display: inline-block;
+          animation: pulse 2s infinite;
+        }
+        .form-select.status-in-progress { border-color: #ffc107; background-color: #fff3cd; }
+        .form-select.status-pending { border-color: #0dcaf0; background-color: #cff4fc; }
+        .form-select.status-hold { border-color: #e91e63; background-color: #fce4ec; }
+        .form-select.status-closed { border-color: #198754; background-color: #d1e7dd; }
+        .form-select.status-in-progress:focus { border-color: #ffc107; box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25); }
+        .form-select.status-pending:focus { border-color: #0dcaf0; box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25); }
+        .form-select.status-hold:focus { border-color: #e91e63; box-shadow: 0 0 0 0.25rem rgba(233, 30, 99, 0.25); }
+        .form-select.status-closed:focus { border-color: #198754; box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25); }
+        .glass-button { background: rgba(255, 255, 255, 0.1); border: 1.5px solid rgba(255, 255, 255, 0.4); border-radius: 12px; backdrop-filter: blur(10px); color: white; font-weight: 600; padding: 0.4rem 0.9rem; transition: all 0.3s ease-in-out; cursor: pointer; }
+        .glass-button:hover { background: rgba(255, 255, 255, 0.35); color: #001f3f; transform: scale(1.07); box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
+        .custom-tabs .nav-link { font-weight: 600; color: #001f3f; border-radius: 10px; transition: all 0.3s ease; cursor: pointer; }
+        .custom-tabs .nav-link:hover { background: rgba(0, 114, 255, 0.1); color: #0072ff; transform: translateY(-2px); }
+        .custom-tabs .nav-link.active { background: linear-gradient(to right, #00c6ff, #0072ff); color: white !important; box-shadow: 0 0 8px rgba(0, 114, 255, 0.5); }
+        .table-fixed-header thead.sticky-top th { position: sticky; top: 0; z-index: 10; background: linear-gradient(180deg, #001f3f, #002952); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        .table-fit td, .table-fit th { font-size: 0.98rem; padding: 0.45rem 0.5rem; vertical-align: middle; }
+        .custom-align-table th, .custom-align-table td { vertical-align: middle !important; text-align: left; }
+        .custom-align-table th.text-center, .custom-align-table td.text-center { text-align: center !important; }
+        .custom-align-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .custom-align-table td.description-col { white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+        .tab-title-lg { font-size: 1.35rem; font-weight: 700; color: #001f3f; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); }
+        .description-col { max-width: 180px; white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+        .table-row-hover:hover { filter: brightness(95%); cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .glass-table { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1); }
+        .glass-table thead th { background: linear-gradient(180deg, #001f3f, #002952); color: white; font-weight: 600; padding: 1rem 0.5rem; border-bottom: 2px solid rgba(255, 255, 255, 0.1); text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; }
+        .glass-table tbody tr { transition: all 0.3s ease; border-bottom: 1px solid rgba(0, 31, 63, 0.05); }
+        .glass-table tbody tr:last-child { border-bottom: none; }
+        .glass-table tbody td { padding: 1rem 0.5rem; }
+        .status-in-progress-row { background: linear-gradient(145deg, rgba(255, 243, 205, 0.7), rgba(255, 243, 205, 0.9)) !important; backdrop-filter: blur(5px); }
+        .status-pending-row { background: linear-gradient(145deg, rgba(207, 244, 252, 0.7), rgba(207, 244, 252, 0.9)) !important; backdrop-filter: blur(5px); }
+        .status-hold-row { background: linear-gradient(145deg, rgba(252, 228, 236, 0.7), rgba(252, 228, 236, 0.9)) !important; backdrop-filter: blur(5px); }
+        .status-closed-row { background: linear-gradient(145deg, rgba(209, 231, 221, 0.7), rgba(209, 231, 221, 0.9)) !important; backdrop-filter: blur(5px); }
+        .table-row-hover:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); cursor: pointer; }
+        .form-control, .form-select { font-size: 1rem; border-radius: 8px; }
+        .sidebar { background-color: #001f3f !important; height: 100vh; position: fixed; top: 60px; left: 0; z-index: 1040; overflow-y: auto; width: 16.6666667%; }
+        .sidebar .nav-link.btn-link { font-size: 1rem; padding: 0.35rem 0.7rem; height: 2.1rem; border-radius: 8px; font-weight: 600; letter-spacing: 0.2px; }
+        .sidebar .nav-link.btn-link:hover, .sidebar .nav-link.btn-link:focus { background-color: rgba(255, 255, 255, 0.18); color: #0072ff; }
+        .glass-sidebar-title { background: rgba(255, 255, 255, 0.13); border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 16px; backdrop-filter: blur(8px); color: #001f3f; font-weight: 700; font-size: 1.5rem; padding: 0.7rem 0.5rem 0.7rem 0.5rem; margin-bottom: 1.2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.07); transition: all 0.3s ease; cursor: pointer; }
+        .glass-sidebar-title:hover { background: rgba(255, 255, 255, 0.25); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2); }
+        .glass-sidebar-title:active { transform: translateY(0); }
+        .sidebar-title-text { color: #dfe3e7ff; font-weight: 600; font-size: 1.50rem; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.08); pointer-events: none; }
+        .performance-card { transition: all 0.3s ease; background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0, 31, 63, 0.1); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1); }
+        .performance-card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15); }
+        .tech-avatar { background: linear-gradient(135deg, #001f3f, #0072ff); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; }
+        .performance-stats { display: flex; flex-direction: column; gap: 0.8rem; }
+        .stat-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: rgba(0, 31, 63, 0.05); border-radius: 8px; transition: all 0.2s ease; }
+        .stat-item:hover { background: rgba(0, 31, 63, 0.1); }
+        .stat-label { font-size: 0.9rem; color: #4a5568; }
+        .stat-value { font-weight: bold; color: #2d3748; }
+        .stat-item.completed { background: rgba(25, 135, 84, 0.1); }
+        .stat-item.resolved { background: rgba(108, 117, 125, 0.1); }
+        .stat-item.in-progress { background: rgba(255, 193, 7, 0.1); }
+        .stat-item.pending { background: rgba(13, 202, 240, 0.1); }
+        .donut-chart-container { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .donut-chart { width: 120px; height: 120px; }
+        .circular-chart { display: block; margin: 10px auto; max-width: 100%; max-height: 250px; transform: rotate(-90deg); }
+        .donut-segment { transition: all 0.3s ease; }
+        .donut-segment.completed { stroke: #198754; }
+        .donut-segment.resolved { stroke: #6c757d; }
+        .donut-segment.in-progress { stroke: #ffc107; }
+        .donut-segment.pending { stroke: #0dcaf0; }
+        .donut-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; font-size: 0.8rem; }
+        .legend-item { display: flex; align-items: center; gap: 0.3rem; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .legend-dot.completed { background-color: #198754; }
+        .legend-dot.resolved { background-color: #6c757d; }
+        .legend-dot.in-progress { background-color: #ffc107; }
+        .legend-dot.pending { background-color: #0dcaf0; }
+        .clickable-card { cursor: pointer; transition: all 0.3s ease; }
+        .clickable-card:hover { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0, 31, 63, 0.15); }
+        .clickable-card:active { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0, 31, 63, 0.1); }
+        @media (max-width: 992px) { .description-col { max-width: 120px; } .table-fit td, .table-fit th { font-size: 0.9rem; padding: 0.4rem 0.35rem; } }
+        @media (max-width: 768px) { .description-col { max-width: 100px; } .table-fit td, .table-fit th { font-size: 0.85rem; padding: 0.35rem 0.3rem; } .form-select-sm { font-size: 0.75rem; padding: 0.15rem 0.5rem; } .btn-sm { padding: 0.25rem 0.4rem; font-size: 0.75rem; } }
+        @media (max-width: 576px) { .table-responsive { overflow-x: auto; } .description-col { max-width: 80px; } }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .clickable-status { cursor: pointer; transition: all 0.2s ease; }
+        .clickable-status:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .legend-item.clickable-status { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; }
+        .legend-item.clickable-status:hover { background-color: rgba(0, 31, 63, 0.1); }
+        
+        /* Enhanced Search Bar Styles */
+        .enhanced-search-container {
+          max-width: 400px;
+          margin: 0 auto;
+        }
+        
+        .enhanced-search-input {
+          height: 38px !important;
+          padding-left: 35px !important;
+          padding-right: 35px !important;
+          border-radius: 25px !important;
+          border: 3px solid #d1d9e3 !important;
+          background: linear-gradient(145deg, #ffffff, #f8fafc) !important;
+          box-shadow: 0 4px 15px rgba(0, 114, 255, 0.08), inset 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          font-size: 14px !important;
+          font-weight: 500 !important;
+          color: #374151 !important;
+        }
+        
+        .enhanced-search-input:focus {
+          outline: none !important;
+          border: 4px solid #0072ff !important;
+          box-shadow: 0 0 0 2px rgba(0, 114, 255, 0.2), 0 8px 25px rgba(0, 114, 255, 0.15) !important;
+          background: #ffffff !important;
+          transform: translateY(-1px) !important;
+        }
+        
+        .enhanced-search-input::placeholder {
+          color: #9ca3af !important;
+          font-weight: 400 !important;
+        }
+        
+        .search-clear-btn {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #6b7280;
+          font-size: 16px;
           cursor: pointer;
+          padding: 4px;
+          border-radius: 50%;
+          transition: all 0.2s ease;
+          z-index: 2;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        .glass-button:hover {
-          background: rgba(255, 255, 255, 0.35);
-          color: #001f3f;
-          transform: scale(1.07);
-          box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        
+        .search-clear-btn:hover {
+          background-color: #f3f4f6;
+          color: #374151;
+          transform: translateY(-50%) scale(1.1);
         }
-        .custom-tabs .nav-link {
-          font-weight: 600;
-          color: #001f3f;
-          border-radius: 10px;
-          transition: all 0.3s ease;
-        }
-        .custom-tabs .nav-link.active {
-          background: linear-gradient(to right, #00c6ff, #0072ff);
-          color: white !important;
-          box-shadow: 0 0 8px rgba(0, 114, 255, 0.5);
-        }
-        .table-fixed-header thead.sticky-top th {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          background-color: #f8f9fa;
-          border-bottom: 2px solid #dee2e6;
-        }
-        .table-lg td, .table-lg th {
-          font-size: 1.15rem;
-          padding: 1rem 1.25rem;
-          vertical-align: middle;
-        }
-        .tab-title-lg {
-          font-size: 1.6rem;
-          font-weight: 700;
-          color: #001f3f;
-          letter-spacing: 0.5px;
-          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-        }
-        .description-col {
-          max-width: 300px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .table-row-hover:hover {
-          background-color: #e6f0ff;
+
+        /* Footer Statistics Clickable Styles */
+        .footer-stat-clickable {
           cursor: pointer;
-          transition: background-color 0.25s ease;
+          padding: 4px 8px;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+          text-decoration: none;
+          position: relative;
         }
-
-        .form-control, .form-select {
-         font-size: 1rem;
-         border-radius: 8px;
+        
+        .footer-stat-clickable:hover {
+          background-color: rgba(0, 114, 255, 0.1);
+          color: #0072ff !important;
+          transform: translateY(-1px);
+          text-decoration: none;
         }
-
-        /* Add these new styles */
-      .sidebar {
-        background-color: #001f3f !important;
-        height: 100vh;
-        position: fixed;
-        top: 60px;
-        left: 0;
-        z-index: 1040;
-        overflow-y: auto;
-        width: 16.6666667%;
-      }
-
-      .glass-sidebar-title {
-        background: rgba(255, 255, 255, 0.13);
-        border: 1.5px solid rgba(255, 255, 255, 0.35);
-        border-radius: 16px;
-        backdrop-filter: blur(8px);
-        color: #001f3f;
-        font-weight: 700;
-        font-size: 1.5rem;
-        padding: 0.7rem 0.5rem;
-        margin-bottom: 1.2rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-        transition: all 0.3s ease;
-      }
-
-      .sidebar-title-text {
-        color: #dfe3e7ff;
-        font-weight: 600;
-        font-size: 1.50rem;
-        letter-spacing: 0.5px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
-        pointer-events: none;
-      }
-
-      .sidebar .nav-link.btn-link {
-        font-size: 1rem;
-        padding: 0.35rem 0.7rem;
-        height: 2.1rem;
-        border-radius: 8px;
-        font-weight: 600;
-        letter-spacing: 0.2px;
-      }
-
-      .sidebar .nav-link.btn-link:hover,
-      .sidebar .nav-link.btn-link:focus {
-        background-color: rgba(255, 255, 255, 0.18);
-        color: #0072ff;
-      }
-
-      /* Performance Card Styles */
-      .performance-card {
-        transition: all 0.3s ease;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid rgba(0, 31, 63, 0.1);
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-      }
-      
-      .performance-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
-      }
-      
-      .tech-avatar {
-        background: linear-gradient(135deg, #001f3f, #0072ff);
-        color: white;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 1.1rem;
-      }
-
-      /* Donut Chart Styles */
-      .donut-chart-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-      }
-
-      .donut-chart {
-        width: 120px;
-        height: 120px;
-      }
-
-      .circular-chart {
-        display: block;
-        margin: 10px auto;
-        max-width: 100%;
-        max-height: 250px;
-        transform: rotate(-90deg);
-      }
-
-      .donut-segment {
-        transition: all 0.3s ease;
-      }
-
-      .donut-segment.completed {
-        stroke: #198754;
-      }
-
-      .donut-segment.in-progress {
-        stroke: #ffc107;
-      }
-
-      .donut-segment.pending {
-        stroke: #0dcaf0;
-      }
-
-      .donut-legend {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.5rem;
-        font-size: 0.8rem;
-      }
-
-      .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 0.3rem;
-      }
-
-      .legend-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-      }
-
-      .legend-dot.completed {
-        background-color: #198754;
-      }
-
-      .legend-dot.in-progress {
-        background-color: #ffc107;
-      }
-
-      .legend-dot.pending {
-        background-color: #0dcaf0;
-      }
-
-      /* Form Modal Styles */
-      .fault-modal .modal-content {
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(10px);
-        border: none;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-      }
-
-      .glass-form {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 12px;
-        box-shadow: 0 4px 16px rgba(0, 31, 63, 0.05);
-      }
-
-      .glass-input {
-        background: rgba(255, 255, 255, 0.9) !important;
-        border: 1px solid rgba(0, 31, 63, 0.2) !important;
-        border-radius: 8px !important;
-        backdrop-filter: blur(4px);
-        padding: 0.6rem 1rem;
-        transition: all 0.3s ease;
-        font-size: 0.95rem;
-      }
-
-      .glass-input:focus {
-        box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.2) !important;
-        border-color: #0072ff !important;
-      }
-
-      .glass-input:disabled {
-        background: rgba(240, 240, 240, 0.9) !important;
-      }
-
-      .glass-button-primary {
-        background: linear-gradient(135deg, #0072ff, #00c6ff);
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-      }
-
-      .glass-button-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(0, 114, 255, 0.4);
-      }
-
-      .glass-button-secondary {
-        background: rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(0, 31, 63, 0.2);
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-      }
-
-      .glass-button-secondary:hover {
-        background: rgba(0, 31, 63, 0.05);
-        transform: translateY(-2px);
-      }
-
-      /* Status Colors */
-      .status-high {
-        border-color: #dc3545 !important;
-        background-color: rgba(220, 53, 69, 0.1) !important;
-      }
-
-      .status-medium {
-        border-color: #ffc107 !important;
-        background-color: rgba(255, 193, 7, 0.1) !important;
-      }
-
-      .status-low {
-        border-color: #6c757d !important;
-        background-color: rgba(108, 117, 125, 0.1) !important;
-      }
-
-      .status-open {
-        border-color: #0dcaf0 !important;
-        background-color: rgba(13, 202, 240, 0.1) !important;
-      }
-
-      .status-closed {
-        border-color: #198754 !important;
-        background-color: rgba(25, 135, 84, 0.1) !important;
-      }
+        
+        .footer-stat-clickable:active {
+          transform: translateY(0);
+          background-color: rgba(0, 114, 255, 0.2);
+        }
       `}</style>
     </>
   );
-}
-
-function getUrgencyColor(level) {
-  switch (level) {
-    case "high":
-      return "danger";
-    case "medium":
-      return "warning";
-    case "low":
-      return "secondary";
-    default:
-      return "light";
-  }
 }
