@@ -24,6 +24,7 @@ import { PhotoModal } from "./components/PhotoModal";
 import { useMultiFaults } from "./useMultiFaults";
 import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
 import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
+import ProgressDonutChart from "./components/ProgressDonutChart";
 
 // Debounce utility function
 const debounce = (func, delay) => {
@@ -52,7 +53,10 @@ function FaultsTable({
   onOpenEditModal,
   onOpenNotesModal,
   handleStatusChange,
+  showActions, // Pass this as prop instead of calculating inside
 }) {
+  console.log("DashboardViewOnly FaultsTable - Received showActions prop:", showActions); // Debug log
+  
   const [photosModalOpen, setPhotosModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(null);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
@@ -367,6 +371,11 @@ function FaultsTable({
                               value={f.Status}
                               onChange={async (e) => {
                                 if (isResolved) return;
+                                // Prevent status change for non-admin users
+                                if (!showActions) {
+                                  alert("You don't have permission to change status");
+                                  return;
+                                }
                                 if (handleStatusChange) {
                                   handleStatusChange(f, e.target.value);
                                 } else {
@@ -386,7 +395,7 @@ function FaultsTable({
                                 /\s+/g,
                                 "-"
                               )}`}
-                              disabled={isResolved}
+                              disabled={isResolved || !showActions} // Disable for non-admin users
                               style={{
                                 backgroundColor:
                                   f.Status === "In Progress"
@@ -398,8 +407,9 @@ function FaultsTable({
                                     : f.Status === "Closed"
                                     ? "#d1e7dd"
                                     : "",
-                                color: "#000",
+                                color: showActions ? "#000" : "#666", // Gray out for non-admin
                                 fontWeight: "500",
+                                cursor: showActions ? "pointer" : "not-allowed",
                               }}
                             >
                               {["Pending", "In Progress", "Hold", "Closed"].map(
@@ -568,6 +578,19 @@ export default function Dashboard({
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
   const [success, setSuccess] = useState("");
   const notifRef = useRef();
+
+  // Role detection for conditional UI
+  let role = "user";
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem("user") || '{}');
+    if (user && user.role) role = user.role;
+    console.log("DashboardViewOnly - User:", user, "Role:", role); // Debug log
+  } catch (e) {
+    console.log("DashboardViewOnly - Error parsing user:", e);
+  }
+  const isAdmin = role === "admin";
+  console.log("DashboardViewOnly - IsAdmin:", isAdmin); // Debug log
 
   // Get data from useMultiFaults hook
   const {
@@ -1043,11 +1066,26 @@ export default function Dashboard({
                     />
                   </Col>
                   <Col md={3}>
-                    <SimplifiedTechnicianCards
-                      technicians={assignablePersons}
-                      faults={[...open, ...resolved]}
-                      onTechnicianClick={handleTechnicianClick}
-                    />
+                    {isAdmin ? (
+                      <SimplifiedTechnicianCards
+                        technicians={assignablePersons}
+                        faults={[...open, ...resolved]}
+                        onTechnicianClick={handleTechnicianClick}
+                      />
+                    ) : (
+                      <div className="mb-4">
+                        <ProgressDonutChart
+                          data={[
+                            { label: "Pending", value: open.filter(f => f.Status === "Pending").length },
+                            { label: "In Progress", value: open.filter(f => f.Status === "In Progress").length },
+                            { label: "Hold", value: open.filter(f => f.Status === "Hold").length },
+                            { label: "Closed", value: resolved.filter(f => f.Status === "Closed").length }
+                          ]}
+                          colors={["#ffc107", "#17a2b8", "#dc3545", "#28a745"]}
+                          userName={user.username || user.name || "User"}
+                        />
+                      </div>
+                    )}
                   </Col>
                 </Row>
               </div>
@@ -1227,6 +1265,7 @@ export default function Dashboard({
                             onOpenEditModal={openEditModal}
                             onOpenNotesModal={openNotesModal}
                             handleStatusChange={handleStatusChange}
+                            showActions={isAdmin} // Pass the admin status
                           />
                         </>
                       ))}
