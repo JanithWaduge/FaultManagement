@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Table, Badge, Card } from "react-bootstrap";
 
-const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
+const AllPendingFaultsTable = ({ faults }) => {
   const [sortField, setSortField] = useState("id");
   const [sortDirection, setSortDirection] = useState("desc");
 
@@ -241,7 +241,6 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
                   <tr
                     key={fault.id}
                     className={`professional-table-row ${isOverdue(fault) ? "overdue-row" : ""} ${index % 2 === 0 ? "even-row" : "odd-row"}`}
-                    onClick={() => onViewDetails(fault)}
                   >
                     <td className="text-center professional-td">
                       {fault.isHighPriority || fault.Priority === "High" ? (
@@ -517,21 +516,9 @@ const AllPendingFaultsTable = ({ faults, onViewDetails }) => {
           background: rgba(248, 249, 250, 0.9);
         }
 
-        .professional-table-row:hover {
-          background: linear-gradient(135deg, rgba(0, 123, 255, 0.05), rgba(0, 123, 255, 0.02)) !important;
-          transform: translateX(4px) translateY(-1px);
-          box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
-          border-left: 4px solid #007bff;
-        }
-
         .professional-table-row.overdue-row {
           background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(220, 53, 69, 0.03)) !important;
           border-left: 3px solid #dc3545;
-        }
-
-        .professional-table-row.overdue-row:hover {
-          background: linear-gradient(135deg, rgba(220, 53, 69, 0.12), rgba(220, 53, 69, 0.06)) !important;
-          border-left: 4px solid #dc3545;
         }
 
         .professional-td {

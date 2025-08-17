@@ -50,7 +50,6 @@ function FaultsTable({
   page,
   setPage,
   max,
-  onOpenEditModal,
   onOpenNotesModal,
   handleStatusChange,
   showActions, // Pass this as prop instead of calculating inside
@@ -279,7 +278,6 @@ function FaultsTable({
                       "Status",
                       "Assigned To",
                       "Date",
-                      !isResolved && "Actions",
                       "Photos",
                       "Notes",
                     ]
@@ -351,7 +349,7 @@ function FaultsTable({
                       return (
                         <tr
                           key={f.id}
-                          className={`table-row-hover ${getRowClassName()}`}
+                          className={getRowClassName()}
                         >
                           <td className="text-center">
                             <PriorityFlag priority={f.Priority} fault={f} />
@@ -430,19 +428,6 @@ function FaultsTable({
                               ? new Date(f.DateTime).toLocaleDateString()
                               : ""}
                           </td>
-                          {!isResolved && (
-                            <td className="text-center">
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                className="me-1 mb-1"
-                                onClick={() => onOpenEditModal(f)}
-                                title="Edit Fault"
-                              >
-                                ✏️
-                              </Button>
-                            </td>
-                          )}
                           <td className="text-center">
                             {faultsWithPhotos.has(f.id) && (
                               <Button
@@ -1062,7 +1047,6 @@ export default function Dashboard({
                   <Col md={9}>
                     <AllPendingFaultsTable
                       faults={open}
-                      onViewDetails={(fault) => openEditModal(fault)}
                     />
                   </Col>
                   <Col md={3}>
@@ -1262,7 +1246,6 @@ export default function Dashboard({
                             page={page}
                             setPage={setPage}
                             max={max}
-                            onOpenEditModal={openEditModal}
                             onOpenNotesModal={openNotesModal}
                             handleStatusChange={handleStatusChange}
                             showActions={isAdmin} // Pass the admin status
@@ -1434,7 +1417,6 @@ export default function Dashboard({
         .custom-align-table td.description-col { white-space: normal; overflow-wrap: break-word; word-break: break-word; }
         .tab-title-lg { font-size: 1.35rem; font-weight: 700; color: #001f3f; letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); }
         .description-col { max-width: 180px; white-space: normal; overflow-wrap: break-word; word-break: break-word; }
-        .table-row-hover:hover { filter: brightness(95%); cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .glass-table { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1); }
         .glass-table thead th { background: linear-gradient(180deg, #001f3f, #002952); color: white; font-weight: 600; padding: 1rem 0.5rem; border-bottom: 2px solid rgba(255, 255, 255, 0.1); text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; }
         .glass-table tbody tr { transition: all 0.3s ease; border-bottom: 1px solid rgba(0, 31, 63, 0.05); }
@@ -1444,7 +1426,6 @@ export default function Dashboard({
         .status-pending-row { background: linear-gradient(145deg, rgba(207, 244, 252, 0.7), rgba(207, 244, 252, 0.9)) !important; backdrop-filter: blur(5px); }
         .status-hold-row { background: linear-gradient(145deg, rgba(252, 228, 236, 0.7), rgba(252, 228, 236, 0.9)) !important; backdrop-filter: blur(5px); }
         .status-closed-row { background: linear-gradient(145deg, rgba(209, 231, 221, 0.7), rgba(209, 231, 221, 0.9)) !important; backdrop-filter: blur(5px); }
-        .table-row-hover:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); cursor: pointer; }
         .form-control, .form-select { font-size: 1rem; border-radius: 8px; }
         .sidebar { background-color: #001f3f !important; height: 100vh; position: fixed; top: 60px; left: 0; z-index: 1040; overflow-y: auto; width: 16.6666667%; }
         .sidebar .nav-link.btn-link { font-size: 1rem; padding: 0.35rem 0.7rem; height: 2.1rem; border-radius: 8px; font-weight: 600; letter-spacing: 0.2px; }
