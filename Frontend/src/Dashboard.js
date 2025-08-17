@@ -8,15 +8,12 @@ import {
   Card,
   Tabs,
   Tab,
-  Modal,
-  Image,
 } from "react-bootstrap";
 import { BellFill } from "react-bootstrap-icons";
 import UserProfileDisplay from "./UserProfileDisplay";
 import NewFaultModal from "./NewFaultModal";
 import NotesModal from "./NotesModal";
 import Activecharts from "./components/Activecharts";
-import TechnicianCards from "./components/TechnicianCards";
 import PriorityFlag from "./components/PriorityFlag";
 import { useFaultNotes } from "./useFaultNotes";
 import PhotoUploadForm from "./PhotoUploadForm";
@@ -24,6 +21,7 @@ import { PhotoModal } from "./components/PhotoModal";
 import { useMultiFaults } from "./useMultiFaults";
 import AllPendingFaultsTable from "./components/AllPendingFaultsTable";
 import SimplifiedTechnicianCards from "./components/SimplifiedTechnicianCards";
+import ProgressDonutChart from "./components/ProgressDonutChart";
 
 // Debounce utility function
 const debounce = (func, delay) => {
@@ -52,7 +50,10 @@ function FaultsTable({
   onOpenEditModal,
   onOpenNotesModal,
   handleStatusChange,
+  showActions, // Pass this as prop instead of calculating inside
 }) {
+  console.log("FaultsTable - Received showActions prop:", showActions); // Debug log
+
   const [photosModalOpen, setPhotosModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(null);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
@@ -63,12 +64,8 @@ function FaultsTable({
   const handlePhotosClick = async (faultId) => {
     setLoadingPhotos(true);
     try {
-      const baseUrl =
-        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
       const url = `${baseUrl}/api/photos/fault/${faultId}`;
-
-      console.log("Fetching photos from:", url);
-      console.log("Token:", token ? "Present" : "Missing");
 
       const res = await fetch(url, {
         method: "GET",
@@ -78,33 +75,24 @@ function FaultsTable({
         },
       });
 
-      console.log("Response status:", res.status);
-
       if (res.status === 429) {
-        throw new Error(
-          "Too many requests. Please wait a moment and try again."
-        );
+        throw new Error("Too many requests. Please wait a moment and try again.");
       }
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Error response:", errorText);
         throw new Error(`HTTP ${res.status}: ${errorText}`);
       }
 
       const photos = await res.json();
-      console.log("Photos fetched successfully:", photos);
       setSelectedPhotos(photos);
       setPhotosModalOpen(true);
     } catch (error) {
       console.error("Error fetching photos:", error);
       setSelectedPhotos([]);
       setPhotosModalOpen(true);
-
       if (error.message.includes("Too many requests")) {
-        alert(
-          "Too many requests. Please wait a moment before trying to view photos again."
-        );
+        alert("Too many requests. Please wait a moment before trying to view photos again.");
       } else {
         alert(`Failed to load photos: ${error.message}`);
       }
@@ -119,11 +107,9 @@ function FaultsTable({
     handlePhotosClick(faultId);
   };
 
-  // Function to check if a fault has photos with caching
   const checkFaultPhotos = async (faultId) => {
     try {
-      const baseUrl =
-        process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const baseUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
       const url = `${baseUrl}/api/photos/fault/${faultId}`;
 
       const res = await fetch(url, {
@@ -135,10 +121,7 @@ function FaultsTable({
       });
 
       if (res.status === 429) {
-        console.warn(
-          `Rate limited for fault ${faultId}, using cache or skipping`
-        );
-        return false; // Return false when rate limited to avoid errors
+        return false;
       }
 
       if (res.ok) {
@@ -152,23 +135,19 @@ function FaultsTable({
     }
   };
 
-  // Cache for photo check results to avoid repeated API calls
   const [photoCheckCache, setPhotoCheckCache] = React.useState(new Map());
 
-  // Debounced photo checking to prevent too many simultaneous requests
   const checkAllFaultPhotosDebounced = React.useCallback(
     debounce(async (faultsList) => {
       const faultsWithPhotosSet = new Set();
       const newCache = new Map(photoCheckCache);
 
-      // Check only faults that aren't in cache or need refresh
       const faultsToCheck = faultsList.filter(
         (fault) =>
           !newCache.has(fault.id) ||
-          Date.now() - newCache.get(fault.id).timestamp > 300000 // 5 minutes cache
+          Date.now() - newCache.get(fault.id).timestamp > 300000
       );
 
-      // Process in batches to avoid overwhelming the server
       const batchSize = 5;
       for (let i = 0; i < faultsToCheck.length; i += batchSize) {
         const batch = faultsToCheck.slice(i, i + batchSize);
@@ -182,21 +161,16 @@ function FaultsTable({
                 faultsWithPhotosSet.add(fault.id);
               }
             } catch (error) {
-              console.error(
-                `Error checking photos for fault ${fault.id}:`,
-                error
-              );
+              console.error(`Error checking photos for fault ${fault.id}:`, error);
             }
           })
         );
 
-        // Add delay between batches
         if (i + batchSize < faultsToCheck.length) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
-      // Add cached results to the set
       newCache.forEach((value, faultId) => {
         if (value.hasPhotos && faultsList.some((f) => f.id === faultId)) {
           faultsWithPhotosSet.add(faultId);
@@ -205,11 +179,10 @@ function FaultsTable({
 
       setPhotoCheckCache(newCache);
       setFaultsWithPhotos(faultsWithPhotosSet);
-    }, 500), // 500ms debounce
+    }, 500),
     [photoCheckCache]
   );
 
-  // Use effect to check photos for all faults when faults change
   React.useEffect(() => {
     if (faults && faults.length > 0) {
       checkAllFaultPhotosDebounced(faults);
@@ -247,8 +220,7 @@ function FaultsTable({
                     7,
                     10,
                     7.5,
-                    !isResolved && 5,
-                    7.5,
+                    showActions ? 7.5 : null,
                     10,
                   ]
                     .filter(Boolean)
@@ -275,7 +247,7 @@ function FaultsTable({
                       "Status",
                       "Assigned To",
                       "Date",
-                      !isResolved && "Actions",
+                      showActions ? "Actions" : null,
                       "Photos",
                       "Notes",
                     ]
@@ -287,8 +259,7 @@ function FaultsTable({
                             i === 0 ||
                             i === 1 ||
                             i === 2 ||
-                            (!isResolved && i === 9) ||
-                            i === 10
+                            (showActions ? i === 10 || i === 11 : i === 9 || i === 10)
                               ? "text-center"
                               : i === 4
                               ? "d-none d-md-table-cell"
@@ -308,7 +279,7 @@ function FaultsTable({
                   {faults.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isResolved ? 12 : 13}
+                        colSpan={showActions ? 13 : 12}
                         className="text-center text-muted py-4"
                       >
                         No faults.
@@ -316,12 +287,11 @@ function FaultsTable({
                     </tr>
                   ) : (
                     faults.map((f) => {
-                      // Check if fault is overdue (more than a week old)
                       const isOverdue = () => {
                         if (!f.DateTime || f.Status === "Closed") return false;
                         const faultDate = new Date(f.DateTime);
                         const currentDate = new Date();
-                        const weekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+                        const weekInMs = 7 * 24 * 60 * 60 * 1000;
                         return currentDate - faultDate > weekInMs;
                       };
 
@@ -355,18 +325,19 @@ function FaultsTable({
                           <td className="text-center">{f.id}</td>
                           <td className="text-center">{f.SystemID}</td>
                           <td>{f.ReportedBy}</td>
-                          <td className="d-none d-md-table-cell">
-                            {f.Location}
-                          </td>
-                          <td className="d-none d-lg-table-cell">
-                            {f.LocationOfFault}
-                          </td>
+                          <td className="d-none d-md-table-cell">{f.Location}</td>
+                          <td className="d-none d-lg-table-cell">{f.LocationOfFault}</td>
                           <td className="description-col">{f.DescFault}</td>
                           <td>
                             <select
                               value={f.Status}
                               onChange={async (e) => {
                                 if (isResolved) return;
+                                // Prevent status change for non-admin users
+                                if (!showActions) {
+                                  alert("You don't have permission to change status");
+                                  return;
+                                }
                                 if (handleStatusChange) {
                                   handleStatusChange(f, e.target.value);
                                 } else {
@@ -376,17 +347,12 @@ function FaultsTable({
                                       Status: e.target.value,
                                     });
                                   } catch (err) {
-                                    alert(
-                                      "Failed to update status: " + err.message
-                                    );
+                                    alert("Failed to update status: " + err.message);
                                   }
                                 }
                               }}
-                              className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(
-                                /\s+/g,
-                                "-"
-                              )}`}
-                              disabled={isResolved}
+                              className={`form-select form-select-sm status-${f.Status.toLowerCase().replace(/\s+/g, "-")}`}
+                              disabled={isResolved || !showActions} // Disable for non-admin users
                               style={{
                                 backgroundColor:
                                   f.Status === "In Progress"
@@ -398,17 +364,16 @@ function FaultsTable({
                                     : f.Status === "Closed"
                                     ? "#d1e7dd"
                                     : "",
-                                color: "#000",
+                                color: showActions ? "#000" : "#666", // Gray out for non-admin
                                 fontWeight: "500",
+                                cursor: showActions ? "pointer" : "not-allowed",
                               }}
                             >
-                              {["Pending", "In Progress", "Hold", "Closed"].map(
-                                (s) => (
-                                  <option key={s} value={s}>
-                                    {s}
-                                  </option>
-                                )
-                              )}
+                              {["Pending", "In Progress", "Hold", "Closed"].map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
                             </select>
                           </td>
                           <td>{f.AssignTo}</td>
@@ -420,7 +385,7 @@ function FaultsTable({
                               ? new Date(f.DateTime).toLocaleDateString()
                               : ""}
                           </td>
-                          {!isResolved && (
+                          {showActions && (
                             <td className="text-center">
                               <Button
                                 variant="outline-primary"
@@ -513,32 +478,20 @@ function FaultsTable({
           </Card.Body>
         </Card>
       </Row>
-
+      
       <PhotoModal
         show={photosModalOpen}
         photos={selectedPhotos}
-        onHide={() => {
-          setPhotosModalOpen(false);
-          setSelectedPhotos([]);
-        }}
-        title="Fault Photos"
+        onHide={() => setPhotosModalOpen(false)}
       />
-
-      <Modal
-        show={uploadModalOpen !== null}
-        onHide={() => setUploadModalOpen(null)}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Upload Photo for Fault {uploadModalOpen}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <PhotoUploadForm
-            faultId={uploadModalOpen}
-            onUploadSuccess={() => handleUploadSuccess(uploadModalOpen)}
-          />
-        </Modal.Body>
-      </Modal>
+      
+      {uploadModalOpen && (
+        <PhotoUploadForm
+          faultId={uploadModalOpen}
+          onUploadSuccess={() => handleUploadSuccess(uploadModalOpen)}
+          onCancel={() => setUploadModalOpen(null)}
+        />
+      )}
     </>
   );
 }
@@ -568,6 +521,19 @@ export default function Dashboard({
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
   const [success, setSuccess] = useState("");
   const notifRef = useRef();
+
+  // Role detection for conditional UI
+  let role = "user";
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem("user") || '{}');
+    if (user && user.role) role = user.role;
+    console.log("Main Dashboard - User:", user, "Role:", role); // Debug log
+  } catch (e) {
+    console.log("Main Dashboard - Error parsing user:", e);
+  }
+  const isAdmin = role === "admin";
+  console.log("Main Dashboard - IsAdmin:", isAdmin); // Debug log
 
   // Get data from useMultiFaults hook
   const {
@@ -745,12 +711,6 @@ export default function Dashboard({
       setFaultPendingClose(null);
       setPendingStatusChange(null);
       setCloseNoteRequired(false);
-      setSelectedFaultForNotes(null);
-
-      // Show success message
-      setSuccess(
-        `Fault #${faultPendingClose.id} has been closed and moved to resolved faults.`
-      );
 
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(""), 5000);
@@ -1043,11 +1003,26 @@ export default function Dashboard({
                     />
                   </Col>
                   <Col md={3}>
-                    <SimplifiedTechnicianCards
-                      technicians={assignablePersons}
-                      faults={[...open, ...resolved]}
-                      onTechnicianClick={handleTechnicianClick}
-                    />
+                    {isAdmin ? (
+                      <SimplifiedTechnicianCards
+                        technicians={assignablePersons}
+                        faults={[...open, ...resolved]}
+                        onTechnicianClick={handleTechnicianClick}
+                      />
+                    ) : (
+                      <div className="mb-4">
+                        <ProgressDonutChart
+                          data={[
+                            { label: "Pending", value: open.filter(f => f.Status === "Pending").length },
+                            { label: "In Progress", value: open.filter(f => f.Status === "In Progress").length },
+                            { label: "Hold", value: open.filter(f => f.Status === "Hold").length },
+                            { label: "Closed", value: resolved.filter(f => f.Status === "Closed").length }
+                          ]}
+                          colors={["#ffc107", "#17a2b8", "#dc3545", "#28a745"]}
+                          userName={user.username || user.name || "User"}
+                        />
+                      </div>
+                    )}
                   </Col>
                 </Row>
               </div>
@@ -1227,6 +1202,7 @@ export default function Dashboard({
                             onOpenEditModal={openEditModal}
                             onOpenNotesModal={openNotesModal}
                             handleStatusChange={handleStatusChange}
+                            showActions={isAdmin} // Pass the admin status
                           />
                         </>
                       ))}

@@ -66,13 +66,21 @@ export default function NewFaultModal({
   assignablePersons = [],
   initialData = null,
 }) {
+  // Role detection for conditional UI
+  let role = "user";
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || '{}');
+    if (user && user.role) role = user.role;
+  } catch (e) {}
+  const isAdmin = role === "admin";
+
   const [formData, setFormData] = useState({
     SystemID: systemOptions[0],
     ReportedBy: "",
     Location: locationOptions[0],
     LocationOfFault: "",
     DescFault: "",
-    Status: "In Progress",
+    Status: isAdmin ? "In Progress" : "Pending", // Role-based default status
     AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
     SubSystem: subSystemOptions[0],
     isHighPriority: false,
@@ -230,7 +238,7 @@ export default function NewFaultModal({
       Location: locationOptions[0],
       LocationOfFault: "",
       DescFault: "",
-      Status: "In Progress",
+      Status: isAdmin ? "In Progress" : "Pending", // Role-based default status
       AssignTo: isTechnician ? user.username : assignablePersons[0] || "",
       SubSystem: subSystemOptions[0],
       isHighPriority: false,
@@ -277,7 +285,7 @@ export default function NewFaultModal({
     setValidated(false);
     setError("");
     setIsSubmitting(false);
-  }, [initialData, assignablePersons, show, fetchPhotos]);
+  }, [initialData, assignablePersons, show, fetchPhotos, isAdmin]);
 
   // Handler for when a new system is added via modal
   const handleSystemAdded = (newSystem) => {
@@ -483,7 +491,7 @@ export default function NewFaultModal({
         Location: locationOptions[0],
         LocationOfFault: "",
         DescFault: "",
-        Status: "In Progress",
+        Status: isAdmin ? "In Progress" : "Pending", // Role-based default status
         AssignTo: assignablePersons.length > 0 ? assignablePersons[0] : "",
       });
       clearPhotos();
@@ -592,14 +600,16 @@ export default function NewFaultModal({
                             </option>
                           ))}
                         </Form.Select>
-                        <Button
-                          variant="outline-primary"
-                          className="btn-modern-outline"
-                          onClick={() => setShowAddSystemModal(true)}
-                          disabled={isSubmitting}
-                        >
-                          +
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="outline-primary"
+                            className="btn-modern-outline"
+                            onClick={() => setShowAddSystemModal(true)}
+                            disabled={isSubmitting}
+                          >
+                            +
+                          </Button>
+                        )}
                       </div>
                       <Form.Control.Feedback type="invalid">
                         Please select the system.
@@ -714,14 +724,16 @@ export default function NewFaultModal({
                             </option>
                           ))}
                         </Form.Select>
-                        <Button
-                          variant="outline-info"
-                          className="btn-modern-outline"
-                          onClick={() => setShowAddFaultLocationModal(true)}
-                          disabled={isSubmitting}
-                        >
-                          +
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="outline-info"
+                            className="btn-modern-outline"
+                            onClick={() => setShowAddFaultLocationModal(true)}
+                            disabled={isSubmitting}
+                          >
+                            +
+                          </Button>
+                        )}
                       </div>
                     </Form.Group>
                   </Col>
@@ -910,21 +922,32 @@ export default function NewFaultModal({
                       <Form.Label className="fw-semibold">
                         Status <span className="text-danger ms-1">*</span>
                       </Form.Label>
-                      <Form.Select
-                        name="Status"
-                        value={formData.Status}
-                        onChange={handleChange}
-                        required
-                        disabled={isSubmitting}
-                        aria-required="true"
-                        className="form-control-modern"
-                      >
-                        {statusOptions.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </Form.Select>
+                      {isAdmin ? (
+                        <Form.Select
+                          name="Status"
+                          value={formData.Status}
+                          onChange={handleChange}
+                          required
+                          disabled={isSubmitting}
+                          aria-required="true"
+                          className="form-control-modern"
+                        >
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </Form.Select>
+                      ) : (
+                        <Form.Control
+                          type="text"
+                          value="Pending"
+                          readOnly
+                          disabled
+                          className="form-control-modern bg-light"
+                          style={{ color: '#6c757d' }}
+                        />
+                      )}
                       <Form.Control.Feedback type="invalid">
                         Please select the status.
                       </Form.Control.Feedback>
